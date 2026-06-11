@@ -35,7 +35,7 @@
         ['label' => 'Servicios médicos', 'href' => route('services.index'), 'active' => request()->routeIs('services.*'), 'icon' => 'services', 'placeholder' => false],
         ['label' => 'Reportes', 'href' => route('reports.index'), 'active' => request()->routeIs('reports.*'), 'icon' => 'reports', 'placeholder' => false],
         ['label' => 'Usuarios y Roles', 'href' => route('users.index'), 'active' => request()->routeIs('users.*'), 'icon' => 'users', 'placeholder' => false],
-        ['label' => 'Configuración', 'href' => '#', 'active' => false, 'icon' => 'settings', 'placeholder' => true],
+        ['label' => 'Configuración', 'href' => route('settings.clinic.edit'), 'active' => request()->routeIs('settings.*'), 'icon' => 'settings', 'placeholder' => false],
     ];
 @endphp
 
@@ -137,8 +137,8 @@
                     </svg>
                 </span>
                 <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold text-[#0F172A]">Consultorio principal</p>
-                    <p class="text-xs font-medium text-[#10B981]">Activo</p>
+                    <p class="truncate text-sm font-semibold text-[#0F172A]">{{ $user?->clinic?->name ?? 'Sin clínica asignada' }}</p>
+                    <p class="text-xs font-medium {{ $user?->clinic?->status === 'inactive' ? 'text-[#EF4444]' : 'text-[#10B981]' }}">{{ $user?->clinic?->status === 'inactive' ? 'Inactivo' : 'Activo' }}</p>
                 </div>
             </div>
         </div>

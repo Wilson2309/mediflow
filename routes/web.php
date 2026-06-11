@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ConsultationController;
+use App\Http\Controllers\ClinicSettingsController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\MedicalRecordController;
 use App\Http\Controllers\PatientController;
@@ -101,6 +102,8 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/patients', [ReportController::class, 'patients'])->name('reports.patients');
     Route::get('reports/doctors', [ReportController::class, 'doctors'])->name('reports.doctors');
     Route::get('reports/services', [ReportController::class, 'services'])->name('reports.services');
+    Route::get('settings/clinic', [ClinicSettingsController::class, 'edit'])->name('settings.clinic.edit');
+    Route::match(['put', 'patch'], 'settings/clinic', [ClinicSettingsController::class, 'update'])->name('settings.clinic.update');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
