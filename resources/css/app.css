@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html {
+        background: #F8FAFC;
+    }
+
+    [x-cloak] {
+        display: none !important;
+    }
+}
+
+@layer utilities {
+    .mediflow-scrollbar {
+        scrollbar-color: #CBD5E1 transparent;
+        scrollbar-width: thin;
+    }
+
+    .mediflow-scrollbar::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .mediflow-scrollbar::-webkit-scrollbar-thumb {
+        background-color: #CBD5E1;
+        border-radius: 999px;
+    }
+}
