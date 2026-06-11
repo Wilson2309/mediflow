@@ -20,10 +20,19 @@ class ReportController extends Controller
     public function index(ReportFilterRequest $request): View
     {
         [$clinicId, $filters, $start, $end] = $this->context($request);
-        $appointments = $this->appointmentsQuery($clinicId, $start, $end);
-        $consultations = $this->consultationsQuery($clinicId, $start, $end);
-        $prescriptions = $this->prescriptionsQuery($clinicId, $start, $end);
-        $payments = $this->paymentPeriod(Payment::where('clinic_id', $clinicId), $start, $end);
+        $user = $request->user();
+        $appointments = $user->can('reports.appointments')
+            ? $this->appointmentsQuery($clinicId, $start, $end)
+            : Appointment::query()->whereRaw('1 = 0');
+        $consultations = $user->can('reports.clinical')
+            ? $this->consultationsQuery($clinicId, $start, $end)
+            : Consultation::query()->whereRaw('1 = 0');
+        $prescriptions = $user->can('reports.clinical')
+            ? $this->prescriptionsQuery($clinicId, $start, $end)
+            : Prescription::query()->whereRaw('1 = 0');
+        $payments = $user->can('reports.financial')
+            ? $this->paymentPeriod(Payment::where('clinic_id', $clinicId), $start, $end)
+            : Payment::query()->whereRaw('1 = 0');
 
         $appointmentCounts = (clone $appointments)
             ->selectRaw('status, COUNT(*) as total')
@@ -33,12 +42,14 @@ class ReportController extends Controller
         return view('reports.index', [
             ...$this->shared($clinicId, $filters, $start, $end),
             'metrics' => [
-                'activePatients' => Patient::where('clinic_id', $clinicId)->where('status', 'active')->count(),
-                'newPatients' => Patient::where('clinic_id', $clinicId)->whereBetween('created_at', [$start, $end])->count(),
-                'activeDoctors' => Doctor::where('clinic_id', $clinicId)->where('status', 'active')->count(),
-                'activeServices' => Service::where('clinic_id', $clinicId)->where('status', 'active')->count(),
+                'activePatients' => $user->can('patients.view') ? Patient::where('clinic_id', $clinicId)->where('status', 'active')->count() : 0,
+                'newPatients' => $user->can('reports.patients') ? Patient::where('clinic_id', $clinicId)->whereBetween('created_at', [$start, $end])->count() : 0,
+                'activeDoctors' => $user->can('doctors.view') ? Doctor::where('clinic_id', $clinicId)->where('status', 'active')->count() : 0,
+                'activeServices' => $user->can('services.view') ? Service::where('clinic_id', $clinicId)->where('status', 'active')->count() : 0,
                 'appointments' => (clone $appointments)->count(),
-                'todayAppointments' => Appointment::where('clinic_id', $clinicId)->whereDate('appointment_date', today())->count(),
+                'todayAppointments' => $user->can('reports.appointments')
+                    ? Appointment::where('clinic_id', $clinicId)->whereDate('appointment_date', today())->count()
+                    : 0,
                 'completedAppointments' => (int) ($appointmentCounts['completed'] ?? 0),
                 'cancelledAppointments' => (int) ($appointmentCounts['cancelled'] ?? 0),
                 'noShowAppointments' => (int) ($appointmentCounts['no_show'] ?? 0),

@@ -11,7 +11,7 @@
             </div>
             <div class="flex flex-col gap-3 sm:flex-row">
                 <a href="{{ route('appointments.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569]">Volver</a>
-                <a href="{{ route('appointments.edit', $appointment) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white">Editar cita</a>
+                @can('appointments.update')<a href="{{ route('appointments.edit', $appointment) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white">Editar cita</a>@endcan
             </div>
         </section>
         @if (session('success'))<div class="rounded-lg border border-[#10B981]/20 bg-[#10B981]/10 px-4 py-3 text-sm font-semibold text-[#047857]">{{ session('success') }}</div>@endif

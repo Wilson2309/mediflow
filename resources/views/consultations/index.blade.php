@@ -6,7 +6,7 @@
                 <h1 class="mt-2 text-2xl font-bold tracking-tight text-[#0F172A] sm:text-3xl">Consultas médicas</h1>
                 <p class="mt-2 text-sm leading-6 text-[#475569]">Registro y seguimiento de atenciones clínicas realizadas</p>
             </div>
-            <a href="{{ route('consultations.create') }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Nueva consulta</a>
+            @can('consultations.create')<a href="{{ route('consultations.create') }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Nueva consulta</a>@endcan
         </header>
 
         @if (session('success'))
@@ -71,12 +71,12 @@
                                 <td class="px-5 py-4">
                                     <div class="flex justify-end gap-2">
                                         <a href="{{ route('consultations.show', $consultation) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#2563EB]">Ver</a>
-                                        <a href="{{ route('consultations.edit', $consultation) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#475569]">Editar</a>
-                                        <form method="POST" action="{{ route('consultations.destroy', $consultation) }}" onsubmit="return confirm('¿Eliminar esta consulta?');">
+                                        @can('consultations.update')<a href="{{ route('consultations.edit', $consultation) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#475569]">Editar</a>@endcan
+                                        @can('consultations.delete')<form method="POST" action="{{ route('consultations.destroy', $consultation) }}" onsubmit="return confirm('¿Eliminar esta consulta?');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="rounded-lg border border-[#EF4444]/30 px-3 py-2 text-xs font-semibold text-[#EF4444]">Eliminar</button>
-                                        </form>
+                                        </form>@endcan
                                     </div>
                                 </td>
                             </tr>

@@ -11,9 +11,7 @@
                 <a href="{{ route('patients.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB]">
                     Volver
                 </a>
-                <a href="{{ route('patients.edit', $patient) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">
-                    Editar paciente
-                </a>
+                @can('patients.update')<a href="{{ route('patients.edit', $patient) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Editar paciente</a>@endcan
             </div>
         </section>
 
@@ -99,7 +97,7 @@
                             <a href="{{ route('medical-records.show', $patient->medicalRecord) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">
                                 Ver historial clinico
                             </a>
-                        @else
+                        @elseif (auth()->user()->can('medical_records.create'))
                             <a href="{{ route('medical-records.create', ['patient_id' => $patient->id]) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">
                                 Crear historial clinico
                             </a>

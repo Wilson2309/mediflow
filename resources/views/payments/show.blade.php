@@ -20,7 +20,7 @@
             <div class="flex flex-col gap-3 sm:flex-row">
                 <a href="{{ route('payments.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569]">Volver</a>
                 <button type="button" disabled class="inline-flex cursor-not-allowed items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#94A3B8]">Recibo PDF próximamente</button>
-                <a href="{{ route('payments.edit', $payment) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">Editar pago</a>
+                @can('payments.update')<a href="{{ route('payments.edit', $payment) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">Editar pago</a>@endcan
             </div>
         </header>
 

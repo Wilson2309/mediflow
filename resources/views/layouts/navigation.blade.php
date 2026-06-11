@@ -2,6 +2,7 @@
     $user = Auth::user();
     $roleName = $user && method_exists($user, 'getRoleNames') ? $user->getRoleNames()->first() : null;
     $roleLabel = $roleName ? str($roleName)->replace('_', ' ')->title() : 'Rol provisional';
+    $homeHref = $user?->can('dashboard.view') ? route('dashboard') : route('profile.edit');
     $initials = collect(explode(' ', trim($user?->name ?? 'Usuario')))
         ->filter()
         ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
@@ -24,19 +25,23 @@
     ];
 
     $moduleLinks = [
-        ['label' => 'Dashboard', 'href' => route('dashboard'), 'active' => request()->routeIs('dashboard'), 'icon' => 'dashboard', 'placeholder' => false],
-        ['label' => 'Pacientes', 'href' => route('patients.index'), 'active' => request()->routeIs('patients.*'), 'icon' => 'patients', 'placeholder' => false],
-        ['label' => 'Medicos', 'href' => route('doctors.index'), 'active' => request()->routeIs('doctors.*'), 'icon' => 'doctors', 'placeholder' => false],
-        ['label' => 'Citas médicas', 'href' => route('appointments.index'), 'active' => request()->routeIs('appointments.*'), 'icon' => 'calendar', 'placeholder' => false],
-        ['label' => 'Consultas', 'href' => route('consultations.index'), 'active' => request()->routeIs('consultations.*'), 'icon' => 'consultations', 'placeholder' => false],
-        ['label' => 'Historial clínico', 'href' => route('medical-records.index'), 'active' => request()->routeIs('medical-records.*'), 'icon' => 'records', 'placeholder' => false],
-        ['label' => 'Recetas médicas', 'href' => route('prescriptions.index'), 'active' => request()->routeIs('prescriptions.*'), 'icon' => 'prescriptions', 'placeholder' => false],
-        ['label' => 'Pagos y Finanzas', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*'), 'icon' => 'payments', 'placeholder' => false],
-        ['label' => 'Servicios médicos', 'href' => route('services.index'), 'active' => request()->routeIs('services.*'), 'icon' => 'services', 'placeholder' => false],
-        ['label' => 'Reportes', 'href' => route('reports.index'), 'active' => request()->routeIs('reports.*'), 'icon' => 'reports', 'placeholder' => false],
-        ['label' => 'Usuarios y Roles', 'href' => route('users.index'), 'active' => request()->routeIs('users.*'), 'icon' => 'users', 'placeholder' => false],
-        ['label' => 'Configuración', 'href' => route('settings.clinic.edit'), 'active' => request()->routeIs('settings.*'), 'icon' => 'settings', 'placeholder' => false],
+        ['label' => 'Dashboard', 'href' => route('dashboard'), 'active' => request()->routeIs('dashboard'), 'icon' => 'dashboard', 'permission' => 'dashboard.view'],
+        ['label' => 'Pacientes', 'href' => route('patients.index'), 'active' => request()->routeIs('patients.*'), 'icon' => 'patients', 'permission' => 'patients.view'],
+        ['label' => 'Medicos', 'href' => route('doctors.index'), 'active' => request()->routeIs('doctors.*'), 'icon' => 'doctors', 'permission' => 'doctors.view'],
+        ['label' => 'Citas médicas', 'href' => route('appointments.index'), 'active' => request()->routeIs('appointments.*'), 'icon' => 'calendar', 'permission' => 'appointments.view'],
+        ['label' => 'Consultas', 'href' => route('consultations.index'), 'active' => request()->routeIs('consultations.*'), 'icon' => 'consultations', 'permission' => 'consultations.view'],
+        ['label' => 'Historial clínico', 'href' => route('medical-records.index'), 'active' => request()->routeIs('medical-records.*'), 'icon' => 'records', 'permission' => 'medical_records.view'],
+        ['label' => 'Recetas médicas', 'href' => route('prescriptions.index'), 'active' => request()->routeIs('prescriptions.*'), 'icon' => 'prescriptions', 'permission' => 'prescriptions.view'],
+        ['label' => 'Pagos y Finanzas', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*'), 'icon' => 'payments', 'permission' => 'payments.view'],
+        ['label' => 'Servicios médicos', 'href' => route('services.index'), 'active' => request()->routeIs('services.*'), 'icon' => 'services', 'permission' => 'services.view'],
+        ['label' => 'Reportes', 'href' => route('reports.index'), 'active' => request()->routeIs('reports.*'), 'icon' => 'reports', 'permission' => 'reports.view'],
+        ['label' => 'Usuarios y Roles', 'href' => route('users.index'), 'active' => request()->routeIs('users.*'), 'icon' => 'users', 'permission' => 'users.view'],
+        ['label' => 'Configuración', 'href' => route('settings.clinic.edit'), 'active' => request()->routeIs('settings.*'), 'icon' => 'settings', 'permission' => 'settings.clinic.view'],
     ];
+
+    $moduleLinks = collect($moduleLinks)
+        ->filter(fn ($item) => $user?->can($item['permission']))
+        ->values();
 @endphp
 
 <div x-cloak x-show="sidebarOpen" class="relative z-50 lg:hidden" role="dialog" aria-modal="true">
@@ -54,7 +59,7 @@
             class="relative flex w-72 max-w-[85vw] flex-1 flex-col bg-white shadow-xl"
         >
             <div class="flex h-16 items-center justify-between border-b border-[#E2E8F0] px-5">
-                <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
+                <a href="{{ $homeHref }}" class="flex items-center gap-3">
                     <span class="grid h-10 w-10 place-items-center rounded-lg bg-[#2563EB] text-white shadow-sm shadow-blue-500/25">
                         <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
@@ -78,16 +83,12 @@
                 @foreach ($moduleLinks as $item)
                     <a
                         href="{{ $item['href'] }}"
-                        @if ($item['placeholder']) onclick="event.preventDefault()" aria-disabled="true" @endif
                         class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition {{ $item['active'] ? 'bg-[#2563EB] text-white shadow-sm shadow-blue-500/20' : 'text-slate-600 hover:bg-slate-100 hover:text-[#0F172A]' }}"
                     >
                         <span class="grid h-9 w-9 place-items-center rounded-lg {{ $item['active'] ? 'bg-white/15 text-white' : 'text-slate-400 group-hover:bg-white group-hover:text-[#2563EB]' }}">
                             {!! $icons[$item['icon']] !!}
                         </span>
                         <span class="min-w-0 flex-1 truncate">{{ $item['label'] }}</span>
-                        @if ($item['placeholder'])
-                            <span class="h-1.5 w-1.5 rounded-full bg-slate-300"></span>
-                        @endif
                     </a>
                 @endforeach
             </nav>
@@ -97,7 +98,7 @@
 
 <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-[#E2E8F0] bg-white lg:flex lg:flex-col">
     <div class="flex h-16 shrink-0 items-center border-b border-[#E2E8F0] px-6">
-        <a href="{{ route('dashboard') }}" class="flex items-center gap-3">
+        <a href="{{ $homeHref }}" class="flex items-center gap-3">
             <span class="grid h-10 w-10 place-items-center rounded-lg bg-[#2563EB] text-white shadow-sm shadow-blue-500/25">
                 <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
@@ -114,16 +115,12 @@
         @foreach ($moduleLinks as $item)
             <a
                 href="{{ $item['href'] }}"
-                @if ($item['placeholder']) onclick="event.preventDefault()" aria-disabled="true" @endif
                 class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold transition {{ $item['active'] ? 'bg-[#2563EB] text-white shadow-sm shadow-blue-500/20' : 'text-slate-600 hover:bg-slate-100 hover:text-[#0F172A]' }}"
             >
                 <span class="grid h-9 w-9 place-items-center rounded-lg {{ $item['active'] ? 'bg-white/15 text-white' : 'text-slate-400 group-hover:bg-white group-hover:text-[#2563EB]' }}">
                     {!! $icons[$item['icon']] !!}
                 </span>
                 <span class="min-w-0 flex-1 truncate">{{ $item['label'] }}</span>
-                @if ($item['placeholder'])
-                    <span class="h-1.5 w-1.5 rounded-full bg-slate-300"></span>
-                @endif
             </a>
         @endforeach
     </nav>

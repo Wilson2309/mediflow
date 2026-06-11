@@ -21,7 +21,7 @@
             <div class="flex flex-col gap-3 sm:flex-row">
                 <a href="{{ route('medical-records.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569]">Volver</a>
                 <a href="{{ route('patients.show', $patient) }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#2563EB]">Ver paciente</a>
-                <a href="{{ route('medical-records.edit', $medicalRecord) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">Editar historial</a>
+                @can('medical_records.update')<a href="{{ route('medical-records.edit', $medicalRecord) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">Editar historial</a>@endcan
             </div>
         </header>
 

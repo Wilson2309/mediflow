@@ -8,7 +8,7 @@
             </div>
             <div class="flex flex-col gap-3 sm:flex-row">
                 <a href="{{ route('consultations.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569]">Volver</a>
-                <a href="{{ route('consultations.edit', $consultation) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">Editar consulta</a>
+                @can('consultations.update')<a href="{{ route('consultations.edit', $consultation) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">Editar consulta</a>@endcan
             </div>
         </header>
 

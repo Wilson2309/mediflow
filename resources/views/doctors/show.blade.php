@@ -11,9 +11,7 @@
                 <a href="{{ route('doctors.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB]">
                     Volver
                 </a>
-                <a href="{{ route('doctors.edit', $doctor) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">
-                    Editar medico
-                </a>
+                @can('doctors.update')<a href="{{ route('doctors.edit', $doctor) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Editar medico</a>@endcan
             </div>
         </section>
 

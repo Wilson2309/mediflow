@@ -7,9 +7,9 @@
                 <p class="mt-2 text-sm leading-6 text-[#475569]">Gestion de pacientes registrados en el consultorio</p>
             </div>
 
-            <a href="{{ route('patients.create') }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">
-                Nuevo paciente
-            </a>
+            @can('patients.create')
+                <a href="{{ route('patients.create') }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Nuevo paciente</a>
+            @endcan
         </section>
 
         @if (session('success'))
@@ -96,12 +96,12 @@
                                 <td class="whitespace-nowrap px-5 py-4">
                                     <div class="flex items-center justify-end gap-2">
                                         <a href="{{ route('patients.show', $patient) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#2563EB] transition hover:border-[#2563EB] hover:bg-[#2563EB]/5">Ver</a>
-                                        <a href="{{ route('patients.edit', $patient) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#0F172A] transition hover:border-[#0F172A] hover:bg-slate-50">Editar</a>
-                                        <form method="POST" action="{{ route('patients.destroy', $patient) }}" onsubmit="return confirm('¿Eliminar este paciente? Esta accion no se puede deshacer.');">
+                                        @can('patients.update')<a href="{{ route('patients.edit', $patient) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#0F172A] transition hover:border-[#0F172A] hover:bg-slate-50">Editar</a>@endcan
+                                        @can('patients.delete')<form method="POST" action="{{ route('patients.destroy', $patient) }}" onsubmit="return confirm('¿Eliminar este paciente? Esta accion no se puede deshacer.');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="rounded-lg border border-[#EF4444]/20 px-3 py-2 text-xs font-semibold text-[#EF4444] transition hover:bg-[#EF4444]/5">Eliminar</button>
-                                        </form>
+                                        </form>@endcan
                                     </div>
                                 </td>
                             </tr>

@@ -22,6 +22,11 @@ class StoreUserRequest extends FormRequest
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'role' => ['required', Rule::in(['administrador', 'medico', 'recepcionista', 'caja_finanzas'])],
             'status' => ['required', Rule::in(['active', 'inactive'])],
+            'specialty_id' => ['nullable', Rule::exists('specialties', 'id')],
+            'license_number' => ['nullable', 'string', 'max:255', Rule::unique('doctors', 'license_number')],
+            'doctor_phone' => ['nullable', 'string', 'max:30'],
+            'consultation_fee' => ['required_if:role,medico', 'nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'doctor_status' => ['required_if:role,medico', 'nullable', Rule::in(['active', 'inactive'])],
         ];
     }
 }

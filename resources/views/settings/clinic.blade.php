@@ -57,9 +57,11 @@
                             @error('address')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
                         </div>
                     </div>
-                    <div class="flex justify-end border-t border-[#E2E8F0] px-5 py-4">
-                        <button type="submit" class="rounded-lg bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Guardar configuración</button>
-                    </div>
+                    @can('settings.clinic.update')
+                        <div class="flex justify-end border-t border-[#E2E8F0] px-5 py-4">
+                            <button type="submit" class="rounded-lg bg-[#2563EB] px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Guardar configuración</button>
+                        </div>
+                    @endcan
                 </form>
 
                 <article class="rounded-lg border border-dashed border-[#38BDF8]/50 bg-[#38BDF8]/5 p-5">

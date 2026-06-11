@@ -23,7 +23,7 @@
                 <h1 class="mt-2 text-2xl font-bold tracking-tight text-[#0F172A] sm:text-3xl">Citas médicas</h1>
                 <p class="mt-2 text-sm leading-6 text-[#475569]">Gestión de agenda y programación de citas del consultorio</p>
             </div>
-            <a href="{{ route('appointments.create') }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Nueva cita</a>
+            @can('appointments.create')<a href="{{ route('appointments.create') }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Nueva cita</a>@endcan
         </section>
 
         @if (session('success'))
@@ -91,12 +91,12 @@
                                 <td class="whitespace-nowrap px-5 py-4">
                                     <div class="flex items-center justify-end gap-2">
                                         <a href="{{ route('appointments.show', $appointment) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#2563EB]">Ver</a>
-                                        <a href="{{ route('appointments.edit', $appointment) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#0F172A]">Editar</a>
-                                        <form method="POST" action="{{ route('appointments.destroy', $appointment) }}" onsubmit="return confirm('Eliminar esta cita?');">
+                                        @can('appointments.update')<a href="{{ route('appointments.edit', $appointment) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#0F172A]">Editar</a>@endcan
+                                        @can('appointments.delete')<form method="POST" action="{{ route('appointments.destroy', $appointment) }}" onsubmit="return confirm('Eliminar esta cita?');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="rounded-lg border border-[#EF4444]/20 px-3 py-2 text-xs font-semibold text-[#EF4444]">Eliminar</button>
-                                        </form>
+                                        </form>@endcan
                                     </div>
                                 </td>
                             </tr>

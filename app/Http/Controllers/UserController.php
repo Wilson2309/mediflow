@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
+use App\Models\Doctor;
+use App\Models\Specialty;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +63,7 @@ class UserController extends Controller
 
         return view('users.create', [
             'roles' => $this->roleOptions(),
+            'specialties' => $this->availableSpecialties(),
         ]);
     }
 
@@ -80,6 +84,10 @@ class UserController extends Controller
             ]);
 
             $user->syncRoles([$validated['role']]);
+
+            if ($validated['role'] === 'medico') {
+                $this->createDoctorProfile($user, $validated, $clinicId);
+            }
         });
 
         return redirect()->route('users.index')->with('success', 'Usuario creado correctamente.');
@@ -100,8 +108,9 @@ class UserController extends Controller
         $this->authorizeClinic($user);
 
         return view('users.edit', [
-            'managedUser' => $user->load('roles'),
+            'managedUser' => $user->load(['roles', 'doctor.specialty']),
             'roles' => $this->roleOptions(),
+            'specialties' => $this->availableSpecialties($user->doctor?->specialty_id),
         ]);
     }
 
@@ -137,6 +146,12 @@ class UserController extends Controller
 
             $user->update($data);
             $user->syncRoles([$validated['role']]);
+
+            if ($validated['role'] === 'medico') {
+                $this->updateOrCreateDoctorProfile($user, $validated);
+            } elseif ($user->doctor) {
+                $user->doctor->update(['status' => 'inactive']);
+            }
         });
 
         return redirect()->route('users.show', $user)->with('success', 'Usuario actualizado correctamente.');
@@ -189,6 +204,57 @@ class UserController extends Controller
     private function ensureRole(string $role): void
     {
         Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+    }
+
+    /** @return Collection<int, Specialty> */
+    private function availableSpecialties(?int $currentSpecialtyId = null): Collection
+    {
+        return Specialty::query()
+            ->where(function ($query) use ($currentSpecialtyId) {
+                $query->where('status', 'active')
+                    ->when($currentSpecialtyId, fn ($query) => $query->orWhereKey($currentSpecialtyId));
+            })
+            ->orderBy('name')
+            ->get();
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function createDoctorProfile(User $user, array $validated, int $clinicId): Doctor
+    {
+        return Doctor::create([
+            'clinic_id' => $clinicId,
+            'user_id' => $user->id,
+            ...$this->doctorData($validated),
+        ]);
+    }
+
+    /** @param array<string, mixed> $validated */
+    private function updateOrCreateDoctorProfile(User $user, array $validated): Doctor
+    {
+        $doctor = $user->doctor;
+
+        if ($doctor) {
+            abort_if((int) $doctor->clinic_id !== (int) $user->clinic_id, 403);
+            $doctor->update($this->doctorData($validated));
+
+            return $doctor;
+        }
+
+        return $this->createDoctorProfile($user, $validated, (int) $user->clinic_id);
+    }
+
+    /** @param array<string, mixed> $validated
+     * @return array<string, mixed>
+     */
+    private function doctorData(array $validated): array
+    {
+        return [
+            'specialty_id' => $validated['specialty_id'] ?? null,
+            'license_number' => $validated['license_number'] ?? null,
+            'phone' => $validated['doctor_phone'] ?? null,
+            'consultation_fee' => $validated['consultation_fee'],
+            'status' => $validated['doctor_status'],
+        ];
     }
 
     private function administratorCount(int $clinicId, bool $activeOnly = false): int

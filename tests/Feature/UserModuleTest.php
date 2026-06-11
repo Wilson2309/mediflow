@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Clinic;
+use App\Models\Doctor;
+use App\Models\Specialty;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -77,6 +79,68 @@ class UserModuleTest extends TestCase
         $this->assertTrue(User::where('email', 'medico@mediflow.test')->firstOrFail()->hasRole('medico'));
     }
 
+    public function test_creating_non_medical_user_does_not_create_doctor(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $email = 'recepcionista.sin.doctor@mediflow.test';
+
+        $this->actingAs($this->userForClinic($clinic))
+            ->post(route('users.store'), $this->validPayload(['email' => $email, 'role' => 'recepcionista']))
+            ->assertRedirect(route('users.index'));
+
+        $createdUser = User::where('email', $email)->firstOrFail();
+        $this->assertNull($createdUser->doctor);
+    }
+
+    public function test_create_form_shows_medical_fields_and_only_active_specialties(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $activeSpecialty = Specialty::factory()->create(['name' => 'Especialidad Activa', 'status' => 'active']);
+        $inactiveSpecialty = Specialty::factory()->create(['name' => 'Especialidad Inactiva', 'status' => 'inactive']);
+
+        $this->actingAs($this->userForClinic($clinic))
+            ->get(route('users.create'))
+            ->assertOk()
+            ->assertSee('Perfil médico')
+            ->assertSee('name="specialty_id"', escape: false)
+            ->assertSee($activeSpecialty->name)
+            ->assertDontSee($inactiveSpecialty->name);
+    }
+
+    public function test_creating_medical_user_creates_doctor_for_authenticated_clinic(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $otherClinic = Clinic::factory()->create();
+        $specialty = Specialty::factory()->create();
+        $payload = $this->validPayload([
+            'email' => 'perfil.medico@mediflow.test',
+            'role' => 'medico',
+            'specialty_id' => $specialty->id,
+            'license_number' => 'USR-MED-001',
+            'doctor_phone' => '0987654321',
+            'consultation_fee' => '85.50',
+            'doctor_status' => 'active',
+            'clinic_id' => $otherClinic->id,
+        ]);
+
+        $this->actingAs($this->userForClinic($clinic))
+            ->post(route('users.store'), $payload)
+            ->assertRedirect(route('users.index'));
+
+        $createdUser = User::where('email', 'perfil.medico@mediflow.test')->firstOrFail();
+        $this->assertTrue($createdUser->hasRole('medico'));
+        $this->assertDatabaseHas('doctors', [
+            'clinic_id' => $clinic->id,
+            'user_id' => $createdUser->id,
+            'specialty_id' => $specialty->id,
+            'license_number' => 'USR-MED-001',
+            'phone' => '0987654321',
+            'consultation_fee' => 85.50,
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseMissing('doctors', ['clinic_id' => $otherClinic->id, 'user_id' => $createdUser->id]);
+    }
+
     public function test_authenticated_user_can_view_user_detail(): void
     {
         $clinic = Clinic::factory()->create();
@@ -145,6 +209,66 @@ class UserModuleTest extends TestCase
         $this->assertCount(1, $target->roles);
     }
 
+    public function test_updating_medical_user_updates_related_doctor(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $target = $this->userForClinic($clinic, 'medico');
+        $doctor = Doctor::factory()->create(['clinic_id' => $clinic->id, 'user_id' => $target->id]);
+        $specialty = Specialty::factory()->create();
+
+        $this->actingAs($this->userForClinic($clinic))->put(route('users.update', $target), $this->validUpdatePayload($target, [
+            'specialty_id' => $specialty->id,
+            'license_number' => 'USR-MED-UPD',
+            'doctor_phone' => '0911111111',
+            'consultation_fee' => '120.75',
+            'doctor_status' => 'inactive',
+        ]))->assertRedirect(route('users.show', $target));
+
+        $this->assertDatabaseHas('doctors', [
+            'id' => $doctor->id,
+            'user_id' => $target->id,
+            'clinic_id' => $clinic->id,
+            'specialty_id' => $specialty->id,
+            'license_number' => 'USR-MED-UPD',
+            'phone' => '0911111111',
+            'consultation_fee' => 120.75,
+            'status' => 'inactive',
+        ]);
+    }
+
+    public function test_changing_regular_user_to_medical_role_creates_doctor(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $target = $this->userForClinic($clinic, 'recepcionista');
+
+        $this->actingAs($this->userForClinic($clinic))->put(route('users.update', $target), $this->validUpdatePayload($target, [
+            'role' => 'medico',
+            'license_number' => 'USR-ROLE-MED',
+            'consultation_fee' => '60.00',
+            'doctor_status' => 'active',
+        ]))->assertRedirect(route('users.show', $target));
+
+        $this->assertTrue($target->fresh()->hasRole('medico'));
+        $this->assertDatabaseHas('doctors', [
+            'clinic_id' => $clinic->id,
+            'user_id' => $target->id,
+            'license_number' => 'USR-ROLE-MED',
+        ]);
+    }
+
+    public function test_changing_medical_user_to_another_role_preserves_and_inactivates_doctor(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $target = $this->userForClinic($clinic, 'medico');
+        $doctor = Doctor::factory()->create(['clinic_id' => $clinic->id, 'user_id' => $target->id, 'status' => 'active']);
+
+        $this->actingAs($this->userForClinic($clinic))->put(route('users.update', $target), $this->validUpdatePayload($target, [
+            'role' => 'recepcionista',
+        ]))->assertRedirect(route('users.show', $target));
+
+        $this->assertDatabaseHas('doctors', ['id' => $doctor->id, 'user_id' => $target->id, 'status' => 'inactive']);
+    }
+
     public function test_user_cannot_update_user_from_another_clinic(): void
     {
         [$actor, $target] = $this->userAndOtherClinicUser();
@@ -170,6 +294,7 @@ class UserModuleTest extends TestCase
         $clinic = Clinic::factory()->create();
         $administrator = $this->userForClinic($clinic, 'administrador');
         $actor = $this->userForClinic($clinic, 'recepcionista');
+        $actor->givePermissionTo('users.delete');
 
         $this->actingAs($actor)->delete(route('users.destroy', $administrator))->assertSessionHasErrors('user');
         $this->assertDatabaseHas('users', ['id' => $administrator->id]);
@@ -180,6 +305,7 @@ class UserModuleTest extends TestCase
         $clinic = Clinic::factory()->create();
         $administrator = $this->userForClinic($clinic, 'administrador');
         $actor = $this->userForClinic($clinic, 'recepcionista');
+        $actor->givePermissionTo('users.update');
 
         $this->actingAs($actor)->put(route('users.update', $administrator), $this->validUpdatePayload($administrator, ['role' => 'medico']))->assertSessionHasErrors('role');
         $this->assertTrue($administrator->refresh()->hasRole('administrador'));
@@ -190,6 +316,7 @@ class UserModuleTest extends TestCase
         $clinic = Clinic::factory()->create();
         $administrator = $this->userForClinic($clinic, 'administrador');
         $actor = $this->userForClinic($clinic, 'recepcionista');
+        $actor->givePermissionTo('users.update');
 
         $this->actingAs($actor)->put(route('users.update', $administrator), $this->validUpdatePayload($administrator, ['status' => 'inactive']))->assertSessionHasErrors('status');
         $this->assertSame('active', $administrator->refresh()->status);
@@ -201,6 +328,7 @@ class UserModuleTest extends TestCase
         $primary = $this->userForClinic($clinic, 'administrador', ['email' => 'admin@mediflow.com']);
         $this->userForClinic($clinic, 'administrador');
         $actor = $this->userForClinic($clinic, 'recepcionista');
+        $actor->givePermissionTo('users.delete');
 
         $this->actingAs($actor)->delete(route('users.destroy', $primary))->assertSessionHasErrors('user');
         $this->assertDatabaseHas('users', ['id' => $primary->id]);
@@ -296,7 +424,7 @@ class UserModuleTest extends TestCase
         $this->assertDatabaseHas('users', ['id' => $administrator->id]);
     }
 
-    private function userForClinic(Clinic $clinic, string $role = 'recepcionista', array $overrides = []): User
+    private function userForClinic(Clinic $clinic, string $role = 'administrador', array $overrides = []): User
     {
         $user = User::factory()->create(['clinic_id' => $clinic->id, ...$overrides]);
         $user->syncRoles([$role]);
@@ -324,6 +452,11 @@ class UserModuleTest extends TestCase
             'password_confirmation' => 'Password123',
             'role' => 'recepcionista',
             'status' => 'active',
+            'specialty_id' => null,
+            'license_number' => null,
+            'doctor_phone' => null,
+            'consultation_fee' => '0.00',
+            'doctor_status' => 'active',
         ], $overrides);
     }
 
@@ -338,6 +471,11 @@ class UserModuleTest extends TestCase
             'password_confirmation' => '',
             'role' => $user->getRoleNames()->first() ?? 'recepcionista',
             'status' => $user->status,
+            'specialty_id' => $user->doctor?->specialty_id,
+            'license_number' => $user->doctor?->license_number,
+            'doctor_phone' => $user->doctor?->phone,
+            'consultation_fee' => $user->doctor?->consultation_fee ?? '0.00',
+            'doctor_status' => $user->doctor?->status ?? 'active',
         ], $overrides);
     }
 }

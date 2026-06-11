@@ -6,7 +6,7 @@
                 <h1 class="mt-2 text-2xl font-bold tracking-tight text-[#0F172A] sm:text-3xl">{{ $service->name }}</h1>
                 <p class="mt-2 text-sm text-[#475569]">Información comercial y operativa del servicio médico.</p>
             </div>
-            <div class="flex flex-col gap-3 sm:flex-row"><a href="{{ route('services.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB]">Volver</a><a href="{{ route('services.edit', $service) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Editar servicio</a></div>
+            <div class="flex flex-col gap-3 sm:flex-row"><a href="{{ route('services.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB]">Volver</a>@can('services.update')<a href="{{ route('services.edit', $service) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Editar servicio</a>@endcan</div>
         </section>
 
         @if (session('success'))<div class="rounded-lg border border-[#10B981]/20 bg-[#10B981]/10 px-4 py-3 text-sm font-semibold text-[#047857]">{{ session('success') }}</div>@endif

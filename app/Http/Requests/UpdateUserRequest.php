@@ -22,6 +22,7 @@ class UpdateUserRequest extends FormRequest
     public function rules(): array
     {
         $target = $this->route('user');
+        $doctorId = $target instanceof User ? $target->doctor?->id : null;
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -30,6 +31,11 @@ class UpdateUserRequest extends FormRequest
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
             'role' => ['required', Rule::in(['administrador', 'medico', 'recepcionista', 'caja_finanzas'])],
             'status' => ['required', Rule::in(['active', 'inactive'])],
+            'specialty_id' => ['nullable', Rule::exists('specialties', 'id')],
+            'license_number' => ['nullable', 'string', 'max:255', Rule::unique('doctors', 'license_number')->ignore($doctorId)],
+            'doctor_phone' => ['nullable', 'string', 'max:30'],
+            'consultation_fee' => ['required_if:role,medico', 'nullable', 'numeric', 'min:0', 'max:999999.99'],
+            'doctor_status' => ['required_if:role,medico', 'nullable', Rule::in(['active', 'inactive'])],
         ];
     }
 }
