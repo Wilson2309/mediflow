@@ -10,6 +10,7 @@ use App\Http\Controllers\PrescriptionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\UserController;
 use App\Models\Doctor;
 use App\Models\Appointment;
 use App\Models\Consultation;
@@ -17,6 +18,7 @@ use App\Models\Patient;
 use App\Models\Payment;
 use App\Models\Prescription;
 use App\Models\Service;
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -54,6 +56,9 @@ Route::get('/dashboard', function () {
     $activeServiceCount = $clinicId
         ? Service::where('clinic_id', $clinicId)->where('status', 'active')->count()
         : 0;
+    $activeUserCount = $clinicId
+        ? User::where('clinic_id', $clinicId)->where('status', 'active')->count()
+        : 0;
     $upcomingAppointments = $clinicId
         ? Appointment::with(['patient', 'doctor.user', 'service'])
             ->where('clinic_id', $clinicId)
@@ -74,6 +79,7 @@ Route::get('/dashboard', function () {
         'monthlyPaidIncome' => $monthlyPaidIncome,
         'pendingPaymentsCount' => $pendingPaymentsCount,
         'activeServiceCount' => $activeServiceCount,
+        'activeUserCount' => $activeUserCount,
         'upcomingAppointments' => $upcomingAppointments,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -87,6 +93,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('prescriptions', PrescriptionController::class);
     Route::resource('payments', PaymentController::class);
     Route::resource('services', ServiceController::class);
+    Route::resource('users', UserController::class);
     Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
     Route::get('reports/appointments', [ReportController::class, 'appointments'])->name('reports.appointments');
     Route::get('reports/clinical', [ReportController::class, 'clinical'])->name('reports.clinical');

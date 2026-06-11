@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
@@ -26,6 +28,13 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
+        if (strtolower($request->user()->email) === 'admin@mediflow.com'
+            && strtolower($request->validated('email')) !== 'admin@mediflow.com') {
+            throw ValidationException::withMessages([
+                'email' => 'El correo del administrador principal no puede cambiarse.',
+            ]);
+        }
+
         $request->user()->fill($request->validated());
 
         if ($request->user()->isDirty('email')) {
@@ -47,6 +56,24 @@ class ProfileController extends Controller
         ]);
 
         $user = $request->user();
+
+        if (strtolower($user->email) === 'admin@mediflow.com') {
+            return Redirect::route('profile.edit')->withErrors([
+                'password' => 'El administrador principal de MediFlow no puede eliminarse.',
+            ], 'userDeletion');
+        }
+
+        if ($user->clinic_id && $user->hasRole('administrador')) {
+            $administratorCount = User::where('clinic_id', $user->clinic_id)
+                ->whereHas('roles', fn ($query) => $query->where('name', 'administrador'))
+                ->count();
+
+            if ($administratorCount <= 1) {
+                return Redirect::route('profile.edit')->withErrors([
+                    'password' => 'El último administrador de la clínica no puede eliminarse.',
+                ], 'userDeletion');
+            }
+        }
 
         Auth::logout();
 

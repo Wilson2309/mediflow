@@ -34,7 +34,7 @@
         ['label' => 'Pagos y Finanzas', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*'), 'icon' => 'payments', 'placeholder' => false],
         ['label' => 'Servicios médicos', 'href' => route('services.index'), 'active' => request()->routeIs('services.*'), 'icon' => 'services', 'placeholder' => false],
         ['label' => 'Reportes', 'href' => route('reports.index'), 'active' => request()->routeIs('reports.*'), 'icon' => 'reports', 'placeholder' => false],
-        ['label' => 'Usuarios y Roles', 'href' => '#', 'active' => false, 'icon' => 'users', 'placeholder' => true],
+        ['label' => 'Usuarios y Roles', 'href' => route('users.index'), 'active' => request()->routeIs('users.*'), 'icon' => 'users', 'placeholder' => false],
         ['label' => 'Configuración', 'href' => '#', 'active' => false, 'icon' => 'settings', 'placeholder' => true],
     ];
 @endphp
