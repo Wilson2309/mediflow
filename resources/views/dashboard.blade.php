@@ -5,6 +5,7 @@
     $activePrescriptionCount = $activePrescriptionCount ?? 0;
     $monthlyPaidIncome = $monthlyPaidIncome ?? 0;
     $pendingPaymentsCount = $pendingPaymentsCount ?? 0;
+    $activeServiceCount = $activeServiceCount ?? 0;
     $upcomingAppointments = $upcomingAppointments ?? collect();
 
     $icons = [
@@ -14,6 +15,7 @@
         'income' => '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 7.5A2.25 2.25 0 0 1 6 5.25h12A2.25 2.25 0 0 1 20.25 7.5v9A2.25 2.25 0 0 1 18 18.75H6A2.25 2.25 0 0 1 3.75 16.5v-9ZM3.75 9.75h16.5M7.5 15h3" /></svg>',
         'pending' => '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6l3.5 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>',
         'doctors' => '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5ZM4.5 21a7.5 7.5 0 0 1 15 0M18 4.5v4.5M20.25 6.75h-4.5" /></svg>',
+        'services' => '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h6.75v6.75H4.5V6.75ZM12.75 5.25h6.75M12.75 9h6.75M12.75 12.75h6.75M4.5 17.25h15" /></svg>',
         'plus' => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" /></svg>',
     ];
 
@@ -24,6 +26,7 @@
         ['label' => 'Ingresos del mes', 'value' => '$'.number_format((float) $monthlyPaidIncome, 2), 'summary' => 'Pagos marcados como pagados', 'icon' => 'income', 'iconClass' => 'bg-[#0F172A] text-white', 'trend' => 'Real'],
         ['label' => 'Pagos pendientes', 'value' => number_format($pendingPaymentsCount), 'summary' => 'Cobros por confirmar', 'icon' => 'pending', 'iconClass' => 'bg-[#F59E0B]/15 text-[#F59E0B]', 'trend' => 'Real'],
         ['label' => 'Medicos activos', 'value' => number_format($activeDoctorCount), 'summary' => 'Profesionales activos', 'icon' => 'doctors', 'iconClass' => 'bg-[#EF4444]/10 text-[#EF4444]', 'trend' => 'Real'],
+        ['label' => 'Servicios activos', 'value' => number_format($activeServiceCount), 'summary' => 'Servicios disponibles', 'icon' => 'services', 'iconClass' => 'bg-[#2563EB]/10 text-[#2563EB]', 'trend' => 'Real'],
     ];
 
     $statusLabels = [

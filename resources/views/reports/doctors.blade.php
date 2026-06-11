@@ -1,0 +1,14 @@
+@php $statusOptions = ['active' => 'Activo', 'inactive' => 'Inactivo']; @endphp
+<x-app-layout><div class="space-y-6">
+    @include('reports._header', ['title' => 'Reporte de médicos', 'description' => 'Rendimiento médico por citas, consultas, recetas e ingresos asociados.'])
+    @include('reports._filters', ['routeName' => 'reports.doctors', 'showStatus' => true, 'showSpecialty' => true])
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        @include('reports._stat-card', ['label' => 'Médicos activos', 'value' => number_format($metrics['active']), 'tone' => 'green'])
+        @include('reports._stat-card', ['label' => 'Médicos inactivos', 'value' => number_format($metrics['inactive']), 'tone' => 'slate'])
+        @include('reports._stat-card', ['label' => 'Citas asociadas', 'value' => number_format($metrics['appointments'])])
+        @include('reports._stat-card', ['label' => 'Consultas realizadas', 'value' => number_format($metrics['consultations']), 'tone' => 'green'])
+        @include('reports._stat-card', ['label' => 'Recetas emitidas', 'value' => number_format($metrics['prescriptions'])])
+        @include('reports._stat-card', ['label' => 'Promedio de consultas', 'value' => number_format($metrics['averageConsultations'],1), 'tone' => 'slate'])
+    </section>
+    <section class="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-[#E2E8F0]"><thead class="bg-[#F8FAFC]"><tr>@foreach(['Médico','Especialidad','Teléfono','Estado','Citas','Consultas','Recetas','Ingresos asociados'] as $heading)<th class="px-5 py-3 text-left text-xs font-bold uppercase text-[#475569]">{{ $heading }}</th>@endforeach</tr></thead><tbody class="divide-y divide-[#E2E8F0]">@forelse($doctorsReport as $doctor)<tr><td class="px-5 py-4 text-sm font-semibold">{{ $doctor->user?->name ?? 'Usuario no asignado' }}</td><td class="px-5 py-4 text-sm">{{ $doctor->specialty?->name ?? 'Sin especialidad' }}</td><td class="px-5 py-4 text-sm">{{ $doctor->phone ?: 'Sin registrar' }}</td><td class="px-5 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $doctor->status === 'active' ? 'bg-[#10B981]/10 text-[#047857]' : 'bg-slate-100 text-[#475569]' }}">{{ $statusOptions[$doctor->status] }}</span></td><td class="px-5 py-4 text-sm font-bold">{{ $doctor->appointments_count }}</td><td class="px-5 py-4 text-sm font-bold">{{ $doctor->consultations_count }}</td><td class="px-5 py-4 text-sm font-bold">{{ $doctor->prescriptions_count }}</td><td class="px-5 py-4 text-sm font-bold text-[#10B981]">${{ number_format((float)$doctor->associated_income,2) }}</td></tr>@empty<tr><td colspan="8">@include('reports._empty-state')</td></tr>@endforelse</tbody></table></div><div class="border-t border-[#E2E8F0] px-5 py-4">{{ $doctorsReport->links() }}</div></section>
+</div></x-app-layout>

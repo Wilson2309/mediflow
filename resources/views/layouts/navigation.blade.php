@@ -32,8 +32,8 @@
         ['label' => 'Historial clínico', 'href' => route('medical-records.index'), 'active' => request()->routeIs('medical-records.*'), 'icon' => 'records', 'placeholder' => false],
         ['label' => 'Recetas médicas', 'href' => route('prescriptions.index'), 'active' => request()->routeIs('prescriptions.*'), 'icon' => 'prescriptions', 'placeholder' => false],
         ['label' => 'Pagos y Finanzas', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*'), 'icon' => 'payments', 'placeholder' => false],
-        ['label' => 'Servicios médicos', 'href' => '#', 'active' => false, 'icon' => 'services', 'placeholder' => true],
-        ['label' => 'Reportes', 'href' => '#', 'active' => false, 'icon' => 'reports', 'placeholder' => true],
+        ['label' => 'Servicios médicos', 'href' => route('services.index'), 'active' => request()->routeIs('services.*'), 'icon' => 'services', 'placeholder' => false],
+        ['label' => 'Reportes', 'href' => route('reports.index'), 'active' => request()->routeIs('reports.*'), 'icon' => 'reports', 'placeholder' => false],
         ['label' => 'Usuarios y Roles', 'href' => '#', 'active' => false, 'icon' => 'users', 'placeholder' => true],
         ['label' => 'Configuración', 'href' => '#', 'active' => false, 'icon' => 'settings', 'placeholder' => true],
     ];

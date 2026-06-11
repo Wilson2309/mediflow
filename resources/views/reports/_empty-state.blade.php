@@ -1,0 +1,1 @@
+<div class="px-5 py-10 text-center"><p class="text-sm font-semibold text-[#0F172A]">Sin datos para el periodo.</p><p class="mt-1 text-sm text-[#475569]">Ajusta los filtros o registra nueva información.</p></div>

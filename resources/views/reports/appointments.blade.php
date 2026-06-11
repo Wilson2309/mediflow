@@ -1,0 +1,19 @@
+@php
+    $statusOptions = ['scheduled' => 'Programada', 'confirmed' => 'Confirmada', 'completed' => 'Completada', 'cancelled' => 'Cancelada', 'no_show' => 'No asistió'];
+    $statusClasses = ['scheduled' => 'bg-[#2563EB]/10 text-[#2563EB]', 'confirmed' => 'bg-[#10B981]/10 text-[#047857]', 'completed' => 'bg-slate-100 text-[#475569]', 'cancelled' => 'bg-[#EF4444]/10 text-[#EF4444]', 'no_show' => 'bg-[#F59E0B]/10 text-[#B45309]'];
+@endphp
+<x-app-layout><div class="space-y-6">
+    @include('reports._header', ['title' => 'Reporte de citas', 'description' => 'Análisis de agenda, estados, médicos, servicios y comportamiento de asistencia.'])
+    @include('reports._filters', ['routeName' => 'reports.appointments', 'showStatus' => true, 'showDoctor' => true, 'showService' => true])
+    <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        @include('reports._stat-card', ['label' => 'Total de citas', 'value' => number_format($metrics['total'])])
+        @include('reports._stat-card', ['label' => 'Completadas', 'value' => number_format($metrics['completed']), 'tone' => 'green'])
+        @include('reports._stat-card', ['label' => 'Tasa de cancelación', 'value' => $metrics['cancellationRate'].'%', 'tone' => 'red'])
+        @include('reports._stat-card', ['label' => 'Tasa de inasistencia', 'value' => $metrics['noShowRate'].'%', 'tone' => 'yellow'])
+    </section>
+    <section class="grid gap-6 xl:grid-cols-2">
+        <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 class="font-bold text-[#0F172A]">Citas por médico</h2><div class="mt-4 divide-y divide-[#E2E8F0]">@forelse($appointmentsByDoctor as $row)<div class="flex justify-between py-3 text-sm"><span class="font-semibold">{{ $row->doctor?->user?->name ?? 'Sin médico' }}</span><span>{{ $row->total }}</span></div>@empty @include('reports._empty-state') @endforelse</div></article>
+        <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm"><h2 class="font-bold text-[#0F172A]">Citas por servicio</h2><div class="mt-4 divide-y divide-[#E2E8F0]">@forelse($appointmentsByService as $row)<div class="flex justify-between py-3 text-sm"><span class="font-semibold">{{ $row->service?->name ?? 'Sin servicio' }}</span><span>{{ $row->total }}</span></div>@empty @include('reports._empty-state') @endforelse</div></article>
+    </section>
+    <section class="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="overflow-x-auto"><table class="min-w-full divide-y divide-[#E2E8F0]"><thead class="bg-[#F8FAFC]"><tr>@foreach(['Fecha','Hora','Paciente','Médico','Servicio','Estado','Motivo'] as $heading)<th class="px-5 py-3 text-left text-xs font-bold uppercase text-[#475569]">{{ $heading }}</th>@endforeach</tr></thead><tbody class="divide-y divide-[#E2E8F0]">@forelse($appointments as $appointment)<tr><td class="whitespace-nowrap px-5 py-4 text-sm font-semibold">{{ $appointment->appointment_date?->format('d/m/Y') }}</td><td class="px-5 py-4 text-sm text-[#475569]">{{ substr((string)$appointment->start_time,0,5) }}</td><td class="px-5 py-4 text-sm">{{ $appointment->patient?->full_name }}</td><td class="px-5 py-4 text-sm">{{ $appointment->doctor?->user?->name }}</td><td class="px-5 py-4 text-sm">{{ $appointment->service?->name ?? 'Sin servicio' }}</td><td class="px-5 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-bold {{ $statusClasses[$appointment->status] ?? 'bg-slate-100' }}">{{ $statusOptions[$appointment->status] ?? $appointment->status }}</span></td><td class="max-w-xs truncate px-5 py-4 text-sm text-[#475569]">{{ $appointment->reason ?: 'Sin motivo' }}</td></tr>@empty<tr><td colspan="7">@include('reports._empty-state')</td></tr>@endforelse</tbody></table></div><div class="border-t border-[#E2E8F0] px-5 py-4">{{ $appointments->links() }}</div></section>
+</div></x-app-layout>

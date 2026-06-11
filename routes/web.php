@@ -8,12 +8,15 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PrescriptionController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ServiceController;
 use App\Models\Doctor;
 use App\Models\Appointment;
 use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\Payment;
 use App\Models\Prescription;
+use App\Models\Service;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -48,6 +51,9 @@ Route::get('/dashboard', function () {
     $pendingPaymentsCount = $clinicId
         ? Payment::where('clinic_id', $clinicId)->where('payment_status', 'pending')->count()
         : 0;
+    $activeServiceCount = $clinicId
+        ? Service::where('clinic_id', $clinicId)->where('status', 'active')->count()
+        : 0;
     $upcomingAppointments = $clinicId
         ? Appointment::with(['patient', 'doctor.user', 'service'])
             ->where('clinic_id', $clinicId)
@@ -67,6 +73,7 @@ Route::get('/dashboard', function () {
         'activePrescriptionCount' => $activePrescriptionCount,
         'monthlyPaidIncome' => $monthlyPaidIncome,
         'pendingPaymentsCount' => $pendingPaymentsCount,
+        'activeServiceCount' => $activeServiceCount,
         'upcomingAppointments' => $upcomingAppointments,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
@@ -79,6 +86,14 @@ Route::middleware('auth')->group(function () {
     Route::resource('medical-records', MedicalRecordController::class);
     Route::resource('prescriptions', PrescriptionController::class);
     Route::resource('payments', PaymentController::class);
+    Route::resource('services', ServiceController::class);
+    Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('reports/appointments', [ReportController::class, 'appointments'])->name('reports.appointments');
+    Route::get('reports/clinical', [ReportController::class, 'clinical'])->name('reports.clinical');
+    Route::get('reports/financial', [ReportController::class, 'financial'])->name('reports.financial');
+    Route::get('reports/patients', [ReportController::class, 'patients'])->name('reports.patients');
+    Route::get('reports/doctors', [ReportController::class, 'doctors'])->name('reports.doctors');
+    Route::get('reports/services', [ReportController::class, 'services'])->name('reports.services');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
