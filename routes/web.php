@@ -4,17 +4,20 @@ use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ClinicSettingsController;
 use App\Http\Controllers\ConsultationController;
 use App\Http\Controllers\DoctorController;
+use App\Http\Controllers\DemoRequestController;
 use App\Http\Controllers\MedicalRecordController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PrescriptionController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PublicDemoRequestController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\UserController;
 use App\Models\Appointment;
 use App\Models\Consultation;
 use App\Models\Doctor;
+use App\Models\DemoRequest;
 use App\Models\Patient;
 use App\Models\Payment;
 use App\Models\Prescription;
@@ -25,6 +28,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::post('/demo-requests', [PublicDemoRequestController::class, 'store'])
+    ->middleware('throttle:5,1')
+    ->name('demo-requests.store');
 
 Route::get('/dashboard', function () {
     $user = auth()->user();
@@ -62,6 +69,9 @@ Route::get('/dashboard', function () {
     $activeUserCount = $clinicId && $user?->can('users.view')
         ? User::where('clinic_id', $clinicId)->where('status', 'active')->count()
         : 0;
+    $pendingDemoRequestCount = $user?->can('demo_requests.view')
+        ? DemoRequest::pending()->count()
+        : 0;
     $upcomingAppointments = $clinicId && $user?->can('appointments.view')
         ? Appointment::with(['patient', 'doctor.user', 'service'])
             ->where('clinic_id', $clinicId)
@@ -83,6 +93,7 @@ Route::get('/dashboard', function () {
         'pendingPaymentsCount' => $pendingPaymentsCount,
         'activeServiceCount' => $activeServiceCount,
         'activeUserCount' => $activeUserCount,
+        'pendingDemoRequestCount' => $pendingDemoRequestCount,
         'upcomingAppointments' => $upcomingAppointments,
     ]);
 })->middleware(['auth', 'verified', 'permission:dashboard.view'])->name('dashboard');
@@ -104,6 +115,10 @@ Route::middleware('auth')->group(function () {
     $protectedResource('payments', PaymentController::class, 'payments');
     $protectedResource('services', ServiceController::class, 'services');
     $protectedResource('users', UserController::class, 'users');
+
+    Route::get('demo-requests', [DemoRequestController::class, 'index'])->middleware('permission:demo_requests.view')->name('demo-requests.index');
+    Route::get('demo-requests/{demo_request}', [DemoRequestController::class, 'show'])->middleware('permission:demo_requests.view')->name('demo-requests.show');
+    Route::patch('demo-requests/{demo_request}', [DemoRequestController::class, 'update'])->middleware('permission:demo_requests.update')->name('demo-requests.update');
 
     Route::get('reports', [ReportController::class, 'index'])->middleware('permission:reports.view')->name('reports.index');
     Route::get('reports/appointments', [ReportController::class, 'appointments'])->middleware('permission:reports.appointments')->name('reports.appointments');

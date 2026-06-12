@@ -17,6 +17,9 @@ final class RolePermissions
             ...self::resource('medical_records'),
             ...self::resource('prescriptions'),
             ...self::resource('payments'),
+            'demo_requests.view',
+            'demo_requests.update',
+            'demo_requests.delete',
             'reports.view',
             'reports.appointments',
             'reports.clinical',
@@ -62,6 +65,8 @@ final class RolePermissions
                 'appointments.update',
                 'services.view',
                 'doctors.view',
+                'demo_requests.view',
+                'demo_requests.update',
             ],
             'caja_finanzas' => [
                 'dashboard.view',

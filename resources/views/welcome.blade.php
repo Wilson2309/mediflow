@@ -312,16 +312,71 @@
             <div data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div class="overflow-hidden rounded-3xl bg-[#0F172A] shadow-2xl shadow-slate-900/20">
                     <div class="grid lg:grid-cols-[.85fr_1.15fr]">
-                        <div class="relative overflow-hidden p-7 text-white sm:p-10 lg:p-12"><div class="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[#2563EB]/30 blur-3xl"></div><div class="relative"><p class="text-sm font-bold uppercase tracking-wider text-[#38BDF8]">Solicita una demo</p><h2 class="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Conoce cómo MediFlow puede ordenar tu operación</h2><p class="mt-5 text-sm leading-7 text-slate-300">Cuéntanos sobre tu consultorio. Este formulario es demostrativo y todavía no envía información a un backend.</p><div class="mt-8 space-y-4">@foreach(['Recorrido por los módulos', 'Revisión de necesidades', 'Orientación para implementación'] as $item)<div class="flex items-center gap-3 text-sm font-semibold"><span class="grid h-8 w-8 place-items-center rounded-lg bg-white/10 text-[#38BDF8]"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4 4L19 6" /></svg></span>{{ $item }}</div>@endforeach</div></div></div>
-                        <form x-data="{ submitted: false }" @submit.prevent="submitted = true" class="bg-white p-7 sm:p-10 lg:p-12">
+                        <div class="relative overflow-hidden p-7 text-white sm:p-10 lg:p-12"><div class="absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[#2563EB]/30 blur-3xl"></div><div class="relative"><p class="text-sm font-bold uppercase tracking-wider text-[#38BDF8]">Solicita una demo</p><h2 class="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Conoce cómo MediFlow puede ordenar tu operación</h2><p class="mt-5 text-sm leading-7 text-slate-300">Cuéntanos sobre tu consultorio y nuestro equipo revisará tus necesidades para contactarte.</p><div class="mt-8 space-y-4">@foreach(['Recorrido por los módulos', 'Revisión de necesidades', 'Orientación para implementación'] as $item)<div class="flex items-center gap-3 text-sm font-semibold"><span class="grid h-8 w-8 place-items-center rounded-lg bg-white/10 text-[#38BDF8]"><svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="m5 12 4 4L19 6" /></svg></span>{{ $item }}</div>@endforeach</div></div></div>
+                        <form method="POST" action="{{ route('demo-requests.store') }}" class="relative bg-white p-7 sm:p-10 lg:p-12">
+                            @csrf
+
+                            <div class="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">
+                                <label for="website">Sitio web</label>
+                                <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+                            </div>
+
+                            @if (session('success'))
+                                <div class="mb-6 rounded-xl border border-[#10B981]/20 bg-[#10B981]/10 px-4 py-3 text-sm font-semibold text-[#047857]">{{ session('success') }}</div>
+                            @endif
+
+                            @if ($errors->any())
+                                <div class="mb-6 rounded-xl border border-[#EF4444]/20 bg-[#EF4444]/10 px-4 py-3 text-sm font-semibold text-[#B91C1C]">Revisa los campos marcados antes de enviar la solicitud.</div>
+                            @endif
+
                             <div class="grid gap-5 sm:grid-cols-2">
-                                <div><label for="demo-name" class="mb-2 block text-sm font-bold">Nombre</label><input id="demo-name" type="text" required class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]" placeholder="Tu nombre"></div>
-                                <div><label for="demo-email" class="mb-2 block text-sm font-bold">Correo</label><input id="demo-email" type="email" required class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]" placeholder="correo@consultorio.com"></div>
-                                <div class="sm:col-span-2"><label for="demo-phone" class="mb-2 block text-sm font-bold">Teléfono</label><input id="demo-phone" type="text" class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]" placeholder="Número de contacto"></div>
-                                <div class="sm:col-span-2"><label for="demo-message" class="mb-2 block text-sm font-bold">Mensaje</label><textarea id="demo-message" rows="4" class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]" placeholder="Cuéntanos qué necesitas mejorar"></textarea></div>
+                                <div>
+                                    <label for="demo-name" class="mb-2 block text-sm font-bold">Nombre completo</label>
+                                    <input id="demo-name" name="full_name" type="text" value="{{ old('full_name') }}" required maxlength="255" autocomplete="name" class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]" placeholder="Tu nombre">
+                                    @error('full_name')<p class="mt-2 text-xs font-semibold text-[#EF4444]">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="demo-email" class="mb-2 block text-sm font-bold">Correo</label>
+                                    <input id="demo-email" name="email" type="email" value="{{ old('email') }}" required maxlength="255" autocomplete="email" class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]" placeholder="correo@consultorio.com">
+                                    @error('email')<p class="mt-2 text-xs font-semibold text-[#EF4444]">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="demo-phone" class="mb-2 block text-sm font-bold">Teléfono</label>
+                                    <input id="demo-phone" name="phone" type="tel" value="{{ old('phone') }}" maxlength="30" autocomplete="tel" class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]" placeholder="Número de contacto">
+                                    @error('phone')<p class="mt-2 text-xs font-semibold text-[#EF4444]">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="clinic-type" class="mb-2 block text-sm font-bold">Tipo de consultorio</label>
+                                    <select id="clinic-type" name="clinic_type" class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]">
+                                        <option value="">Selecciona una opción</option>
+                                        @foreach (\App\Models\DemoRequest::CLINIC_TYPES as $value => $label)<option value="{{ $value }}" @selected(old('clinic_type') === $value)>{{ $label }}</option>@endforeach
+                                    </select>
+                                    @error('clinic_type')<p class="mt-2 text-xs font-semibold text-[#EF4444]">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="doctors-count" class="mb-2 block text-sm font-bold">Cantidad de médicos</label>
+                                    <select id="doctors-count" name="doctors_count" class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]">
+                                        <option value="">Selecciona una opción</option>
+                                        @foreach (\App\Models\DemoRequest::DOCTORS_COUNTS as $value => $label)<option value="{{ $value }}" @selected(old('doctors_count') === $value)>{{ $label }}</option>@endforeach
+                                    </select>
+                                    @error('doctors_count')<p class="mt-2 text-xs font-semibold text-[#EF4444]">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="interest-module" class="mb-2 block text-sm font-bold">Principal interés</label>
+                                    <select id="interest-module" name="interest_module" class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]">
+                                        <option value="">Selecciona una opción</option>
+                                        @foreach (\App\Models\DemoRequest::INTEREST_MODULES as $value => $label)<option value="{{ $value }}" @selected(old('interest_module') === $value)>{{ $label }}</option>@endforeach
+                                    </select>
+                                    @error('interest_module')<p class="mt-2 text-xs font-semibold text-[#EF4444]">{{ $message }}</p>@enderror
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label for="demo-message" class="mb-2 block text-sm font-bold">Mensaje</label>
+                                    <textarea id="demo-message" name="message" rows="4" maxlength="3000" class="w-full rounded-xl border-[#E2E8F0] bg-[#F8FAFC] focus:border-[#2563EB] focus:ring-[#2563EB]" placeholder="Cuéntanos qué necesitas mejorar">{{ old('message') }}</textarea>
+                                    @error('message')<p class="mt-2 text-xs font-semibold text-[#EF4444]">{{ $message }}</p>@enderror
+                                </div>
                             </div>
                             <button type="submit" class="public-action mt-6 w-full rounded-xl bg-[#2563EB] px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700">Solicitar demo</button>
-                            <p x-cloak x-show="submitted" x-transition class="mt-4 rounded-xl bg-[#10B981]/10 px-4 py-3 text-sm font-semibold text-[#047857]">Formulario de demostración completado. La conexión de contacto se habilitará próximamente.</p>
+                            <p class="mt-3 text-center text-xs leading-5 text-[#475569]">Usaremos estos datos únicamente para responder tu solicitud de información.</p>
                         </form>
                     </div>
                 </div>

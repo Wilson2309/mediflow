@@ -7,6 +7,7 @@
     $pendingPaymentsCount = $pendingPaymentsCount ?? 0;
     $activeServiceCount = $activeServiceCount ?? 0;
     $activeUserCount = $activeUserCount ?? 0;
+    $pendingDemoRequestCount = $pendingDemoRequestCount ?? 0;
     $upcomingAppointments = $upcomingAppointments ?? collect();
 
     $icons = [
@@ -18,6 +19,7 @@
         'doctors' => '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.75a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5ZM4.5 21a7.5 7.5 0 0 1 15 0M18 4.5v4.5M20.25 6.75h-4.5" /></svg>',
         'services' => '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h6.75v6.75H4.5V6.75ZM12.75 5.25h6.75M12.75 9h6.75M12.75 12.75h6.75M4.5 17.25h15" /></svg>',
         'users' => '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 7.5a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0M18.75 9.75c1.45.2 2.75 1.55 2.75 3.25" /></svg>',
+        'demoRequests' => '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h15A1.5 1.5 0 0 1 21 6.75v10.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.25V6.75a1.5 1.5 0 0 1 1.5-1.5ZM3.75 7.5 12 13.25 20.25 7.5" /></svg>',
         'plus' => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" /></svg>',
     ];
 
@@ -30,6 +32,7 @@
         ['permission' => 'doctors.view', 'label' => 'Medicos activos', 'value' => number_format($activeDoctorCount), 'summary' => 'Profesionales activos', 'icon' => 'doctors', 'iconClass' => 'bg-[#EF4444]/10 text-[#EF4444]', 'trend' => 'Real'],
         ['permission' => 'services.view', 'label' => 'Servicios activos', 'value' => number_format($activeServiceCount), 'summary' => 'Servicios disponibles', 'icon' => 'services', 'iconClass' => 'bg-[#2563EB]/10 text-[#2563EB]', 'trend' => 'Real'],
         ['permission' => 'users.view', 'label' => 'Usuarios activos', 'value' => number_format($activeUserCount), 'summary' => 'Usuarios de tu clínica', 'icon' => 'users', 'iconClass' => 'bg-[#38BDF8]/15 text-[#2563EB]', 'trend' => 'Real'],
+        ['permission' => 'demo_requests.view', 'label' => 'Solicitudes de demo', 'value' => number_format($pendingDemoRequestCount), 'summary' => 'Prospectos pendientes', 'icon' => 'demoRequests', 'iconClass' => 'bg-[#F59E0B]/15 text-[#B45309]', 'trend' => 'Real'],
     ];
 
     $statusLabels = [

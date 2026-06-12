@@ -56,7 +56,7 @@ class RolePermissionModuleTest extends TestCase
             'dashboard', 'patients.index', 'doctors.index', 'services.index',
             'appointments.index', 'consultations.index', 'medical-records.index',
             'prescriptions.index', 'payments.index', 'reports.index', 'users.index',
-            'settings.clinic.edit',
+            'settings.clinic.edit', 'demo-requests.index',
         ] as $routeName) {
             $this->actingAs($user)->get(route($routeName))->assertOk();
         }
