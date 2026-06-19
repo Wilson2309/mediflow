@@ -4,15 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StorePrescriptionRequest;
 use App\Http\Requests\UpdatePrescriptionRequest;
+use App\Mail\PrescriptionMail;
 use App\Models\Consultation;
 use App\Models\Doctor;
 use App\Models\Patient;
 use App\Models\Prescription;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 class PrescriptionController extends Controller
 {
@@ -120,6 +125,68 @@ class PrescriptionController extends Controller
             ->with('success', 'Receta eliminada correctamente.');
     }
 
+    public function print(Prescription $prescription): View
+    {
+        $this->authorizePrescriptionView($prescription);
+        $prescription = $this->loadForDelivery($prescription);
+        $this->markAsPrinted($prescription);
+
+        return view('prescriptions.print', [
+            'prescription' => $prescription->refresh()->load(['patient.clinic', 'doctor.user', 'doctor.specialty', 'consultation', 'items']),
+            'clinic' => $prescription->patient?->clinic,
+            'generatedAt' => now(),
+            'forPdf' => false,
+        ]);
+    }
+
+    public function pdf(Prescription $prescription): Response
+    {
+        $this->authorizePrescriptionView($prescription);
+        $prescription = $this->loadForDelivery($prescription);
+        $this->markAsPrinted($prescription);
+
+        return $this->pdfFor($prescription->refresh())
+            ->download($this->pdfFileName($prescription));
+    }
+
+    public function sendEmail(Request $request, Prescription $prescription): RedirectResponse
+    {
+        $this->authorizePrescriptionUpdate($prescription);
+
+        $validated = $request->validate([
+            'email' => 'nullable|email|max:255',
+        ]);
+
+        $prescription = $this->loadForDelivery($prescription);
+        $recipient = ($validated['email'] ?? null) ?: $prescription->patient?->email;
+
+        if (! $recipient) {
+            return back()->withErrors([
+                'email' => 'El paciente no tiene correo registrado. Ingrese un correo para enviar la receta.',
+            ])->withInput();
+        }
+
+        try {
+            Mail::to($recipient)->send(new PrescriptionMail(
+                prescription: $prescription,
+                pdfContent: $this->pdfFor($prescription)->output(),
+                fileName: $this->pdfFileName($prescription),
+            ));
+
+            $prescription->forceFill([
+                'last_emailed_at' => now(),
+                'last_emailed_to' => $recipient,
+                'email_count' => ((int) $prescription->email_count) + 1,
+            ])->save();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return back()->with('error', 'No se pudo enviar la receta por correo. Revise la configuracion de correo e intentelo nuevamente.');
+        }
+
+        return back()->with('success', 'Receta enviada por correo correctamente.');
+    }
+
     private function prepareData(array $validated, int $clinicId): array
     {
         $patient = Patient::where('clinic_id', $clinicId)->find($validated['patient_id']);
@@ -130,13 +197,13 @@ class PrescriptionController extends Controller
 
         if (! $patient || ! $doctor || (($validated['consultation_id'] ?? null) && ! $consultation)) {
             throw ValidationException::withMessages([
-                'clinic_id' => 'Los datos seleccionados no pertenecen a la clínica del usuario autenticado.',
+                'clinic_id' => 'Los datos seleccionados no pertenecen a la clinica del usuario autenticado.',
             ]);
         }
 
         if ($consultation && ((int) $consultation->patient_id !== (int) $patient->id || (int) $consultation->doctor_id !== (int) $doctor->id)) {
             throw ValidationException::withMessages([
-                'consultation_id' => 'La consulta seleccionada no coincide con el paciente y médico indicados.',
+                'consultation_id' => 'La consulta seleccionada no coincide con el paciente y medico indicados.',
             ]);
         }
 
@@ -162,7 +229,7 @@ class PrescriptionController extends Controller
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
 
         return (int) $clinicId;
     }
@@ -170,6 +237,46 @@ class PrescriptionController extends Controller
     private function authorizeClinic(Prescription $prescription): void
     {
         abort_if((int) $prescription->patient?->clinic_id !== $this->clinicId(), 403);
+    }
+
+    private function authorizePrescriptionView(Prescription $prescription): void
+    {
+        abort_unless(auth()->user()?->can('prescriptions.view'), 403);
+        $this->authorizeClinic($prescription);
+    }
+
+    private function authorizePrescriptionUpdate(Prescription $prescription): void
+    {
+        abort_unless(auth()->user()?->can('prescriptions.update'), 403);
+        $this->authorizeClinic($prescription);
+    }
+
+    private function loadForDelivery(Prescription $prescription): Prescription
+    {
+        return $prescription->load(['patient.clinic', 'doctor.user', 'doctor.specialty', 'consultation', 'items']);
+    }
+
+    private function markAsPrinted(Prescription $prescription): void
+    {
+        $prescription->forceFill([
+            'last_printed_at' => now(),
+            'print_count' => ((int) $prescription->print_count) + 1,
+        ])->save();
+    }
+
+    private function pdfFor(Prescription $prescription)
+    {
+        return Pdf::loadView('prescriptions.print', [
+            'prescription' => $prescription->loadMissing(['patient.clinic', 'doctor.user', 'doctor.specialty', 'consultation', 'items']),
+            'clinic' => $prescription->patient?->clinic,
+            'generatedAt' => now(),
+            'forPdf' => true,
+        ])->setPaper('a4');
+    }
+
+    private function pdfFileName(Prescription $prescription): string
+    {
+        return 'receta-medica-REC-'.str_pad((string) $prescription->id, 6, '0', STR_PAD_LEFT).'.pdf';
     }
 
     private function formData(int $clinicId): array

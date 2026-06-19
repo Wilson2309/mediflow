@@ -111,6 +111,9 @@ Route::middleware('auth')->group(function () {
     $protectedResource('appointments', AppointmentController::class, 'appointments');
     $protectedResource('consultations', ConsultationController::class, 'consultations');
     $protectedResource('medical-records', MedicalRecordController::class, 'medical_records');
+    Route::get('prescriptions/{prescription}/print', [PrescriptionController::class, 'print'])->middleware('permission:prescriptions.view')->name('prescriptions.print');
+    Route::get('prescriptions/{prescription}/pdf', [PrescriptionController::class, 'pdf'])->middleware('permission:prescriptions.view')->name('prescriptions.pdf');
+    Route::post('prescriptions/{prescription}/send-email', [PrescriptionController::class, 'sendEmail'])->middleware('permission:prescriptions.update')->name('prescriptions.send-email');
     $protectedResource('prescriptions', PrescriptionController::class, 'prescriptions');
     $protectedResource('payments', PaymentController::class, 'payments');
     $protectedResource('services', ServiceController::class, 'services');

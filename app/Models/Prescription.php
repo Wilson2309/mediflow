@@ -18,12 +18,21 @@ class Prescription extends Model
         'prescription_date',
         'general_instructions',
         'status',
+        'last_printed_at',
+        'print_count',
+        'last_emailed_at',
+        'last_emailed_to',
+        'email_count',
     ];
 
     protected function casts(): array
     {
         return [
             'prescription_date' => 'date',
+            'last_printed_at' => 'datetime',
+            'last_emailed_at' => 'datetime',
+            'print_count' => 'integer',
+            'email_count' => 'integer',
         ];
     }
 
