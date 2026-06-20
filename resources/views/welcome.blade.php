@@ -65,6 +65,9 @@
     <meta name="description" content="MediFlow centraliza la gestión clínica, administrativa y financiera de consultorios y centros médicos pequeños.">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>MediFlow | Gestión médica en una sola plataforma</title>
+        <link rel="icon" href="{{ asset('brand/favicon.ico') }}" sizes="any">
+    <link rel="icon" type="image/png" href="{{ asset('brand/favicon.png') }}">
+    <link rel="apple-touch-icon" href="{{ asset('brand/favicon.png') }}">
     <script>document.documentElement.classList.add('js');</script>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />

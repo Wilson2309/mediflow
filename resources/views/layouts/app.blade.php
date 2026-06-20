@@ -7,6 +7,9 @@
 
         <title>{{ config('app.name') === 'Laravel' ? 'MediFlow' : config('app.name', 'MediFlow') }}</title>
 
+        <link rel="icon" href="{{ asset('brand/favicon.ico') }}" sizes="any">
+        <link rel="icon" type="image/png" href="{{ asset('brand/favicon.png') }}">
+        <link rel="apple-touch-icon" href="{{ asset('brand/favicon.png') }}">
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet" />
 

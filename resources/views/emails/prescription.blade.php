@@ -1,4 +1,8 @@
 <div style="font-family: Arial, sans-serif; color: #0F172A; line-height: 1.6;">
+    @php($logoPath = public_path('brand/mediflow-logo-primary.png'))
+    <div style="margin-bottom: 20px;">
+        <img src="{{ isset($message) && file_exists($logoPath) ? $message->embed($logoPath) : asset('brand/mediflow-logo-primary.png') }}" alt="MediFlow" style="max-width: 180px; height: auto;">
+    </div>
     <h1 style="font-size: 20px; margin-bottom: 16px;">Receta médica</h1>
 
     <p>Hola {{ $patient?->full_name ?? 'paciente' }},</p>

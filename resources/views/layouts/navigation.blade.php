@@ -62,11 +62,7 @@
         >
             <div class="flex h-16 items-center justify-between border-b border-[#E2E8F0] px-5">
                 <a href="{{ $homeHref }}" class="flex items-center gap-3">
-                    <span class="grid h-10 w-10 place-items-center rounded-lg bg-[#2563EB] text-white shadow-sm shadow-blue-500/25">
-                        <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
-                        </svg>
-                    </span>
+                    <img src="{{ asset('brand/mediflow-isotype.png') }}" alt="MediFlow" class="h-10 w-10 rounded-xl">
                     <span>
                         <span class="block text-base font-bold tracking-tight text-[#0F172A]">MediFlow</span>
                         <span class="block text-xs font-medium text-[#475569]">Gestión clínica</span>
@@ -101,11 +97,7 @@
 <aside class="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-[#E2E8F0] bg-white lg:flex lg:flex-col">
     <div class="flex h-16 shrink-0 items-center border-b border-[#E2E8F0] px-6">
         <a href="{{ $homeHref }}" class="flex items-center gap-3">
-            <span class="grid h-10 w-10 place-items-center rounded-lg bg-[#2563EB] text-white shadow-sm shadow-blue-500/25">
-                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14M5 12h14" />
-                </svg>
-            </span>
+            <img src="{{ asset('brand/mediflow-isotype.png') }}" alt="MediFlow" class="h-10 w-10 rounded-xl">
             <span>
                 <span class="block text-base font-bold tracking-tight text-[#0F172A]">MediFlow</span>
                 <span class="block text-xs font-medium text-[#475569]">Gestión clínica</span>

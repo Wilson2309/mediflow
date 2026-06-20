@@ -9,6 +9,10 @@ use App\Models\Consultation;
 use App\Models\Doctor;
 use App\Models\Patient;
 use App\Models\Prescription;
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -85,13 +89,19 @@ class PrescriptionController extends Controller
         $this->authorizeClinic($prescription);
 
         return view('prescriptions.show', [
-            'prescription' => $prescription->load(['patient', 'doctor.user', 'doctor.specialty', 'consultation.appointment', 'items']),
+            'prescription' => $prescription->load(['patient', 'doctor.user', 'doctor.specialty', 'consultation.appointment', 'items', 'signedByUser']),
         ]);
     }
 
-    public function edit(Prescription $prescription): View
+    public function edit(Prescription $prescription): View|RedirectResponse
     {
         $this->authorizeClinic($prescription);
+
+        if ($prescription->isSigned()) {
+            return redirect()
+                ->route('prescriptions.show', $prescription)
+                ->with('error', 'No se puede editar una receta firmada. Anule o cree una nueva receta.');
+        }
 
         return view('prescriptions.edit', [
             'prescription' => $prescription->load(['items', 'patient', 'doctor.user', 'consultation']),
@@ -102,6 +112,13 @@ class PrescriptionController extends Controller
     public function update(UpdatePrescriptionRequest $request, Prescription $prescription): RedirectResponse
     {
         $this->authorizeClinic($prescription);
+
+        if ($prescription->isSigned()) {
+            return redirect()
+                ->route('prescriptions.show', $prescription)
+                ->with('error', 'No se puede editar una receta firmada. Anule o cree una nueva receta.');
+        }
+
         $data = $this->prepareData($request->validated(), $this->clinicId());
 
         DB::transaction(function () use ($prescription, $data) {
@@ -130,12 +147,14 @@ class PrescriptionController extends Controller
         $this->authorizePrescriptionView($prescription);
         $prescription = $this->loadForDelivery($prescription);
         $this->markAsPrinted($prescription);
+        $prescription = $prescription->refresh()->load(['patient.clinic', 'doctor.user', 'doctor.specialty', 'consultation', 'items', 'signedByUser']);
 
         return view('prescriptions.print', [
-            'prescription' => $prescription->refresh()->load(['patient.clinic', 'doctor.user', 'doctor.specialty', 'consultation', 'items']),
+            'prescription' => $prescription,
             'clinic' => $prescription->patient?->clinic,
             'generatedAt' => now(),
             'forPdf' => false,
+            'signatureQrCode' => $this->signatureQrDataUri($prescription),
         ]);
     }
 
@@ -181,10 +200,67 @@ class PrescriptionController extends Controller
         } catch (Throwable $exception) {
             report($exception);
 
-            return back()->with('error', 'No se pudo enviar la receta por correo. Revise la configuracion de correo e intentelo nuevamente.');
+            return back()->with('error', 'No se pudo enviar la receta por correo. Revise la configuración de correo e inténtelo nuevamente.');
         }
 
         return back()->with('success', 'Receta enviada por correo correctamente.');
+    }
+
+    public function sign(Request $request, Prescription $prescription): RedirectResponse
+    {
+        $this->authorizePrescriptionUpdate($prescription);
+        $prescription->loadMissing(['items']);
+
+        if ($prescription->status === 'cancelled') {
+            return back()->with('error', 'No se puede firmar una receta cancelada.');
+        }
+
+        if ($prescription->isSigned()) {
+            return back()->with('error', 'La receta ya está firmada.');
+        }
+
+        $prescription->forceFill([
+            'signed_at' => now(),
+            'signed_by_user_id' => $request->user()?->id,
+            'signature_verification_code' => $prescription->generateVerificationCode(),
+            'signature_hash' => $prescription->calculateSignatureHash(),
+            'signed_ip_address' => $request->ip(),
+            'signed_user_agent' => $request->userAgent(),
+        ])->save();
+
+        return redirect()
+            ->route('prescriptions.show', $prescription)
+            ->with('success', 'Receta firmada electrónicamente correctamente.');
+    }
+
+    public function verify(string $code): View
+    {
+        $prescription = Prescription::with(['patient.clinic', 'doctor.user', 'doctor.specialty', 'items', 'signedByUser'])
+            ->where('signature_verification_code', $code)
+            ->first();
+
+        if (! $prescription) {
+            return view('prescriptions.verify', [
+                'status' => 'not_found',
+                'code' => $code,
+                'prescription' => null,
+                'currentHash' => null,
+                'patientName' => null,
+                'maskedIdentification' => null,
+            ]);
+        }
+
+        $currentHash = $prescription->calculateSignatureHash();
+        $status = hash_equals((string) $prescription->signature_hash, $currentHash) ? 'valid' : 'altered';
+
+        return view('prescriptions.verify', [
+            'status' => $status,
+            'code' => $code,
+            'prescription' => $prescription,
+            'currentHash' => $currentHash,
+            'patientName' => $this->maskedPatientName($prescription->patient),
+            'maskedIdentification' => $this->maskedIdentification($prescription->patient?->identification_number),
+        ]);
     }
 
     private function prepareData(array $validated, int $clinicId): array
@@ -197,13 +273,13 @@ class PrescriptionController extends Controller
 
         if (! $patient || ! $doctor || (($validated['consultation_id'] ?? null) && ! $consultation)) {
             throw ValidationException::withMessages([
-                'clinic_id' => 'Los datos seleccionados no pertenecen a la clinica del usuario autenticado.',
+                'clinic_id' => 'Los datos seleccionados no pertenecen a la clínica del usuario autenticado.',
             ]);
         }
 
         if ($consultation && ((int) $consultation->patient_id !== (int) $patient->id || (int) $consultation->doctor_id !== (int) $doctor->id)) {
             throw ValidationException::withMessages([
-                'consultation_id' => 'La consulta seleccionada no coincide con el paciente y medico indicados.',
+                'consultation_id' => 'La consulta seleccionada no coincide con el paciente y médico indicados.',
             ]);
         }
 
@@ -229,13 +305,14 @@ class PrescriptionController extends Controller
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
 
         return (int) $clinicId;
     }
 
     private function authorizeClinic(Prescription $prescription): void
     {
+        $prescription->loadMissing('patient');
         abort_if((int) $prescription->patient?->clinic_id !== $this->clinicId(), 403);
     }
 
@@ -253,7 +330,7 @@ class PrescriptionController extends Controller
 
     private function loadForDelivery(Prescription $prescription): Prescription
     {
-        return $prescription->load(['patient.clinic', 'doctor.user', 'doctor.specialty', 'consultation', 'items']);
+        return $prescription->load(['patient.clinic', 'doctor.user', 'doctor.specialty', 'consultation', 'items', 'signedByUser']);
     }
 
     private function markAsPrinted(Prescription $prescription): void
@@ -266,17 +343,59 @@ class PrescriptionController extends Controller
 
     private function pdfFor(Prescription $prescription)
     {
+        $prescription->loadMissing(['patient.clinic', 'doctor.user', 'doctor.specialty', 'consultation', 'items', 'signedByUser']);
+
         return Pdf::loadView('prescriptions.print', [
-            'prescription' => $prescription->loadMissing(['patient.clinic', 'doctor.user', 'doctor.specialty', 'consultation', 'items']),
+            'prescription' => $prescription,
             'clinic' => $prescription->patient?->clinic,
             'generatedAt' => now(),
             'forPdf' => true,
+            'signatureQrCode' => $this->signatureQrDataUri($prescription),
         ])->setPaper('a4');
+    }
+
+    private function signatureQrDataUri(Prescription $prescription): ?string
+    {
+        if (! $prescription->signature_verification_code) {
+            return null;
+        }
+
+        $renderer = new ImageRenderer(
+            new RendererStyle(132, 1),
+            new SvgImageBackEnd()
+        );
+        $writer = new Writer($renderer);
+        $svg = $writer->writeString(route('prescriptions.verify', $prescription->signature_verification_code));
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 
     private function pdfFileName(Prescription $prescription): string
     {
         return 'receta-medica-REC-'.str_pad((string) $prescription->id, 6, '0', STR_PAD_LEFT).'.pdf';
+    }
+
+    private function maskedPatientName(?Patient $patient): string
+    {
+        if (! $patient) {
+            return 'Paciente no disponible';
+        }
+
+        $firstName = trim((string) $patient->first_name) ?: 'Paciente';
+        $lastInitial = $patient->last_name ? strtoupper(substr((string) $patient->last_name, 0, 1)).'.' : '';
+
+        return trim($firstName.' '.$lastInitial);
+    }
+
+    private function maskedIdentification(?string $identification): string
+    {
+        if (! $identification) {
+            return 'No registrada';
+        }
+
+        $visible = substr($identification, -3);
+
+        return str_repeat('*', max(strlen($identification) - 3, 0)).$visible;
     }
 
     private function formData(int $clinicId): array

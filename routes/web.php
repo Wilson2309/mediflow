@@ -33,6 +33,9 @@ Route::post('/demo-requests', [PublicDemoRequestController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('demo-requests.store');
 
+Route::get('/verificar-receta/{code}', [PrescriptionController::class, 'verify'])
+    ->name('prescriptions.verify');
+
 Route::get('/dashboard', function () {
     $user = auth()->user();
     $clinicId = $user?->clinic_id;
@@ -114,6 +117,7 @@ Route::middleware('auth')->group(function () {
     Route::get('prescriptions/{prescription}/print', [PrescriptionController::class, 'print'])->middleware('permission:prescriptions.view')->name('prescriptions.print');
     Route::get('prescriptions/{prescription}/pdf', [PrescriptionController::class, 'pdf'])->middleware('permission:prescriptions.view')->name('prescriptions.pdf');
     Route::post('prescriptions/{prescription}/send-email', [PrescriptionController::class, 'sendEmail'])->middleware('permission:prescriptions.update')->name('prescriptions.send-email');
+    Route::post('prescriptions/{prescription}/sign', [PrescriptionController::class, 'sign'])->middleware('permission:prescriptions.update')->name('prescriptions.sign');
     $protectedResource('prescriptions', PrescriptionController::class, 'prescriptions');
     $protectedResource('payments', PaymentController::class, 'payments');
     $protectedResource('services', ServiceController::class, 'services');

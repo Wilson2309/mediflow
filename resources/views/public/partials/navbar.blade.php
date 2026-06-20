@@ -1,15 +1,7 @@
 <header class="fixed inset-x-0 top-0 z-50 border-b border-white/70 bg-white/90 backdrop-blur-xl" x-data="{ mobileOpen: false }">
     <nav class="mx-auto flex h-18 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8" aria-label="Navegación principal">
         <a href="#inicio" class="flex items-center gap-3" aria-label="MediFlow, inicio">
-            <span class="grid h-10 w-10 place-items-center rounded-xl bg-[#2563EB] text-white shadow-lg shadow-blue-500/20">
-                <svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                    <path stroke-linecap="round" d="M12 5v14M5 12h14" />
-                </svg>
-            </span>
-            <span>
-                <span class="block text-lg font-extrabold tracking-tight text-[#0F172A]">MediFlow</span>
-                <span class="block text-[10px] font-bold uppercase tracking-[0.18em] text-[#2563EB]">Gestión médica</span>
-            </span>
+            <img src="{{ asset('brand/mediflow-logo-primary-cropped.png') }}" alt="MediFlow" class="h-10 w-auto md:h-12 lg:h-14">
         </a>
 
         <div class="hidden items-center gap-7 lg:flex">
