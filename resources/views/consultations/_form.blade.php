@@ -1,3 +1,6 @@
+@php
+    $prefill = $prefill ?? [];
+@endphp
 <div class="space-y-6 p-5">
     <section>
         <h2 class="text-base font-bold text-[#0F172A]">Información general</h2>
@@ -7,7 +10,7 @@
                 <select id="appointment_id" name="appointment_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                     <option value="">Sin cita asociada</option>
                     @foreach ($appointments as $appointment)
-                        <option value="{{ $appointment->id }}" @selected((string) old('appointment_id', $consultation?->appointment_id) === (string) $appointment->id)>
+                        <option value="{{ $appointment->id }}" @selected((string) old('appointment_id', $consultation?->appointment_id ?? ($prefill['appointment_id'] ?? null)) === (string) $appointment->id)>
                             {{ $appointment->appointment_date?->format('d/m/Y') }} {{ substr((string) $appointment->start_time, 0, 5) }} · {{ $appointment->patient?->full_name }} · {{ $appointment->doctor?->user?->name }}
                         </option>
                     @endforeach
@@ -19,7 +22,7 @@
                 <select id="patient_id" name="patient_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                     <option value="">Seleccione un paciente</option>
                     @foreach ($patients as $patient)
-                        <option value="{{ $patient->id }}" @selected((string) old('patient_id', $consultation?->patient_id) === (string) $patient->id)>{{ $patient->full_name }} - {{ $patient->identification_number ?: 'Sin identificación' }}</option>
+                        <option value="{{ $patient->id }}" @selected((string) old('patient_id', $consultation?->patient_id ?? ($prefill['patient_id'] ?? null)) === (string) $patient->id)>{{ $patient->full_name }} - {{ $patient->identification_number ?: 'Sin identificación' }}</option>
                     @endforeach
                 </select>
                 @error('patient_id') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
@@ -29,14 +32,14 @@
                 <select id="doctor_id" name="doctor_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                     <option value="">Seleccione un médico</option>
                     @foreach ($doctors as $doctor)
-                        <option value="{{ $doctor->id }}" @selected((string) old('doctor_id', $consultation?->doctor_id) === (string) $doctor->id)>{{ $doctor->user?->name }}{{ $doctor->specialty ? ' - '.$doctor->specialty->name : '' }}</option>
+                        <option value="{{ $doctor->id }}" @selected((string) old('doctor_id', $consultation?->doctor_id ?? ($prefill['doctor_id'] ?? null)) === (string) $doctor->id)>{{ $doctor->user?->name }}{{ $doctor->specialty ? ' - '.$doctor->specialty->name : '' }}</option>
                     @endforeach
                 </select>
                 @error('doctor_id') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
             </div>
             <div>
                 <label for="consultation_date" class="mb-2 block text-sm font-semibold text-[#0F172A]">Fecha y hora *</label>
-                <input id="consultation_date" name="consultation_date" type="datetime-local" value="{{ old('consultation_date', $consultation?->consultation_date?->format('Y-m-d\TH:i')) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                <input id="consultation_date" name="consultation_date" type="datetime-local" value="{{ old('consultation_date', $consultation?->consultation_date?->format('Y-m-d\TH:i') ?? ($prefill['consultation_date'] ?? null)) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                 @error('consultation_date') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
             </div>
             <div>
@@ -52,7 +55,7 @@
         <div class="mt-4 grid gap-5 md:grid-cols-2">
             <div class="md:col-span-2">
                 <label for="reason" class="mb-2 block text-sm font-semibold text-[#0F172A]">Motivo de consulta</label>
-                <textarea id="reason" name="reason" rows="3" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">{{ old('reason', $consultation?->reason) }}</textarea>
+                <textarea id="reason" name="reason" rows="3" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">{{ old('reason', $consultation?->reason ?? ($prefill['reason'] ?? null)) }}</textarea>
                 @error('reason') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
             </div>
             <div>

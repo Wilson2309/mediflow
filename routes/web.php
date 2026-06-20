@@ -39,22 +39,53 @@ Route::get('/verificar-receta/{code}', [PrescriptionController::class, 'verify']
 Route::get('/dashboard', function () {
     $user = auth()->user();
     $clinicId = $user?->clinic_id;
+    $isDoctorDashboard = (bool) $user?->hasRole('medico');
+    $doctor = $isDoctorDashboard && $clinicId
+        ? Doctor::where('clinic_id', $clinicId)->where('user_id', $user->id)->first()
+        : null;
     $canViewFinance = $user?->canAny(['payments.view', 'reports.financial']);
-    $patientCount = $clinicId && $user?->can('patients.view') ? Patient::where('clinic_id', $clinicId)->count() : 0;
+
+    $patientCount = $clinicId && $user?->can('patients.view')
+        ? Patient::where('clinic_id', $clinicId)
+            ->when($isDoctorDashboard, function ($query) use ($doctor) {
+                if (! $doctor) {
+                    $query->whereRaw('1 = 0');
+                    return;
+                }
+
+                $query->where(function ($query) use ($doctor) {
+                    $query->whereHas('appointments', fn ($query) => $query->where('doctor_id', $doctor->id))
+                        ->orWhereHas('consultations', fn ($query) => $query->where('doctor_id', $doctor->id));
+                });
+            })
+            ->count()
+        : 0;
     $activeDoctorCount = $clinicId && $user?->can('doctors.view')
         ? Doctor::where('clinic_id', $clinicId)->where('status', 'active')->count()
         : 0;
     $todayAppointmentCount = $clinicId && $user?->can('appointments.view')
         ? Appointment::where('clinic_id', $clinicId)
+            ->when($isDoctorDashboard, function ($query) use ($doctor) {
+                $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
+            })
             ->whereDate('appointment_date', today())
             ->whereIn('status', ['scheduled', 'confirmed'])
             ->count()
         : 0;
     $consultationCount = $clinicId && $user?->can('consultations.view')
-        ? Consultation::whereHas('patient', fn ($query) => $query->where('clinic_id', $clinicId))->count()
+        ? Consultation::whereHas('patient', fn ($query) => $query->where('clinic_id', $clinicId))
+            ->when($isDoctorDashboard, function ($query) use ($doctor) {
+                $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
+            })
+            ->count()
         : 0;
     $activePrescriptionCount = $clinicId && $user?->can('prescriptions.view')
-        ? Prescription::whereHas('patient', fn ($query) => $query->where('clinic_id', $clinicId))->where('status', 'active')->count()
+        ? Prescription::whereHas('patient', fn ($query) => $query->where('clinic_id', $clinicId))
+            ->when($isDoctorDashboard, function ($query) use ($doctor) {
+                $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
+            })
+            ->where('status', 'active')
+            ->count()
         : 0;
     $monthlyPaidIncome = $clinicId && $canViewFinance
         ? Payment::where('clinic_id', $clinicId)
@@ -78,6 +109,9 @@ Route::get('/dashboard', function () {
     $upcomingAppointments = $clinicId && $user?->can('appointments.view')
         ? Appointment::with(['patient', 'doctor.user', 'service'])
             ->where('clinic_id', $clinicId)
+            ->when($isDoctorDashboard, function ($query) use ($doctor) {
+                $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
+            })
             ->whereDate('appointment_date', '>=', today())
             ->whereIn('status', ['scheduled', 'confirmed'])
             ->orderBy('appointment_date')
@@ -98,6 +132,7 @@ Route::get('/dashboard', function () {
         'activeUserCount' => $activeUserCount,
         'pendingDemoRequestCount' => $pendingDemoRequestCount,
         'upcomingAppointments' => $upcomingAppointments,
+        'isDoctorDashboard' => $isDoctorDashboard,
     ]);
 })->middleware(['auth', 'verified', 'permission:dashboard.view'])->name('dashboard');
 

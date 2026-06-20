@@ -23,10 +23,15 @@ class AppointmentController extends Controller
         $status = $request->query('status');
         $doctorId = $request->query('doctor_id');
         $date = $request->query('date');
+        $doctor = $this->authenticatedDoctor();
+        $isDoctorView = $this->isDoctorUser();
 
         $appointments = Appointment::query()
             ->with(['patient', 'doctor.user', 'service'])
             ->where('clinic_id', $clinicId)
+            ->when($isDoctorView, function ($query) use ($doctor) {
+                $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
+            })
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('reason', 'like', "%{$search}%")
@@ -38,7 +43,7 @@ class AppointmentController extends Controller
                 });
             })
             ->when(in_array($status, ['scheduled', 'confirmed', 'completed', 'cancelled', 'no_show'], true), fn ($query) => $query->where('status', $status))
-            ->when($doctorId, fn ($query) => $query->where('doctor_id', $doctorId))
+            ->when(! $isDoctorView && $doctorId, fn ($query) => $query->where('doctor_id', $doctorId))
             ->when($date, fn ($query) => $query->whereDate('appointment_date', $date))
             ->orderByDesc('appointment_date')
             ->orderBy('start_time')
@@ -47,19 +52,23 @@ class AppointmentController extends Controller
 
         return view('appointments.index', [
             'appointments' => $appointments,
-            'doctors' => $this->doctors($clinicId, onlyActive: false),
+            'doctors' => $isDoctorView && $doctor ? collect([$doctor->loadMissing(['user', 'specialty'])]) : $this->doctors($clinicId, onlyActive: false),
             'search' => $search,
             'status' => $status,
-            'doctorId' => $doctorId,
+            'doctorId' => $isDoctorView ? $doctor?->id : $doctorId,
             'date' => $date,
+            'isDoctorView' => $isDoctorView,
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
         $clinicId = $this->clinicId();
 
-        return view('appointments.create', $this->formData($clinicId));
+        return view('appointments.create', [
+            ...$this->formData($clinicId),
+            'prefillPatientId' => $request->query('patient_id'),
+        ]);
     }
 
     public function store(StoreAppointmentRequest $request): RedirectResponse
@@ -77,27 +86,30 @@ class AppointmentController extends Controller
 
     public function show(Appointment $appointment): View
     {
-        $this->authorizeClinic($appointment);
+        $this->authorizeAppointmentAccess($appointment);
+        $appointment->load(['patient', 'doctor.user', 'doctor.specialty', 'service', 'consultation']);
 
         return view('appointments.show', [
-            'appointment' => $appointment->load(['patient', 'doctor.user', 'doctor.specialty', 'service']),
+            'appointment' => $appointment,
+            'canStartConsultation' => $this->canStartConsultation($appointment),
         ]);
     }
 
     public function edit(Appointment $appointment): View
     {
-        $this->authorizeClinic($appointment);
+        $this->authorizeAppointmentAccess($appointment);
         $clinicId = $this->clinicId();
 
         return view('appointments.edit', [
             'appointment' => $appointment->load(['patient', 'doctor.user', 'service']),
             ...$this->formData($clinicId),
+            'prefillPatientId' => null,
         ]);
     }
 
     public function update(UpdateAppointmentRequest $request, Appointment $appointment): RedirectResponse
     {
-        $this->authorizeClinic($appointment);
+        $this->authorizeAppointmentAccess($appointment);
 
         $clinicId = $this->clinicId();
         $data = $this->prepareData($request->validated(), $clinicId);
@@ -112,7 +124,7 @@ class AppointmentController extends Controller
 
     public function destroy(Appointment $appointment): RedirectResponse
     {
-        $this->authorizeClinic($appointment);
+        $this->authorizeAppointmentAccess($appointment);
         $appointment->delete();
 
         return redirect()
@@ -173,9 +185,36 @@ class AppointmentController extends Controller
         return (int) $clinicId;
     }
 
-    private function authorizeClinic(Appointment $appointment): void
+    private function authorizeAppointmentAccess(Appointment $appointment): void
     {
-        abort_if($appointment->clinic_id !== $this->clinicId(), 403);
+        abort_if((int) $appointment->clinic_id !== $this->clinicId(), 403);
+
+        if ($this->isDoctorUser()) {
+            $doctor = $this->authenticatedDoctor();
+            abort_if(! $doctor || (int) $appointment->doctor_id !== (int) $doctor->id, 403);
+        }
+    }
+
+    private function canStartConsultation(Appointment $appointment): bool
+    {
+        if (! auth()->user()?->can('consultations.create')) {
+            return false;
+        }
+
+        if (in_array($appointment->status, ['cancelled', 'no_show'], true)) {
+            return false;
+        }
+
+        if ($appointment->consultation) {
+            return false;
+        }
+
+        if ($this->isDoctorUser()) {
+            $doctor = $this->authenticatedDoctor();
+            return $doctor && (int) $appointment->doctor_id === (int) $doctor->id;
+        }
+
+        return true;
     }
 
     private function formData(int $clinicId): array
@@ -194,5 +233,23 @@ class AppointmentController extends Controller
             ->when($onlyActive, fn ($query) => $query->where('status', 'active'))
             ->get()
             ->sortBy(fn (Doctor $doctor) => $doctor->user?->name ?? '');
+    }
+
+    private function isDoctorUser(): bool
+    {
+        return (bool) auth()->user()?->hasRole('medico');
+    }
+
+    private function authenticatedDoctor(): ?Doctor
+    {
+        $user = auth()->user();
+
+        if (! $user?->id) {
+            return null;
+        }
+
+        return Doctor::where('clinic_id', $this->clinicId())
+            ->where('user_id', $user->id)
+            ->first();
     }
 }

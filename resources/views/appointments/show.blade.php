@@ -11,6 +11,9 @@
             </div>
             <div class="flex flex-col gap-3 sm:flex-row">
                 <a href="{{ route('appointments.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569]">Volver</a>
+                @if ($canStartConsultation)
+                    <a href="{{ route('consultations.create', ['appointment_id' => $appointment->id]) }}" class="inline-flex items-center justify-center rounded-lg bg-[#10B981] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-500/20">Iniciar consulta</a>
+                @endif
                 @can('appointments.update')<a href="{{ route('appointments.edit', $appointment) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white">Editar cita</a>@endcan
             </div>
         </section>
@@ -21,12 +24,23 @@
                 <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Paciente</h2></div><div class="p-5 text-sm text-[#0F172A]">{{ $appointment->patient?->full_name }} - {{ $appointment->patient?->identification_number ?: 'Sin identificación' }}</div></article>
                 <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Médico</h2></div><div class="p-5 text-sm text-[#0F172A]">{{ $appointment->doctor?->user?->name }}{{ $appointment->doctor?->specialty ? ' - '.$appointment->doctor->specialty->name : '' }}</div></article>
                 <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Motivo</h2></div><div class="p-5 whitespace-pre-line text-sm text-[#0F172A]">{{ $appointment->reason ?: 'Sin motivo registrado' }}</div></article>
-                <article class="rounded-lg border border-dashed border-[#38BDF8]/50 bg-[#38BDF8]/5 p-5"><h2 class="text-base font-bold text-[#0F172A]">Consulta médica</h2><p class="mt-2 text-sm text-[#475569]">Consulta médica disponible en una próxima fase.</p></article>
+                <article class="rounded-lg border border-dashed border-[#38BDF8]/50 bg-[#38BDF8]/5 p-5">
+                    <h2 class="text-base font-bold text-[#0F172A]">Consulta médica</h2>
+                    @if ($appointment->consultation)
+                        <p class="mt-2 text-sm text-[#475569]">Esta cita ya tiene una consulta registrada.</p>
+                        @can('consultations.view')<a href="{{ route('consultations.show', $appointment->consultation) }}" class="mt-4 inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-2.5 text-sm font-semibold text-white">Ver consulta</a>@endcan
+                    @elseif ($canStartConsultation)
+                        <p class="mt-2 text-sm text-[#475569]">Registra la atención clínica desde esta cita asignada.</p>
+                        <a href="{{ route('consultations.create', ['appointment_id' => $appointment->id]) }}" class="mt-4 inline-flex items-center justify-center rounded-lg bg-[#10B981] px-4 py-2.5 text-sm font-semibold text-white">Iniciar consulta</a>
+                    @else
+                        <p class="mt-2 text-sm text-[#475569]">La consulta podrá iniciarse cuando la cita esté asignada, vigente y sin consulta registrada.</p>
+                    @endif
+                </article>
             </div>
             <aside class="space-y-6">
                 <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Servicio</h2></div><div class="p-5 text-sm text-[#0F172A]">{{ $appointment->service?->name ?? 'Sin servicio' }}</div></article>
                 <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Notas</h2></div><div class="p-5 whitespace-pre-line text-sm text-[#0F172A]">{{ $appointment->notes ?: 'Sin notas' }}</div></article>
-                <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Fechas</h2></div><div class="space-y-4 p-5 text-sm text-[#0F172A]"><p>Creacion: {{ $appointment->created_at?->format('d/m/Y H:i') }}</p><p>Actualizacion: {{ $appointment->updated_at?->format('d/m/Y H:i') }}</p></div></article>
+                <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Fechas</h2></div><div class="space-y-4 p-5 text-sm text-[#0F172A]"><p>Creación: {{ $appointment->created_at?->format('d/m/Y H:i') }}</p><p>Actualización: {{ $appointment->updated_at?->format('d/m/Y H:i') }}</p></div></article>
             </aside>
         </section>
     </div>

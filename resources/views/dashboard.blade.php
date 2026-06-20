@@ -9,6 +9,7 @@
     $activeUserCount = $activeUserCount ?? 0;
     $pendingDemoRequestCount = $pendingDemoRequestCount ?? 0;
     $upcomingAppointments = $upcomingAppointments ?? collect();
+    $isDoctorDashboard = $isDoctorDashboard ?? false;
 
     $icons = [
         'calendar' => '<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3.75v3M16.5 3.75v3M4.5 9.75h15M6 6h12a1.5 1.5 0 0 1 1.5 1.5V18A2.25 2.25 0 0 1 17.25 20.25H6.75A2.25 2.25 0 0 1 4.5 18V7.5A1.5 1.5 0 0 1 6 6Z" /></svg>',
@@ -24,7 +25,7 @@
     ];
 
     $stats = [
-        ['permission' => 'appointments.view', 'label' => 'Citas de hoy', 'value' => number_format($todayAppointmentCount), 'summary' => 'Programadas y confirmadas', 'icon' => 'calendar', 'iconClass' => 'bg-[#2563EB] text-white', 'trend' => 'Real'],
+        ['permission' => 'appointments.view', 'label' => $isDoctorDashboard ? 'Mis citas de hoy' : 'Citas de hoy', 'value' => number_format($todayAppointmentCount), 'summary' => $isDoctorDashboard ? 'Asignadas a tu agenda' : 'Programadas y confirmadas', 'icon' => 'calendar', 'iconClass' => 'bg-[#2563EB] text-white', 'trend' => 'Real'],
         ['permission' => 'patients.view', 'label' => 'Pacientes registrados', 'value' => number_format($patientCount), 'summary' => 'Pacientes de tu clinica', 'icon' => 'patients', 'iconClass' => 'bg-[#38BDF8]/15 text-[#2563EB]', 'trend' => 'Real'],
         ['permission' => 'consultations.view', 'label' => 'Consultas realizadas', 'value' => $consultationCount ?? 0, 'summary' => 'Atenciones registradas', 'icon' => 'consultations', 'iconClass' => 'bg-[#10B981]/15 text-[#10B981]', 'trend' => 'Real'],
         ['permission' => ['payments.view', 'reports.financial'], 'label' => 'Ingresos del mes', 'value' => '$'.number_format((float) $monthlyPaidIncome, 2), 'summary' => 'Pagos marcados como pagados', 'icon' => 'income', 'iconClass' => 'bg-[#0F172A] text-white', 'trend' => 'Real'],
@@ -88,7 +89,7 @@
         <section class="grid gap-6 xl:grid-cols-3">
             <div class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm xl:col-span-2">
                 <div class="flex flex-col gap-3 border-b border-[#E2E8F0] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div><h2 class="text-base font-bold text-[#0F172A]">Próximas citas</h2><p class="mt-1 text-sm text-[#475569]">Agenda clínica priorizada para los próximos días.</p></div>
+                    <div><h2 class="text-base font-bold text-[#0F172A]">{{ $isDoctorDashboard ? 'Mis próximas citas' : 'Próximas citas' }}</h2><p class="mt-1 text-sm text-[#475569]">{{ $isDoctorDashboard ? 'Agenda médica asignada para los próximos días.' : 'Agenda clínica priorizada para los próximos días.' }}</p></div>
                     <a href="{{ route('appointments.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm font-semibold text-[#2563EB] transition hover:border-[#2563EB] hover:bg-[#2563EB]/5">Ver agenda</a>
                 </div>
                 <div class="overflow-x-auto">

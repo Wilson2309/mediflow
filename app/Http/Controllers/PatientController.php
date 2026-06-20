@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StorePatientRequest;
 use App\Http\Requests\UpdatePatientRequest;
+use App\Models\Doctor;
 use App\Models\Patient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,9 +17,21 @@ class PatientController extends Controller
         $clinicId = $this->clinicId();
         $search = trim((string) $request->query('search'));
         $status = $request->query('status');
+        $doctor = $this->authenticatedDoctor();
 
         $patients = Patient::query()
             ->where('clinic_id', $clinicId)
+            ->when($this->isDoctorUser(), function ($query) use ($doctor) {
+                if (! $doctor) {
+                    $query->whereRaw('1 = 0');
+                    return;
+                }
+
+                $query->where(function ($query) use ($doctor) {
+                    $query->whereHas('appointments', fn ($query) => $query->where('doctor_id', $doctor->id))
+                        ->orWhereHas('consultations', fn ($query) => $query->where('doctor_id', $doctor->id));
+                });
+            })
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('first_name', 'like', "%{$search}%")
@@ -61,7 +74,7 @@ class PatientController extends Controller
 
     public function show(Patient $patient): View
     {
-        $this->authorizeClinic($patient);
+        $this->authorizePatientAccess($patient);
 
         return view('patients.show', [
             'patient' => $patient,
@@ -70,7 +83,7 @@ class PatientController extends Controller
 
     public function edit(Patient $patient): View
     {
-        $this->authorizeClinic($patient);
+        $this->authorizePatientAccess($patient);
 
         return view('patients.edit', [
             'patient' => $patient,
@@ -79,7 +92,7 @@ class PatientController extends Controller
 
     public function update(UpdatePatientRequest $request, Patient $patient): RedirectResponse
     {
-        $this->authorizeClinic($patient);
+        $this->authorizePatientAccess($patient);
 
         $patient->update($request->validated());
 
@@ -90,7 +103,7 @@ class PatientController extends Controller
 
     public function destroy(Patient $patient): RedirectResponse
     {
-        $this->authorizeClinic($patient);
+        $this->authorizePatientAccess($patient);
 
         $patient->delete();
 
@@ -103,13 +116,42 @@ class PatientController extends Controller
     {
         $clinicId = auth()->user()?->clinic_id;
 
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
 
         return (int) $clinicId;
     }
 
-    private function authorizeClinic(Patient $patient): void
+    private function authorizePatientAccess(Patient $patient): void
     {
-        abort_if($patient->clinic_id !== $this->clinicId(), 403);
+        abort_if((int) $patient->clinic_id !== $this->clinicId(), 403);
+
+        if ($this->isDoctorUser()) {
+            $doctor = $this->authenticatedDoctor();
+            abort_if(! $doctor || ! $this->patientBelongsToDoctor($patient, $doctor), 403);
+        }
+    }
+
+    private function patientBelongsToDoctor(Patient $patient, Doctor $doctor): bool
+    {
+        return $patient->appointments()->where('doctor_id', $doctor->id)->exists()
+            || $patient->consultations()->where('doctor_id', $doctor->id)->exists();
+    }
+
+    private function isDoctorUser(): bool
+    {
+        return (bool) auth()->user()?->hasRole('medico');
+    }
+
+    private function authenticatedDoctor(): ?Doctor
+    {
+        $user = auth()->user();
+
+        if (! $user?->id) {
+            return null;
+        }
+
+        return Doctor::where('clinic_id', $this->clinicId())
+            ->where('user_id', $user->id)
+            ->first();
     }
 }

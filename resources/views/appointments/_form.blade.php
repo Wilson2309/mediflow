@@ -1,4 +1,5 @@
 @php
+    $prefillPatientId = $prefillPatientId ?? null;
     $statusLabels = [
         'scheduled' => 'Programada',
         'confirmed' => 'Confirmada',
@@ -14,7 +15,7 @@
         <select id="patient_id" name="patient_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
             <option value="">Seleccione un paciente</option>
             @foreach ($patients as $patient)
-                <option value="{{ $patient->id }}" @selected((string) old('patient_id', $appointment?->patient_id) === (string) $patient->id)>{{ $patient->full_name }} - {{ $patient->identification_number ?: 'Sin identificación' }}</option>
+                <option value="{{ $patient->id }}" @selected((string) old('patient_id', $appointment?->patient_id ?? $prefillPatientId) === (string) $patient->id)>{{ $patient->full_name }} - {{ $patient->identification_number ?: 'Sin identificación' }}</option>
             @endforeach
         </select>
         @error('patient_id') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror

@@ -21,10 +21,15 @@ class ConsultationController extends Controller
         $search = trim((string) $request->query('search'));
         $doctorId = $request->query('doctor_id');
         $date = $request->query('date');
+        $doctor = $this->authenticatedDoctor();
+        $isDoctorView = $this->isDoctorUser();
 
         $consultations = Consultation::query()
             ->with(['patient', 'doctor.user', 'appointment'])
             ->whereHas('patient', fn ($query) => $query->where('clinic_id', $clinicId))
+            ->when($isDoctorView, function ($query) use ($doctor) {
+                $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
+            })
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('reason', 'like', "%{$search}%")
@@ -36,7 +41,7 @@ class ConsultationController extends Controller
                         ->orWhereHas('doctor.user', fn ($query) => $query->where('name', 'like', "%{$search}%"));
                 });
             })
-            ->when($doctorId, fn ($query) => $query->where('doctor_id', $doctorId))
+            ->when(! $isDoctorView && $doctorId, fn ($query) => $query->where('doctor_id', $doctorId))
             ->when($date, fn ($query) => $query->whereDate('consultation_date', $date))
             ->orderByDesc('consultation_date')
             ->paginate(10)
@@ -44,16 +49,21 @@ class ConsultationController extends Controller
 
         return view('consultations.index', [
             'consultations' => $consultations,
-            'doctors' => $this->doctors($clinicId, onlyActive: false),
+            'doctors' => $isDoctorView && $doctor ? collect([$doctor->loadMissing(['user', 'specialty'])]) : $this->doctors($clinicId, onlyActive: false),
             'search' => $search,
-            'doctorId' => $doctorId,
+            'doctorId' => $isDoctorView ? $doctor?->id : $doctorId,
             'date' => $date,
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('consultations.create', $this->formData($this->clinicId()));
+        $clinicId = $this->clinicId();
+        $appointment = $request->query('appointment_id')
+            ? $this->appointmentForPrefill((int) $request->query('appointment_id'), $clinicId)
+            : null;
+
+        return view('consultations.create', $this->formData($clinicId, appointment: $appointment));
     }
 
     public function store(StoreConsultationRequest $request): RedirectResponse
@@ -125,6 +135,16 @@ class ConsultationController extends Controller
             ]);
         }
 
+        if ($this->isDoctorUser()) {
+            $authenticatedDoctor = $this->authenticatedDoctor();
+
+            if (! $authenticatedDoctor || (int) $doctor->id !== (int) $authenticatedDoctor->id) {
+                throw ValidationException::withMessages([
+                    'doctor_id' => 'No puede registrar consultas para otro médico.',
+                ]);
+            }
+        }
+
         if ($appointment) {
             if (in_array($appointment->status, ['cancelled', 'no_show'], true)) {
                 throw ValidationException::withMessages([
@@ -175,29 +195,93 @@ class ConsultationController extends Controller
     private function authorizeClinic(Consultation $consultation): void
     {
         abort_if((int) $consultation->patient?->clinic_id !== $this->clinicId(), 403);
+
+        if ($this->isDoctorUser()) {
+            $doctor = $this->authenticatedDoctor();
+            abort_if(! $doctor || (int) $consultation->doctor_id !== (int) $doctor->id, 403);
+        }
     }
 
-    private function formData(int $clinicId, ?Consultation $consultation = null): array
+    private function formData(int $clinicId, ?Consultation $consultation = null, ?Appointment $appointment = null): array
     {
+        $doctor = $this->authenticatedDoctor();
+        $isDoctorView = $this->isDoctorUser();
+
         return [
-            'appointments' => $this->availableAppointments($clinicId, $consultation),
-            'patients' => Patient::where('clinic_id', $clinicId)->where('status', 'active')->orderBy('last_name')->orderBy('first_name')->get(),
-            'doctors' => $this->doctors($clinicId),
+            'appointments' => $this->availableAppointments($clinicId, $consultation, $appointment),
+            'patients' => Patient::where('clinic_id', $clinicId)
+                ->where('status', 'active')
+                ->when($isDoctorView, function ($query) use ($doctor) {
+                    if (! $doctor) {
+                        $query->whereRaw('1 = 0');
+                        return;
+                    }
+
+                    $query->where(function ($query) use ($doctor) {
+                        $query->whereHas('appointments', fn ($query) => $query->where('doctor_id', $doctor->id))
+                            ->orWhereHas('consultations', fn ($query) => $query->where('doctor_id', $doctor->id));
+                    });
+                })
+                ->orderBy('last_name')
+                ->orderBy('first_name')
+                ->get(),
+            'doctors' => $isDoctorView && $doctor ? collect([$doctor->loadMissing(['user', 'specialty'])]) : $this->doctors($clinicId),
+            'prefill' => $this->prefillFromAppointment($appointment),
         ];
     }
 
-    private function availableAppointments(int $clinicId, ?Consultation $consultation = null)
+    private function availableAppointments(int $clinicId, ?Consultation $consultation = null, ?Appointment $selectedAppointment = null)
     {
+        $doctor = $this->authenticatedDoctor();
+
         return Appointment::with(['patient', 'doctor.user', 'service'])
             ->where('clinic_id', $clinicId)
+            ->when($this->isDoctorUser(), function ($query) use ($doctor) {
+                $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
+            })
             ->whereNotIn('status', ['cancelled', 'no_show'])
-            ->where(function ($query) use ($consultation) {
+            ->where(function ($query) use ($consultation, $selectedAppointment) {
                 $query->doesntHave('consultation')
-                    ->when($consultation?->appointment_id, fn ($query) => $query->orWhereKey($consultation->appointment_id));
+                    ->when($consultation?->appointment_id, fn ($query) => $query->orWhere('id', $consultation->appointment_id))
+                    ->when($selectedAppointment?->id, fn ($query) => $query->orWhere('id', $selectedAppointment->id));
             })
             ->orderByDesc('appointment_date')
             ->orderBy('start_time')
             ->get();
+    }
+
+    private function appointmentForPrefill(int $appointmentId, int $clinicId): Appointment
+    {
+        $appointment = Appointment::with(['patient', 'doctor.user'])
+            ->where('clinic_id', $clinicId)
+            ->findOrFail($appointmentId);
+
+        if ($this->isDoctorUser()) {
+            $doctor = $this->authenticatedDoctor();
+            abort_if(! $doctor || (int) $appointment->doctor_id !== (int) $doctor->id, 403);
+        }
+
+        abort_if(in_array($appointment->status, ['cancelled', 'no_show'], true), 403);
+        abort_if($appointment->consultation()->exists(), 403);
+
+        return $appointment;
+    }
+
+    private function prefillFromAppointment(?Appointment $appointment): array
+    {
+        if (! $appointment) {
+            return [];
+        }
+
+        $time = substr((string) $appointment->start_time, 0, 5) ?: '00:00';
+
+        return [
+            'appointment_id' => $appointment->id,
+            'patient_id' => $appointment->patient_id,
+            'doctor_id' => $appointment->doctor_id,
+            'reason' => $appointment->reason,
+            'consultation_date' => $appointment->appointment_date?->format('Y-m-d').'T'.$time,
+        ];
     }
 
     private function doctors(int $clinicId, bool $onlyActive = true)
@@ -207,5 +291,23 @@ class ConsultationController extends Controller
             ->when($onlyActive, fn ($query) => $query->where('status', 'active'))
             ->get()
             ->sortBy(fn (Doctor $doctor) => $doctor->user?->name ?? '');
+    }
+
+    private function isDoctorUser(): bool
+    {
+        return (bool) auth()->user()?->hasRole('medico');
+    }
+
+    private function authenticatedDoctor(): ?Doctor
+    {
+        $user = auth()->user();
+
+        if (! $user?->id) {
+            return null;
+        }
+
+        return Doctor::where('clinic_id', $this->clinicId())
+            ->where('user_id', $user->id)
+            ->first();
     }
 }
