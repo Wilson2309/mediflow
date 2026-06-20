@@ -7,6 +7,7 @@ use App\Models\Clinic;
 use App\Models\Consultation;
 use App\Models\Doctor;
 use App\Models\Patient;
+use App\Models\Payment;
 use App\Models\Specialty;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -189,6 +190,7 @@ class RoleBasedClinicalFlowTest extends TestCase
     {
         [$clinic, $user, $doctor] = $this->doctorUser();
         $appointment = $this->appointmentFor($clinic, $doctor);
+        $this->payAppointment($appointment);
 
         $this->actingAs($user)
             ->get(route('appointments.show', $appointment))
@@ -211,6 +213,7 @@ class RoleBasedClinicalFlowTest extends TestCase
         [$clinic, $user, $doctor] = $this->doctorUser();
         $patient = Patient::factory()->for($clinic)->create(['first_name' => 'Paciente', 'last_name' => 'Prefill']);
         $appointment = $this->appointmentFor($clinic, $doctor, $patient, 'Dolor abdominal', '2026-08-21', '10:15');
+        $this->payAppointment($appointment);
 
         $this->actingAs($user)
             ->get(route('consultations.create', ['appointment_id' => $appointment->id]))
@@ -255,6 +258,14 @@ class RoleBasedClinicalFlowTest extends TestCase
             ->create(['status' => 'active']);
     }
 
+    private function payAppointment(Appointment $appointment): Payment
+    {
+        return Payment::factory()->forAppointment($appointment)->create([
+            'amount' => 50,
+            'payment_status' => 'paid',
+            'payment_date' => '2026-08-20 08:30:00',
+        ]);
+    }
     private function appointmentFor(Clinic $clinic, Doctor $doctor, ?Patient $patient = null, string $reason = 'Control médico', string $date = '2026-08-20', string $startTime = '09:00'): Appointment
     {
         $patient ??= Patient::factory()->for($clinic)->create();

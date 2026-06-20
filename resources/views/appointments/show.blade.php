@@ -1,6 +1,15 @@
 <x-app-layout>
     @php
         $statusLabels = ['scheduled' => 'Programada', 'confirmed' => 'Confirmada', 'completed' => 'Completada', 'cancelled' => 'Cancelada', 'no_show' => 'No asistió'];
+        $paymentStatusLabels = ['pending' => 'Pendiente', 'paid' => 'Pagado', 'cancelled' => 'Cancelado', 'refunded' => 'Reembolsado'];
+        $methodLabels = ['cash' => 'Efectivo', 'card' => 'Tarjeta', 'transfer' => 'Transferencia', 'other' => 'Otro'];
+        $paymentStatusClasses = [
+            'pending' => 'border-[#F59E0B]/20 bg-[#F59E0B]/10 text-[#B45309]',
+            'paid' => 'border-[#10B981]/20 bg-[#10B981]/10 text-[#047857]',
+            'cancelled' => 'border-[#EF4444]/20 bg-[#EF4444]/10 text-[#B91C1C]',
+            'refunded' => 'border-slate-200 bg-slate-100 text-[#475569]',
+        ];
+        $payment = $appointment->payment;
     @endphp
     <div class="space-y-6">
         <section class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -18,6 +27,13 @@
             </div>
         </section>
         @if (session('success'))<div class="rounded-lg border border-[#10B981]/20 bg-[#10B981]/10 px-4 py-3 text-sm font-semibold text-[#047857]">{{ session('success') }}</div>@endif
+
+        @if (! $payment || $payment->payment_status !== 'paid')
+            <div class="rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-4 py-3 text-sm font-semibold text-[#92400E]">
+                Esta cita aún no está habilitada para atención médica porque el pago no consta como pagado.
+            </div>
+        @endif
+
         <section class="grid gap-6 xl:grid-cols-3">
             <div class="space-y-6 xl:col-span-2">
                 <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Datos de la cita</h2></div><div class="grid gap-5 p-5 sm:grid-cols-2"><div><p class="text-xs font-bold uppercase text-[#475569]">Fecha</p><p class="mt-1 text-sm text-[#0F172A]">{{ $appointment->appointment_date?->format('d/m/Y') }}</p></div><div><p class="text-xs font-bold uppercase text-[#475569]">Hora</p><p class="mt-1 text-sm text-[#0F172A]">{{ substr((string) $appointment->start_time, 0, 5) }}{{ $appointment->end_time ? ' - '.substr((string) $appointment->end_time, 0, 5) : '' }}</p></div><div><p class="text-xs font-bold uppercase text-[#475569]">Estado</p><p class="mt-1 text-sm text-[#0F172A]">{{ $statusLabels[$appointment->status] ?? $appointment->status }}</p></div></div></article>
@@ -30,14 +46,31 @@
                         <p class="mt-2 text-sm text-[#475569]">Esta cita ya tiene una consulta registrada.</p>
                         @can('consultations.view')<a href="{{ route('consultations.show', $appointment->consultation) }}" class="mt-4 inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-2.5 text-sm font-semibold text-white">Ver consulta</a>@endcan
                     @elseif ($canStartConsultation)
-                        <p class="mt-2 text-sm text-[#475569]">Registra la atención clínica desde esta cita asignada.</p>
+                        <p class="mt-2 text-sm text-[#475569]">Registra la atención clínica desde esta cita asignada y pagada.</p>
                         <a href="{{ route('consultations.create', ['appointment_id' => $appointment->id]) }}" class="mt-4 inline-flex items-center justify-center rounded-lg bg-[#10B981] px-4 py-2.5 text-sm font-semibold text-white">Iniciar consulta</a>
                     @else
-                        <p class="mt-2 text-sm text-[#475569]">La consulta podrá iniciarse cuando la cita esté asignada, vigente y sin consulta registrada.</p>
+                        <p class="mt-2 text-sm text-[#475569]">La consulta podrá iniciarse cuando la cita esté vigente, sin consulta registrada y con pago confirmado por caja.</p>
                     @endif
                 </article>
             </div>
             <aside class="space-y-6">
+                <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+                    <div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Estado financiero</h2></div>
+                    <div class="space-y-4 p-5 text-sm">
+                        @if ($payment)
+                            <div class="flex items-center justify-between gap-3">
+                                <span class="font-semibold text-[#475569]">Estado</span>
+                                <span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-bold {{ $paymentStatusClasses[$payment->payment_status] ?? 'border-slate-200 bg-slate-100 text-slate-600' }}">{{ $paymentStatusLabels[$payment->payment_status] ?? $payment->payment_status }}</span>
+                            </div>
+                            <div class="flex items-center justify-between gap-3"><span class="font-semibold text-[#475569]">Monto</span><span class="font-bold text-[#0F172A]">${{ number_format((float) $payment->amount, 2) }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><span class="font-semibold text-[#475569]">Método</span><span class="text-[#0F172A]">{{ $payment->payment_status === 'pending' ? 'Por definir al cobrar' : ($methodLabels[$payment->payment_method] ?? $payment->payment_method) }}</span></div>
+                            <div class="flex items-center justify-between gap-3"><span class="font-semibold text-[#475569]">Fecha de pago</span><span class="text-[#0F172A]">{{ $payment->payment_date?->format('d/m/Y H:i') ?: 'Sin fecha' }}</span></div>
+                            @can('payments.view')<a href="{{ route('payments.show', $payment) }}" class="inline-flex w-full items-center justify-center rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#2563EB]">Ver pago</a>@endcan
+                        @else
+                            <p class="text-sm text-[#475569]">Esta cita no tiene un pago asociado. Caja debe registrar o corregir el pago antes de la atención.</p>
+                        @endif
+                    </div>
+                </article>
                 <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Servicio</h2></div><div class="p-5 text-sm text-[#0F172A]">{{ $appointment->service?->name ?? 'Sin servicio' }}</div></article>
                 <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Notas</h2></div><div class="p-5 whitespace-pre-line text-sm text-[#0F172A]">{{ $appointment->notes ?: 'Sin notas' }}</div></article>
                 <article class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm"><div class="border-b border-[#E2E8F0] px-5 py-4"><h2 class="text-base font-bold text-[#0F172A]">Fechas</h2></div><div class="space-y-4 p-5 text-sm text-[#0F172A]"><p>Creación: {{ $appointment->created_at?->format('d/m/Y H:i') }}</p><p>Actualización: {{ $appointment->updated_at?->format('d/m/Y H:i') }}</p></div></article>

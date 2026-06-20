@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateAppointmentRequest;
 use App\Models\Appointment;
 use App\Models\Doctor;
 use App\Models\Patient;
+use App\Models\Payment;
 use App\Models\Service;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -77,7 +78,8 @@ class AppointmentController extends Controller
         $data = $this->prepareData($request->validated(), $clinicId);
         $this->ensureNoScheduleConflict($data, $clinicId);
 
-        Appointment::create($data);
+        $appointment = Appointment::create($data);
+        $this->syncPendingPayment($appointment);
 
         return redirect()
             ->route('appointments.index')
@@ -87,7 +89,7 @@ class AppointmentController extends Controller
     public function show(Appointment $appointment): View
     {
         $this->authorizeAppointmentAccess($appointment);
-        $appointment->load(['patient', 'doctor.user', 'doctor.specialty', 'service', 'consultation']);
+        $appointment->load(['patient', 'doctor.user', 'doctor.specialty', 'service', 'consultation', 'payment']);
 
         return view('appointments.show', [
             'appointment' => $appointment,
@@ -116,6 +118,7 @@ class AppointmentController extends Controller
         $this->ensureNoScheduleConflict($data, $clinicId, $appointment);
 
         $appointment->update($data);
+        $this->syncPendingPayment($appointment->refresh());
 
         return redirect()
             ->route('appointments.show', $appointment)
@@ -209,12 +212,71 @@ class AppointmentController extends Controller
             return false;
         }
 
+        if (! auth()->user()?->hasRole('administrador') && $appointment->payment?->payment_status !== 'paid') {
+            return false;
+        }
+
         if ($this->isDoctorUser()) {
             $doctor = $this->authenticatedDoctor();
             return $doctor && (int) $appointment->doctor_id === (int) $doctor->id;
         }
 
         return true;
+    }
+
+    private function syncPendingPayment(Appointment $appointment): void
+    {
+        $appointment->loadMissing(['doctor', 'service', 'payment']);
+        $payment = $appointment->payment;
+
+        if ($appointment->status === 'cancelled') {
+            if ($payment && $payment->payment_status === 'pending') {
+                $payment->update([
+                    'payment_status' => 'cancelled',
+                    'notes' => 'Pago cancelado automáticamente porque la cita fue cancelada.',
+                ]);
+            }
+
+            return;
+        }
+
+        if ($payment && $payment->payment_status !== 'pending') {
+            return;
+        }
+
+        $paymentData = $this->pendingPaymentData($appointment);
+
+        Payment::updateOrCreate(
+            ['appointment_id' => $appointment->id],
+            $paymentData,
+        );
+    }
+
+    private function pendingPaymentData(Appointment $appointment): array
+    {
+        $amount = (float) ($appointment->service?->price ?? 0);
+        $notes = 'Pago generado automáticamente desde cita médica.';
+
+        if ($amount <= 0) {
+            $amount = (float) ($appointment->doctor?->consultation_fee ?? 0);
+        }
+
+        if ($amount <= 0) {
+            $amount = 0;
+            $notes .= ' Monto pendiente por definir.';
+        }
+
+        return [
+            'clinic_id' => $appointment->clinic_id,
+            'patient_id' => $appointment->patient_id,
+            'appointment_id' => $appointment->id,
+            'service_id' => $appointment->service_id,
+            'amount' => $amount,
+            'payment_method' => 'cash',
+            'payment_status' => 'pending',
+            'payment_date' => null,
+            'notes' => $notes,
+        ];
     }
 
     private function formData(int $clinicId): array

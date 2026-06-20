@@ -1,6 +1,7 @@
 @php
     $methodLabels = ['cash' => 'Efectivo', 'card' => 'Tarjeta', 'transfer' => 'Transferencia', 'other' => 'Otro'];
     $statusLabels = ['pending' => 'Pendiente', 'paid' => 'Pagado', 'cancelled' => 'Cancelado', 'refunded' => 'Reembolsado'];
+    $appointmentStatusLabels = ['scheduled' => 'Programada', 'confirmed' => 'Confirmada', 'completed' => 'Completada', 'cancelled' => 'Cancelada', 'no_show' => 'No asistió'];
     $statusClasses = [
         'pending' => 'border-[#F59E0B]/20 bg-[#F59E0B]/10 text-[#F59E0B]',
         'paid' => 'border-[#10B981]/20 bg-[#10B981]/10 text-[#10B981]',
@@ -13,22 +14,103 @@
     <div class="space-y-6">
         <header class="flex flex-col gap-4 rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
             <div>
-                <p class="text-sm font-semibold uppercase tracking-wide text-[#2563EB]">Finanzas</p>
+                <p class="text-sm font-semibold uppercase tracking-wide text-[#2563EB]">Caja y finanzas</p>
                 <h1 class="mt-2 text-2xl font-bold tracking-tight text-[#0F172A] sm:text-3xl">Pagos y Finanzas</h1>
-                <p class="mt-2 text-sm leading-6 text-[#475569]">Gestión de pagos, ingresos y estados financieros del consultorio</p>
+                <p class="mt-2 text-sm leading-6 text-[#475569]">Cola de cobro, ingresos y estados financieros del consultorio</p>
             </div>
-            @can('payments.create')<a href="{{ route('payments.create') }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Nuevo pago</a>@endcan
+            @can('payments.create')
+                <a href="{{ route('payments.create') }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Nuevo pago</a>
+            @endcan
         </header>
 
         @if (session('success'))
             <div class="rounded-lg border border-[#10B981]/30 bg-[#10B981]/10 px-4 py-3 text-sm font-semibold text-[#047857]">{{ session('success') }}</div>
         @endif
 
-        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm"><p class="text-sm font-semibold text-[#475569]">Ingresos pagados del mes</p><p class="mt-3 text-2xl font-bold text-[#0F172A]">${{ number_format((float) $monthlyPaidIncome, 2) }}</p></article>
-            <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm"><p class="text-sm font-semibold text-[#475569]">Pagos pendientes</p><p class="mt-3 text-2xl font-bold text-[#F59E0B]">{{ number_format($pendingPaymentsCount) }}</p></article>
-            <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm"><p class="text-sm font-semibold text-[#475569]">Total pagado histórico</p><p class="mt-3 text-2xl font-bold text-[#10B981]">${{ number_format((float) $totalPaidIncome, 2) }}</p></article>
-            <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm"><p class="text-sm font-semibold text-[#475569]">Cancelados/Reembolsados</p><p class="mt-3 text-2xl font-bold text-[#EF4444]">{{ number_format($cancelledOrRefundedCount) }}</p></article>
+        <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
+                <p class="text-sm font-semibold text-[#475569]">Pendientes de cobro</p>
+                <p class="mt-3 text-2xl font-bold text-[#F59E0B]">{{ number_format($pendingPaymentsCount) }}</p>
+                <p class="mt-1 text-xs font-medium text-[#475569]">Hoy: {{ number_format($todayPendingPaymentsCount) }}</p>
+            </article>
+            <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
+                <p class="text-sm font-semibold text-[#475569]">Total pendiente</p>
+                <p class="mt-3 text-2xl font-bold text-[#0F172A]">${{ number_format((float) $pendingPaymentsAmount, 2) }}</p>
+            </article>
+            <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
+                <p class="text-sm font-semibold text-[#475569]">Pagos realizados hoy</p>
+                <p class="mt-3 text-2xl font-bold text-[#10B981]">{{ number_format($todayPaidPaymentsCount) }}</p>
+            </article>
+            <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
+                <p class="text-sm font-semibold text-[#475569]">Ingresos del día</p>
+                <p class="mt-3 text-2xl font-bold text-[#10B981]">${{ number_format((float) $todayPaidIncome, 2) }}</p>
+                <p class="mt-1 text-xs font-medium text-[#475569]">Mes: ${{ number_format((float) $monthlyPaidIncome, 2) }}</p>
+            </article>
+            <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
+                <p class="text-sm font-semibold text-[#475569]">Cancelados/Reembolsados</p>
+                <p class="mt-3 text-2xl font-bold text-[#EF4444]">{{ number_format($cancelledOrRefundedCount) }}</p>
+            </article>
+        </section>
+
+        <section class="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+            <div class="flex flex-col gap-2 border-b border-[#E2E8F0] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-base font-bold text-[#0F172A]">Pendientes de cobro</h2>
+                    <p class="mt-1 text-sm text-[#475569]">Citas y pagos que deben ser cobrados antes de la atención médica.</p>
+                </div>
+                <span class="inline-flex w-fit rounded-full border border-[#F59E0B]/20 bg-[#F59E0B]/10 px-3 py-1 text-xs font-bold text-[#B45309]">{{ number_format($pendingPaymentsCount) }} pendientes</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-[#E2E8F0]">
+                    <thead class="bg-[#F8FAFC]">
+                        <tr>
+                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Paciente</th>
+                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Cita</th>
+                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Médico</th>
+                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Servicio</th>
+                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Monto</th>
+                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Estado cita</th>
+                            <th class="px-5 py-3 text-right text-xs font-bold uppercase tracking-wide text-[#475569]">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#E2E8F0] bg-white">
+                        @forelse ($pendingPaymentQueue as $payment)
+                            <tr class="hover:bg-[#F8FAFC]">
+                                <td class="px-5 py-4">
+                                    <p class="text-sm font-semibold text-[#0F172A]">{{ $payment->patient?->full_name }}</p>
+                                    <p class="mt-1 text-xs text-[#475569]">{{ $payment->patient?->identification_number ?: 'Sin identificación' }}</p>
+                                </td>
+                                <td class="whitespace-nowrap px-5 py-4 text-sm text-[#475569]">
+                                    @if ($payment->appointment)
+                                        {{ $payment->appointment->appointment_date?->format('d/m/Y') }} · {{ substr((string) $payment->appointment->start_time, 0, 5) }}
+                                    @else
+                                        Sin cita
+                                    @endif
+                                </td>
+                                <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->appointment?->doctor?->user?->name ?: 'Sin médico' }}</td>
+                                <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->service?->name ?: 'Sin servicio' }}</td>
+                                <td class="px-5 py-4 text-sm font-bold text-[#0F172A]">
+                                    @if ((float) $payment->amount > 0)
+                                        ${{ number_format((float) $payment->amount, 2) }}
+                                    @else
+                                        <span class="inline-flex rounded-full border border-[#F59E0B]/20 bg-[#F59E0B]/10 px-2.5 py-1 text-xs font-bold text-[#B45309]">Monto por definir</span>
+                                    @endif
+                                </td>
+                                <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->appointment ? ($appointmentStatusLabels[$payment->appointment->status] ?? $payment->appointment->status) : 'Sin cita' }}</td>
+                                <td class="px-5 py-4 text-right">
+                                    @can('payments.update')
+                                        <a href="{{ route('payments.edit', $payment) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-3 py-2 text-xs font-semibold text-white">Cobrar</a>
+                                    @else
+                                        <a href="{{ route('payments.show', $payment) }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#2563EB]">Ver</a>
+                                    @endcan
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="7" class="px-5 py-10 text-center text-sm text-[#475569]">No hay pagos pendientes de cobro.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <form method="GET" action="{{ route('payments.index') }}" class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
@@ -71,6 +153,9 @@
         </form>
 
         <section class="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+            <div class="border-b border-[#E2E8F0] px-5 py-4">
+                <h2 class="text-base font-bold text-[#0F172A]">Historial de pagos</h2>
+            </div>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-[#E2E8F0]">
                     <thead class="bg-[#F8FAFC]">
@@ -93,12 +178,12 @@
                                 <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->service?->name ?: 'Sin servicio' }}</td>
                                 <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->appointment ? $payment->appointment->appointment_date?->format('d/m/Y').' '.substr((string) $payment->appointment->start_time, 0, 5) : 'Sin cita' }}</td>
                                 <td class="px-5 py-4 text-sm font-bold text-[#0F172A]">${{ number_format((float) $payment->amount, 2) }}</td>
-                                <td class="px-5 py-4 text-sm text-[#475569]">{{ $methodLabels[$payment->payment_method] ?? $payment->payment_method }}</td>
+                                <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->payment_status === 'pending' ? 'Por definir al cobrar' : ($methodLabels[$payment->payment_method] ?? $payment->payment_method) }}</td>
                                 <td class="px-5 py-4"><span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-bold {{ $statusClasses[$payment->payment_status] ?? 'border-slate-200 bg-slate-100 text-slate-600' }}">{{ $statusLabels[$payment->payment_status] ?? $payment->payment_status }}</span></td>
                                 <td class="px-5 py-4">
                                     <div class="flex justify-end gap-2">
                                         <a href="{{ route('payments.show', $payment) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#2563EB]">Ver</a>
-                                        @can('payments.update')<a href="{{ route('payments.edit', $payment) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#475569]">Editar</a>@endcan
+                                        @can('payments.update')<a href="{{ route('payments.edit', $payment) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#475569]">{{ $payment->payment_status === 'pending' ? 'Cobrar' : 'Editar' }}</a>@endcan
                                         @can('payments.delete')<form method="POST" action="{{ route('payments.destroy', $payment) }}" onsubmit="return confirm('¿Eliminar este pago?');">
                                             @csrf
                                             @method('DELETE')

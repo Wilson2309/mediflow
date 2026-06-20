@@ -152,6 +152,8 @@ class ConsultationController extends Controller
                 ]);
             }
 
+            $this->ensureAppointmentIsPaidForClinicalCare($appointment);
+
             $alreadyUsed = Consultation::where('appointment_id', $appointment->id)
                 ->when($ignore, fn ($query) => $query->whereKeyNot($ignore->id))
                 ->exists();
@@ -234,12 +236,13 @@ class ConsultationController extends Controller
     {
         $doctor = $this->authenticatedDoctor();
 
-        return Appointment::with(['patient', 'doctor.user', 'service'])
+        return Appointment::with(['patient', 'doctor.user', 'service', 'payment'])
             ->where('clinic_id', $clinicId)
             ->when($this->isDoctorUser(), function ($query) use ($doctor) {
                 $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
             })
             ->whereNotIn('status', ['cancelled', 'no_show'])
+            ->when(! auth()->user()?->hasRole('administrador'), fn ($query) => $query->whereHas('payment', fn ($query) => $query->where('payment_status', 'paid')))
             ->where(function ($query) use ($consultation, $selectedAppointment) {
                 $query->doesntHave('consultation')
                     ->when($consultation?->appointment_id, fn ($query) => $query->orWhere('id', $consultation->appointment_id))
@@ -252,7 +255,7 @@ class ConsultationController extends Controller
 
     private function appointmentForPrefill(int $appointmentId, int $clinicId): Appointment
     {
-        $appointment = Appointment::with(['patient', 'doctor.user'])
+        $appointment = Appointment::with(['patient', 'doctor.user', 'payment'])
             ->where('clinic_id', $clinicId)
             ->findOrFail($appointmentId);
 
@@ -263,8 +266,18 @@ class ConsultationController extends Controller
 
         abort_if(in_array($appointment->status, ['cancelled', 'no_show'], true), 403);
         abort_if($appointment->consultation()->exists(), 403);
+        $this->ensureAppointmentIsPaidForClinicalCare($appointment);
 
         return $appointment;
+    }
+
+    private function ensureAppointmentIsPaidForClinicalCare(Appointment $appointment): void
+    {
+        if (auth()->user()?->hasRole('administrador')) {
+            return;
+        }
+
+        abort_if(! $appointment->payment || $appointment->payment->payment_status !== 'paid', 403);
     }
 
     private function prefillFromAppointment(?Appointment $appointment): array

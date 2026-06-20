@@ -26,6 +26,18 @@ class PaymentController extends Controller
 
         $baseQuery = Payment::where('clinic_id', $clinicId);
 
+
+        $showPendingQueue = ($search === '' && blank($paymentStatus) && blank($paymentMethod) && blank($dateFrom) && blank($dateTo))
+            || $paymentStatus === 'pending';
+        $pendingPaymentQueue = $showPendingQueue
+            ? Payment::with(['patient', 'appointment.doctor.user', 'service'])
+                ->where('clinic_id', $clinicId)
+                ->where('payment_status', 'pending')
+                ->orderByRaw('CASE WHEN appointment_id IS NULL THEN 1 ELSE 0 END')
+                ->orderByDesc('created_at')
+                ->limit(8)
+                ->get()
+            : collect();
         $payments = Payment::query()
             ->with(['patient', 'appointment.doctor.user', 'service'])
             ->where('clinic_id', $clinicId)
@@ -51,6 +63,7 @@ class PaymentController extends Controller
 
         return view('payments.index', [
             'payments' => $payments,
+            'pendingPaymentQueue' => $pendingPaymentQueue,
             'patients' => $this->patients($clinicId),
             'services' => $this->services($clinicId, onlyActive: false),
             'monthlyPaidIncome' => (clone $baseQuery)
@@ -58,6 +71,19 @@ class PaymentController extends Controller
                 ->whereMonth('payment_date', now()->month)
                 ->whereYear('payment_date', now()->year)
                 ->sum('amount'),
+            'todayPaidIncome' => (clone $baseQuery)
+                ->where('payment_status', 'paid')
+                ->whereDate('payment_date', today())
+                ->sum('amount'),
+            'todayPaidPaymentsCount' => (clone $baseQuery)
+                ->where('payment_status', 'paid')
+                ->whereDate('payment_date', today())
+                ->count(),
+            'todayPendingPaymentsCount' => (clone $baseQuery)
+                ->where('payment_status', 'pending')
+                ->whereDate('created_at', today())
+                ->count(),
+            'pendingPaymentsAmount' => (clone $baseQuery)->where('payment_status', 'pending')->sum('amount'),
             'pendingPaymentsCount' => (clone $baseQuery)->where('payment_status', 'pending')->count(),
             'totalPaidIncome' => (clone $baseQuery)->where('payment_status', 'paid')->sum('amount'),
             'cancelledOrRefundedCount' => (clone $baseQuery)->whereIn('payment_status', ['cancelled', 'refunded'])->count(),
@@ -77,7 +103,8 @@ class PaymentController extends Controller
     public function store(StorePaymentRequest $request): RedirectResponse
     {
         $data = $this->prepareData($request->validated(), $this->clinicId());
-        Payment::create($data);
+        $payment = Payment::create($data);
+        $this->syncAppointmentAfterPayment($payment);
 
         return redirect()
             ->route('payments.index')
@@ -107,6 +134,7 @@ class PaymentController extends Controller
     {
         $this->authorizeClinic($payment);
         $payment->update($this->prepareData($request->validated(), $this->clinicId()));
+        $this->syncAppointmentAfterPayment($payment->refresh());
 
         return redirect()
             ->route('payments.show', $payment)
@@ -204,5 +232,17 @@ class PaymentController extends Controller
             ->when($onlyActive, fn ($query) => $query->where('status', 'active'))
             ->orderBy('name')
             ->get();
+    }
+    private function syncAppointmentAfterPayment(Payment $payment): void
+    {
+        $appointment = $payment->appointment;
+
+        if (! $appointment || $payment->payment_status !== 'paid') {
+            return;
+        }
+
+        if ($appointment->status === 'scheduled') {
+            $appointment->update(['status' => 'confirmed']);
+        }
     }
 }

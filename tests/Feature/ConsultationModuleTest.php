@@ -7,6 +7,7 @@ use App\Models\Clinic;
 use App\Models\Consultation;
 use App\Models\Doctor;
 use App\Models\Patient;
+use App\Models\Payment;
 use App\Models\Service;
 use App\Models\Specialty;
 use App\Models\User;
@@ -408,13 +409,21 @@ class ConsultationModuleTest extends TestCase
         $doctor ??= $this->doctorForClinic($clinic);
         $service = Service::factory()->for($clinic)->create();
 
-        return Appointment::factory()->for($clinic)->for($patient)->for($doctor)->for($service)->create([
+        $appointment = Appointment::factory()->for($clinic)->for($patient)->for($doctor)->for($service)->create([
             'appointment_date' => $date,
             'start_time' => $time,
             'end_time' => null,
             'reason' => 'Cita para consulta',
             'status' => $status,
         ]);
+
+        Payment::factory()->forAppointment($appointment)->create([
+            'amount' => $service->price,
+            'payment_status' => 'paid',
+            'payment_date' => '2026-07-01 07:30:00',
+        ]);
+
+        return $appointment;
     }
 
     private function consultationForClinic(Clinic $clinic, ?Patient $patient = null, ?Doctor $doctor = null, ?Appointment $appointment = null, string $diagnosis = 'Diagnóstico de prueba', string $date = '2026-07-10 09:00:00'): Consultation

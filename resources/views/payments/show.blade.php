@@ -33,7 +33,7 @@
                 <h2 class="text-base font-bold text-[#0F172A]">Información del pago</h2>
                 <dl class="mt-4 space-y-3 text-sm">
                     <div><dt class="font-semibold text-[#475569]">Monto</dt><dd class="mt-1 text-[#0F172A]">${{ number_format((float) $payment->amount, 2) }}</dd></div>
-                    <div><dt class="font-semibold text-[#475569]">Método de pago</dt><dd class="mt-1 text-[#0F172A]">{{ $methodLabels[$payment->payment_method] ?? $payment->payment_method }}</dd></div>
+                    <div><dt class="font-semibold text-[#475569]">Método de pago</dt><dd class="mt-1 text-[#0F172A]">{{ $payment->payment_status === 'pending' ? 'Por definir al cobrar' : ($methodLabels[$payment->payment_method] ?? $payment->payment_method) }}</dd></div>
                     <div><dt class="font-semibold text-[#475569]">Estado del pago</dt><dd class="mt-1"><span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-bold {{ $statusClasses[$payment->payment_status] ?? 'border-slate-200 bg-slate-100 text-slate-600' }}">{{ $statusLabels[$payment->payment_status] ?? $payment->payment_status }}</span></dd></div>
                     <div><dt class="font-semibold text-[#475569]">Fecha de pago</dt><dd class="mt-1 text-[#0F172A]">{{ $payment->payment_date?->format('d/m/Y H:i') ?: 'Sin fecha' }}</dd></div>
                 </dl>

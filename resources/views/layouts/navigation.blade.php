@@ -8,6 +8,9 @@
         ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
         ->take(2)
         ->implode('') ?: 'U';
+    $pendingPaymentsBadge = $user?->clinic_id && $user?->can('payments.view')
+        ? \App\Models\Payment::where('clinic_id', $user->clinic_id)->where('payment_status', 'pending')->count()
+        : 0;
 
     $icons = [
         'dashboard' => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75h6.5v6.5h-6.5v-6.5ZM13.75 3.75h6.5v6.5h-6.5v-6.5ZM3.75 13.75h6.5v6.5h-6.5v-6.5ZM13.75 13.75h6.5v6.5h-6.5v-6.5Z" /></svg>',
@@ -33,7 +36,7 @@
         ['label' => 'Consultas', 'href' => route('consultations.index'), 'active' => request()->routeIs('consultations.*'), 'icon' => 'consultations', 'permission' => 'consultations.view'],
         ['label' => 'Historial clínico', 'href' => route('medical-records.index'), 'active' => request()->routeIs('medical-records.*'), 'icon' => 'records', 'permission' => 'medical_records.view'],
         ['label' => 'Recetas médicas', 'href' => route('prescriptions.index'), 'active' => request()->routeIs('prescriptions.*'), 'icon' => 'prescriptions', 'permission' => 'prescriptions.view'],
-        ['label' => 'Pagos y Finanzas', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*'), 'icon' => 'payments', 'permission' => 'payments.view'],
+        ['label' => 'Pagos y Finanzas', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*'), 'icon' => 'payments', 'permission' => 'payments.view', 'badge' => $pendingPaymentsBadge],
         ['label' => 'Servicios médicos', 'href' => route('services.index'), 'active' => request()->routeIs('services.*'), 'icon' => 'services', 'permission' => 'services.view'],
         ['label' => 'Reportes', 'href' => route('reports.index'), 'active' => request()->routeIs('reports.*'), 'icon' => 'reports', 'permission' => 'reports.view'],
         ['label' => 'Solicitudes de demo', 'href' => route('demo-requests.index'), 'active' => request()->routeIs('demo-requests.*'), 'icon' => 'demoRequests', 'permission' => 'demo_requests.view'],
@@ -87,6 +90,9 @@
                             {!! $icons[$item['icon']] !!}
                         </span>
                         <span class="min-w-0 flex-1 truncate">{{ $item['label'] }}</span>
+                        @if (($item['badge'] ?? 0) > 0)
+                            <span class="ml-auto inline-flex min-w-6 justify-center rounded-full bg-[#F59E0B] px-2 py-0.5 text-xs font-bold text-white">{{ $item['badge'] }}</span>
+                        @endif
                     </a>
                 @endforeach
             </nav>
@@ -115,6 +121,9 @@
                     {!! $icons[$item['icon']] !!}
                 </span>
                 <span class="min-w-0 flex-1 truncate">{{ $item['label'] }}</span>
+                        @if (($item['badge'] ?? 0) > 0)
+                            <span class="ml-auto inline-flex min-w-6 justify-center rounded-full bg-[#F59E0B] px-2 py-0.5 text-xs font-bold text-white">{{ $item['badge'] }}</span>
+                        @endif
             </a>
         @endforeach
     </nav>
