@@ -26,3 +26,7 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 *.sql
+# Playwright
+test-results/
+playwright-report/
+blob-report/

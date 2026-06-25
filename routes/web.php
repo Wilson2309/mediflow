@@ -3,6 +3,7 @@
 use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\ClinicSettingsController;
 use App\Http\Controllers\ConsultationController;
+use App\Http\Controllers\DailyAgendaController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\DemoRequestController;
 use App\Http\Controllers\MedicalRecordController;
@@ -146,6 +147,9 @@ Route::middleware('auth')->group(function () {
 
     $protectedResource('patients', PatientController::class, 'patients');
     $protectedResource('doctors', DoctorController::class, 'doctors');
+    Route::get('daily-agenda', [DailyAgendaController::class, 'index'])->middleware('permission:appointments.view')->name('daily-agenda.index');
+    Route::patch('daily-agenda/appointments/{appointment}/cancel', [DailyAgendaController::class, 'cancel'])->middleware('permission:appointments.update')->name('daily-agenda.appointments.cancel');
+    Route::patch('daily-agenda/appointments/{appointment}/no-show', [DailyAgendaController::class, 'markNoShow'])->middleware('permission:appointments.update')->name('daily-agenda.appointments.no-show');
     $protectedResource('appointments', AppointmentController::class, 'appointments');
     $protectedResource('consultations', ConsultationController::class, 'consultations');
     $protectedResource('medical-records', MedicalRecordController::class, 'medical_records');

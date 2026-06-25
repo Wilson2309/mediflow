@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreConsultationRequest;
 use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Appointment;
+use App\Models\AuditLog;
 use App\Models\Consultation;
 use App\Models\Doctor;
 use App\Models\Patient;
@@ -183,6 +184,14 @@ class ConsultationController extends Controller
 
         if ($appointment && in_array($appointment->status, ['scheduled', 'confirmed'], true)) {
             $appointment->update(['status' => 'completed']);
+            AuditLog::create([
+                'user_id' => request()->user()?->id,
+                'action' => 'appointment.completed',
+                'module' => 'appointments',
+                'description' => "Cita #{$appointment->id} completada al registrar consulta #{$consultation->id}.",
+                'ip_address' => request()->ip(),
+                'user_agent' => (string) request()->userAgent(),
+            ]);
         }
     }
 

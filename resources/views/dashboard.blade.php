@@ -62,6 +62,15 @@
             </div>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div class="rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-semibold text-[#475569] shadow-sm">{{ now()->format('d/m/Y') }}</div>
+                @can('appointments.view')
+                    <a href="{{ route('daily-agenda.index') }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-semibold text-[#2563EB] shadow-sm transition hover:border-[#2563EB] hover:bg-[#2563EB]/5">Agenda del dia</a>
+                @endcan
+                @can('patients.create')
+                    <a href="{{ route('patients.create') }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-semibold text-[#0F172A] shadow-sm transition hover:border-[#2563EB] hover:text-[#2563EB]">Nuevo paciente</a>
+                @endcan
+                @can('payments.view')
+                    <a href="{{ route('payments.index', ['payment_status' => 'pending']) }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-4 py-3 text-sm font-semibold text-[#B45309] shadow-sm transition hover:bg-[#F59E0B]/15">Pendientes de cobro</a>
+                @endcan
                 @can('appointments.create')
                     <a href="{{ route('appointments.create') }}" class="inline-flex items-center justify-center gap-2 rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">{!! $icons['plus'] !!} Nueva cita</a>
                 @endcan
