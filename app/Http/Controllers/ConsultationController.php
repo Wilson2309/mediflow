@@ -5,10 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreConsultationRequest;
 use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Appointment;
-use App\Models\AuditLog;
 use App\Models\Consultation;
 use App\Models\Doctor;
 use App\Models\Patient;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -73,6 +73,7 @@ class ConsultationController extends Controller
         $data = $this->prepareData($request->validated(), $clinicId);
 
         $consultation = Consultation::create($data);
+        AuditLogger::log('consultation.created', 'consultations', $consultation->load('patient'), [], AuditLogger::modelSnapshot($consultation), 'Consulta médica creada.');
         $this->markAppointmentAsCompleted($consultation);
 
         return redirect()
@@ -103,9 +104,12 @@ class ConsultationController extends Controller
     {
         $this->authorizeClinic($consultation);
 
+        $old = AuditLogger::modelSnapshot($consultation);
         $data = $this->prepareData($request->validated(), $this->clinicId(), $consultation);
         $consultation->update($data);
-        $this->markAppointmentAsCompleted($consultation->refresh());
+        $consultation->refresh();
+        AuditLogger::log('consultation.updated', 'consultations', $consultation->load('patient'), $old, AuditLogger::modelSnapshot($consultation), 'Consulta médica actualizada.');
+        $this->markAppointmentAsCompleted($consultation);
 
         return redirect()
             ->route('consultations.show', $consultation)
@@ -115,6 +119,9 @@ class ConsultationController extends Controller
     public function destroy(Consultation $consultation): RedirectResponse
     {
         $this->authorizeClinic($consultation);
+        $old = AuditLogger::modelSnapshot($consultation);
+        AuditLogger::log('consultation.deleted', 'consultations', $consultation->load('patient'), $old, [], 'Consulta médica eliminada.');
+
         $consultation->delete();
 
         return redirect()
@@ -183,15 +190,9 @@ class ConsultationController extends Controller
         $appointment = $consultation->appointment;
 
         if ($appointment && in_array($appointment->status, ['scheduled', 'confirmed'], true)) {
+            $old = AuditLogger::modelSnapshot($appointment);
             $appointment->update(['status' => 'completed']);
-            AuditLog::create([
-                'user_id' => request()->user()?->id,
-                'action' => 'appointment.completed',
-                'module' => 'appointments',
-                'description' => "Cita #{$appointment->id} completada al registrar consulta #{$consultation->id}.",
-                'ip_address' => request()->ip(),
-                'user_agent' => (string) request()->userAgent(),
-            ]);
+            AuditLogger::log('appointment.completed', 'appointments', $appointment, $old, AuditLogger::modelSnapshot($appointment), 'Cita completada al registrar consulta médica.');
         }
     }
 

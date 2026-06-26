@@ -9,6 +9,7 @@ use App\Models\Doctor;
 use App\Models\Patient;
 use App\Models\Payment;
 use App\Models\Service;
+use App\Services\AuditLogger;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -79,6 +80,7 @@ class AppointmentController extends Controller
         $this->ensureNoScheduleConflict($data, $clinicId);
 
         $appointment = Appointment::create($data);
+        AuditLogger::log('appointment.created', 'appointments', $appointment, [], AuditLogger::modelSnapshot($appointment), 'Cita medica creada.');
         $this->syncPendingPayment($appointment);
 
         return redirect()
@@ -117,8 +119,20 @@ class AppointmentController extends Controller
         $data = $this->prepareData($request->validated(), $clinicId);
         $this->ensureNoScheduleConflict($data, $clinicId, $appointment);
 
+        $old = AuditLogger::modelSnapshot($appointment);
+        $oldStatus = $appointment->status;
         $appointment->update($data);
-        $this->syncPendingPayment($appointment->refresh());
+        $appointment->refresh();
+
+        AuditLogger::log(
+            $this->appointmentAction($appointment, $oldStatus),
+            'appointments',
+            $appointment,
+            $old,
+            AuditLogger::modelSnapshot($appointment),
+            'Cita medica actualizada.'
+        );
+        $this->syncPendingPayment($appointment);
 
         return redirect()
             ->route('appointments.show', $appointment)
@@ -128,6 +142,9 @@ class AppointmentController extends Controller
     public function destroy(Appointment $appointment): RedirectResponse
     {
         $this->authorizeAppointmentAccess($appointment);
+        $old = AuditLogger::modelSnapshot($appointment);
+        AuditLogger::log('appointment.deleted', 'appointments', $appointment, $old, [], 'Cita mÃ©dica eliminada.');
+
         $appointment->delete();
 
         return redirect()
@@ -145,7 +162,7 @@ class AppointmentController extends Controller
 
         if (! $patient || ! $doctor || (($validated['service_id'] ?? null) && ! $service)) {
             throw ValidationException::withMessages([
-                'clinic_id' => 'Los datos seleccionados no pertenecen a la clínica del usuario autenticado.',
+                'clinic_id' => 'Los datos seleccionados no pertenecen a la clÃ­nica del usuario autenticado.',
             ]);
         }
 
@@ -175,7 +192,7 @@ class AppointmentController extends Controller
 
         if ($conflict) {
             throw ValidationException::withMessages([
-                'start_time' => 'Ya existe una cita activa para este médico en la misma fecha y hora.',
+                'start_time' => 'Ya existe una cita activa para este mÃ©dico en la misma fecha y hora.',
             ]);
         }
     }
@@ -183,7 +200,7 @@ class AppointmentController extends Controller
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clÃ­nica asignada.');
 
         return (int) $clinicId;
     }
@@ -231,10 +248,12 @@ class AppointmentController extends Controller
 
         if ($appointment->status === 'cancelled') {
             if ($payment && $payment->payment_status === 'pending') {
+                $old = AuditLogger::modelSnapshot($payment);
                 $payment->update([
                     'payment_status' => 'cancelled',
-                    'notes' => 'Pago cancelado automáticamente porque la cita fue cancelada.',
+                    'notes' => 'Pago cancelado automÃ¡ticamente porque la cita fue cancelada.',
                 ]);
+                AuditLogger::log('payment.cancelled', 'payments', $payment, $old, AuditLogger::modelSnapshot($payment), 'Pago pendiente cancelado automaticamente desde cita medica.');
             }
 
             return;
@@ -246,16 +265,27 @@ class AppointmentController extends Controller
 
         $paymentData = $this->pendingPaymentData($appointment);
 
-        Payment::updateOrCreate(
+        $old = $payment ? AuditLogger::modelSnapshot($payment) : [];
+        $syncedPayment = Payment::updateOrCreate(
             ['appointment_id' => $appointment->id],
             $paymentData,
         );
+
+        AuditLogger::log($syncedPayment->wasRecentlyCreated ? 'payment.pending_created' : 'payment.updated', 'payments', $syncedPayment, $old, AuditLogger::modelSnapshot($syncedPayment), $syncedPayment->wasRecentlyCreated ? 'Pago pendiente generado automÃ¡ticamente desde cita mÃ©dica.' : 'Pago pendiente actualizado automÃ¡ticamente desde cita mÃ©dica.');
+    }
+    private function appointmentAction(Appointment $appointment, ?string $oldStatus): string
+    {
+        if ($appointment->status !== $oldStatus && in_array($appointment->status, ['cancelled', 'confirmed', 'completed', 'no_show'], true)) {
+            return 'appointment.'.$appointment->status;
+        }
+
+        return 'appointment.updated';
     }
 
     private function pendingPaymentData(Appointment $appointment): array
     {
         $amount = (float) ($appointment->service?->price ?? 0);
-        $notes = 'Pago generado automáticamente desde cita médica.';
+        $notes = 'Pago generado automÃ¡ticamente desde cita mÃ©dica.';
 
         if ($amount <= 0) {
             $amount = (float) ($appointment->doctor?->consultation_fee ?? 0);
@@ -315,3 +345,6 @@ class AppointmentController extends Controller
             ->first();
     }
 }
+
+
+

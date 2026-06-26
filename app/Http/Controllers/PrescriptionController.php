@@ -9,6 +9,7 @@ use App\Models\Consultation;
 use App\Models\Doctor;
 use App\Models\Patient;
 use App\Models\Prescription;
+use App\Services\AuditLogger;
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;
 use BaconQrCode\Renderer\RendererStyle\RendererStyle;
@@ -74,10 +75,16 @@ class PrescriptionController extends Controller
     {
         $data = $this->prepareData($request->validated(), $this->clinicId());
 
-        DB::transaction(function () use ($data) {
+        $prescription = null;
+
+        DB::transaction(function () use ($data, &$prescription) {
             $prescription = Prescription::create($data['prescription']);
             $prescription->items()->createMany($data['items']);
         });
+
+        if ($prescription) {
+            AuditLogger::log('prescription.created', 'prescriptions', $prescription->load('patient'), [], AuditLogger::modelSnapshot($prescription), 'Receta medica creada.');
+        }
 
         return redirect()
             ->route('prescriptions.index')
@@ -119,6 +126,7 @@ class PrescriptionController extends Controller
                 ->with('error', 'No se puede editar una receta firmada. Anule o cree una nueva receta.');
         }
 
+        $old = AuditLogger::modelSnapshot($prescription);
         $data = $this->prepareData($request->validated(), $this->clinicId());
 
         DB::transaction(function () use ($prescription, $data) {
@@ -126,6 +134,8 @@ class PrescriptionController extends Controller
             $prescription->items()->delete();
             $prescription->items()->createMany($data['items']);
         });
+
+        AuditLogger::log($prescription->status === 'cancelled' ? 'prescription.cancelled' : 'prescription.updated', 'prescriptions', $prescription->refresh()->load('patient'), $old, AuditLogger::modelSnapshot($prescription), 'Receta mÃ©dica actualizada.');
 
         return redirect()
             ->route('prescriptions.show', $prescription)
@@ -135,6 +145,9 @@ class PrescriptionController extends Controller
     public function destroy(Prescription $prescription): RedirectResponse
     {
         $this->authorizeClinic($prescription);
+        $old = AuditLogger::modelSnapshot($prescription);
+        AuditLogger::log('prescription.deleted', 'prescriptions', $prescription->load('patient'), $old, [], 'Receta mÃ©dica eliminada.');
+
         $prescription->delete();
 
         return redirect()
@@ -163,6 +176,7 @@ class PrescriptionController extends Controller
         $this->authorizePrescriptionView($prescription);
         $prescription = $this->loadForDelivery($prescription);
         $this->markAsPrinted($prescription);
+        AuditLogger::log('prescription.pdf_downloaded', 'prescriptions', $prescription->load('patient'), [], ['prescription_id' => $prescription->id], 'PDF de receta descargado.');
 
         return $this->pdfFor($prescription->refresh())
             ->download($this->pdfFileName($prescription));
@@ -192,15 +206,17 @@ class PrescriptionController extends Controller
                 fileName: $this->pdfFileName($prescription),
             ));
 
+            $old = AuditLogger::modelSnapshot($prescription);
             $prescription->forceFill([
                 'last_emailed_at' => now(),
                 'last_emailed_to' => $recipient,
                 'email_count' => ((int) $prescription->email_count) + 1,
             ])->save();
+            AuditLogger::log('prescription.emailed', 'prescriptions', $prescription->load('patient'), $old, ['last_emailed_at' => $prescription->last_emailed_at, 'last_emailed_to' => $recipient, 'email_count' => $prescription->email_count], 'Receta enviada por correo.');
         } catch (Throwable $exception) {
             report($exception);
 
-            return back()->with('error', 'No se pudo enviar la receta por correo. Revise la configuración de correo e inténtelo nuevamente.');
+            return back()->with('error', 'No se pudo enviar la receta por correo. Revise la configuraciÃ³n de correo e intÃ©ntelo nuevamente.');
         }
 
         return back()->with('success', 'Receta enviada por correo correctamente.');
@@ -219,6 +235,8 @@ class PrescriptionController extends Controller
             return back()->with('error', 'La receta ya está firmada.');
         }
 
+        $old = AuditLogger::modelSnapshot($prescription);
+
         $prescription->forceFill([
             'signed_at' => now(),
             'signed_by_user_id' => $request->user()?->id,
@@ -227,6 +245,12 @@ class PrescriptionController extends Controller
             'signed_ip_address' => $request->ip(),
             'signed_user_agent' => $request->userAgent(),
         ])->save();
+
+        AuditLogger::log('prescription.signed', 'prescriptions', $prescription->load('patient'), $old, [
+            'signature_verification_code' => $prescription->signature_verification_code,
+            'signed_at' => $prescription->signed_at,
+            'signed_by_user_id' => $prescription->signed_by_user_id,
+        ], 'Receta firmada electronicamente en MediFlow.');
 
         return redirect()
             ->route('prescriptions.show', $prescription)
@@ -273,13 +297,13 @@ class PrescriptionController extends Controller
 
         if (! $patient || ! $doctor || (($validated['consultation_id'] ?? null) && ! $consultation)) {
             throw ValidationException::withMessages([
-                'clinic_id' => 'Los datos seleccionados no pertenecen a la clínica del usuario autenticado.',
+                'clinic_id' => 'Los datos seleccionados no pertenecen a la clÃ­nica del usuario autenticado.',
             ]);
         }
 
         if ($consultation && ((int) $consultation->patient_id !== (int) $patient->id || (int) $consultation->doctor_id !== (int) $doctor->id)) {
             throw ValidationException::withMessages([
-                'consultation_id' => 'La consulta seleccionada no coincide con el paciente y médico indicados.',
+                'consultation_id' => 'La consulta seleccionada no coincide con el paciente y mÃ©dico indicados.',
             ]);
         }
 
@@ -305,7 +329,7 @@ class PrescriptionController extends Controller
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clÃ­nica asignada.');
 
         return (int) $clinicId;
     }
@@ -419,3 +443,4 @@ class PrescriptionController extends Controller
             ->sortBy(fn (Doctor $doctor) => $doctor->user?->name ?? '');
     }
 }
+

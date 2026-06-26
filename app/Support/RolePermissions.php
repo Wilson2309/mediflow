@@ -27,6 +27,7 @@ final class RolePermissions
             'reports.patients',
             'reports.doctors',
             'reports.services',
+            'audit_logs.view',
             ...self::resource('users'),
             'settings.clinic.view',
             'settings.clinic.update',

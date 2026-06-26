@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreDemoRequestRequest;
 use App\Models\DemoRequest;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 
 class PublicDemoRequestController extends Controller
@@ -18,7 +19,7 @@ class PublicDemoRequestController extends Controller
 
         $validated = $request->safe()->except('website');
 
-        DemoRequest::create([
+        $demoRequest = DemoRequest::create([
             ...$validated,
             'status' => 'pending',
             'source' => 'landing',
@@ -26,6 +27,11 @@ class PublicDemoRequestController extends Controller
             'user_agent' => $request->userAgent(),
         ]);
 
+        AuditLogger::log('demo_request.created', 'demo_requests', $demoRequest, [], AuditLogger::modelSnapshot($demoRequest), 'Solicitud de demo creada desde landing.');
+
         return redirect()->to(url('/').'#contacto')->with('success', $success);
     }
 }
+
+
+
