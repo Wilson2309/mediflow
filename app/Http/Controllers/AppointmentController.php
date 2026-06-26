@@ -11,6 +11,7 @@ use App\Models\Payment;
 use App\Models\Service;
 use App\Services\AuditLogger;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -18,6 +19,12 @@ use Illuminate\View\View;
 
 class AppointmentController extends Controller
 {
+    private const ACTIVE_BLOCKING_STATUSES = ['scheduled', 'confirmed'];
+    private const DEFAULT_APPOINTMENT_DURATION = 30;
+    private const SLOT_START = '08:00';
+    private const SLOT_END = '17:00';
+    private const SLOT_STEP_MINUTES = 15;
+
     public function index(Request $request): View
     {
         $clinicId = $this->clinicId();
@@ -68,7 +75,7 @@ class AppointmentController extends Controller
         $clinicId = $this->clinicId();
 
         return view('appointments.create', [
-            ...$this->formData($clinicId),
+            ...$this->formData($clinicId, prefillPatientId: $request->query('patient_id')),
             'prefillPatientId' => $request->query('patient_id'),
         ]);
     }
@@ -77,6 +84,7 @@ class AppointmentController extends Controller
     {
         $clinicId = $this->clinicId();
         $data = $this->prepareData($request->validated(), $clinicId);
+        $this->ensureDoctorCanProvideService($data, $clinicId);
         $this->ensureNoScheduleConflict($data, $clinicId);
 
         $appointment = Appointment::create($data);
@@ -105,8 +113,8 @@ class AppointmentController extends Controller
         $clinicId = $this->clinicId();
 
         return view('appointments.edit', [
-            'appointment' => $appointment->load(['patient', 'doctor.user', 'service']),
-            ...$this->formData($clinicId),
+            'appointment' => $appointment->load(['patient', 'doctor.user', 'doctor.specialty', 'service']),
+            ...$this->formData($clinicId, appointment: $appointment),
             'prefillPatientId' => null,
         ]);
     }
@@ -117,6 +125,7 @@ class AppointmentController extends Controller
 
         $clinicId = $this->clinicId();
         $data = $this->prepareData($request->validated(), $clinicId);
+        $this->ensureDoctorCanProvideService($data, $clinicId, $appointment);
         $this->ensureNoScheduleConflict($data, $clinicId, $appointment);
 
         $old = AuditLogger::modelSnapshot($appointment);
@@ -143,13 +152,139 @@ class AppointmentController extends Controller
     {
         $this->authorizeAppointmentAccess($appointment);
         $old = AuditLogger::modelSnapshot($appointment);
-        AuditLogger::log('appointment.deleted', 'appointments', $appointment, $old, [], 'Cita mÃ©dica eliminada.');
+        AuditLogger::log('appointment.deleted', 'appointments', $appointment, $old, [], 'Cita medica eliminada.');
 
         $appointment->delete();
 
         return redirect()
             ->route('appointments.index')
             ->with('success', 'Cita eliminada correctamente.');
+    }
+
+    public function searchPatients(Request $request): JsonResponse
+    {
+        $clinicId = $this->clinicId();
+        $term = trim((string) $request->query('q'));
+
+        $patients = Patient::query()
+            ->where('clinic_id', $clinicId)
+            ->where('status', 'active')
+            ->when($term !== '', function ($query) use ($term) {
+                $query->where(function ($query) use ($term) {
+                    $query->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%")
+                        ->orWhere('identification_number', 'like', "%{$term}%")
+                        ->orWhere('phone', 'like', "%{$term}%")
+                        ->orWhere('email', 'like', "%{$term}%");
+                });
+            })
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->limit(12)
+            ->get()
+            ->map(fn (Patient $patient) => [
+                'id' => $patient->id,
+                'label' => trim($patient->full_name),
+                'identification' => $patient->identification_number,
+                'contact' => $patient->phone ?: $patient->email,
+            ]);
+
+        return response()->json($patients);
+    }
+
+    public function searchDoctors(Request $request): JsonResponse
+    {
+        $clinicId = $this->clinicId();
+        $term = trim((string) $request->query('q'));
+        $serviceId = $request->integer('service_id') ?: null;
+
+        if ($serviceId && ! Service::where('clinic_id', $clinicId)->whereKey($serviceId)->exists()) {
+            abort(404);
+        }
+
+        $doctors = Doctor::query()
+            ->with(['user', 'specialty'])
+            ->where('clinic_id', $clinicId)
+            ->where('status', 'active')
+            ->when($serviceId, fn ($query) => $query->whereHas('services', fn ($query) => $query->whereKey($serviceId)))
+            ->when($term !== '', function ($query) use ($term) {
+                $query->where(function ($query) use ($term) {
+                    $query->where('license_number', 'like', "%{$term}%")
+                        ->orWhereHas('user', fn ($query) => $query->where('name', 'like', "%{$term}%"))
+                        ->orWhereHas('specialty', fn ($query) => $query->where('name', 'like', "%{$term}%"));
+                });
+            })
+            ->limit(12)
+            ->get()
+            ->sortBy(fn (Doctor $doctor) => $doctor->user?->name ?? '')
+            ->values()
+            ->map(fn (Doctor $doctor) => [
+                'id' => $doctor->id,
+                'label' => $doctor->user?->name ?? 'Medico sin usuario',
+                'specialty' => $doctor->specialty?->name,
+                'license' => $doctor->license_number,
+            ]);
+
+        return response()->json($doctors);
+    }
+
+    public function availability(Request $request): JsonResponse
+    {
+        $clinicId = $this->clinicId();
+        $doctorId = $request->integer('doctor_id');
+        $serviceId = $request->integer('service_id') ?: null;
+        $date = (string) $request->query('date');
+        $ignoreId = $request->integer('appointment_id') ?: null;
+
+        $doctor = Doctor::where('clinic_id', $clinicId)->where('status', 'active')->findOrFail($doctorId);
+        $service = $serviceId ? Service::where('clinic_id', $clinicId)->where('status', 'active')->findOrFail($serviceId) : null;
+
+        if ($service && ! $this->doctorProvidesService($doctor, $service)) {
+            return response()->json([
+                'available_slots' => [],
+                'unavailable_slots' => [],
+                'duration' => $this->appointmentDuration($service),
+                'message' => 'Este medico no ofrece el servicio seleccionado.',
+            ], 422);
+        }
+
+        try {
+            $day = Carbon::createFromFormat('Y-m-d', $date)->startOfDay();
+        } catch (\Throwable) {
+            return response()->json(['message' => 'Fecha invalida.'], 422);
+        }
+
+        $duration = $this->appointmentDuration($service);
+        $available = [];
+        $unavailable = [];
+        $cursor = $day->copy()->setTimeFromTimeString(self::SLOT_START);
+        $endOfDay = $day->copy()->setTimeFromTimeString(self::SLOT_END);
+
+        while ($cursor->copy()->addMinutes($duration)->lessThanOrEqualTo($endOfDay)) {
+            $slot = $cursor->format('H:i');
+            $slotData = [
+                'doctor_id' => $doctor->id,
+                'service_id' => $service?->id,
+                'appointment_date' => $day->format('Y-m-d'),
+                'start_time' => $slot,
+                'end_time' => $cursor->copy()->addMinutes($duration)->format('H:i'),
+            ];
+
+            if ($this->hasScheduleConflict($slotData, $clinicId, $ignoreId)) {
+                $unavailable[] = $slot;
+            } else {
+                $available[] = $slot;
+            }
+
+            $cursor->addMinutes(self::SLOT_STEP_MINUTES);
+        }
+
+        return response()->json([
+            'available_slots' => $available,
+            'unavailable_slots' => $unavailable,
+            'duration' => $duration,
+            'message' => $available === [] ? 'No hay horarios disponibles para este medico en la fecha seleccionada.' : null,
+        ]);
     }
 
     private function prepareData(array $validated, int $clinicId): array
@@ -162,13 +297,15 @@ class AppointmentController extends Controller
 
         if (! $patient || ! $doctor || (($validated['service_id'] ?? null) && ! $service)) {
             throw ValidationException::withMessages([
-                'clinic_id' => 'Los datos seleccionados no pertenecen a la clÃ­nica del usuario autenticado.',
+                'clinic_id' => 'Los datos seleccionados no pertenecen a la clinica del usuario autenticado.',
             ]);
         }
 
-        if (empty($validated['end_time']) && $service?->duration_minutes) {
+        $duration = $this->appointmentDuration($service);
+
+        if (empty($validated['end_time'])) {
             $validated['end_time'] = Carbon::createFromFormat('H:i', $validated['start_time'])
-                ->addMinutes($service->duration_minutes)
+                ->addMinutes($duration)
                 ->format('H:i');
         }
 
@@ -179,28 +316,93 @@ class AppointmentController extends Controller
         ];
     }
 
+    private function ensureDoctorCanProvideService(array $data, int $clinicId, ?Appointment $appointment = null): void
+    {
+        if (empty($data['service_id'])) {
+            return;
+        }
+
+        $doctor = Doctor::where('clinic_id', $clinicId)->find($data['doctor_id']);
+        $service = Service::where('clinic_id', $clinicId)->find($data['service_id']);
+
+        if (! $doctor || ! $service || $this->doctorProvidesService($doctor, $service)) {
+            return;
+        }
+
+        AuditLogger::log('appointment.doctor_service_mismatch', 'appointments', $appointment, [], [
+            'doctor_id' => $doctor->id,
+            'service_id' => $service->id,
+        ], 'Intento de asignar un medico incompatible con el servicio seleccionado.');
+
+        throw ValidationException::withMessages([
+            'doctor_id' => 'Este medico no ofrece el servicio seleccionado.',
+        ]);
+    }
+
     private function ensureNoScheduleConflict(array $data, int $clinicId, ?Appointment $ignore = null): void
     {
-        $conflict = Appointment::query()
+        if (! $this->hasScheduleConflict($data, $clinicId, $ignore?->id)) {
+            return;
+        }
+
+        AuditLogger::log('appointment.availability_rejected', 'appointments', $ignore, [], [
+            'doctor_id' => $data['doctor_id'] ?? null,
+            'appointment_date' => $data['appointment_date'] ?? null,
+            'start_time' => $data['start_time'] ?? null,
+            'end_time' => $data['end_time'] ?? null,
+        ], 'Intento de agendar una cita en un horario ocupado.');
+
+        throw ValidationException::withMessages([
+            'start_time' => 'El medico ya tiene una cita programada en esa hora.',
+        ]);
+    }
+
+    private function hasScheduleConflict(array $data, int $clinicId, ?int $ignoreId = null): bool
+    {
+        $start = $this->timeOnDate($data['appointment_date'], $data['start_time']);
+        $endTime = $data['end_time'] ?? null;
+        $service = ! empty($data['service_id']) ? Service::where('clinic_id', $clinicId)->find($data['service_id']) : null;
+        $end = $endTime
+            ? $this->timeOnDate($data['appointment_date'], $endTime)
+            : $start->copy()->addMinutes($this->appointmentDuration($service));
+
+        return Appointment::query()
+            ->with('service')
             ->where('clinic_id', $clinicId)
             ->where('doctor_id', $data['doctor_id'])
             ->whereDate('appointment_date', $data['appointment_date'])
-            ->where('start_time', $data['start_time'])
-            ->whereIn('status', ['scheduled', 'confirmed'])
-            ->when($ignore, fn ($query) => $query->whereKeyNot($ignore->id))
-            ->exists();
+            ->whereIn('status', self::ACTIVE_BLOCKING_STATUSES)
+            ->when($ignoreId, fn ($query) => $query->whereKeyNot($ignoreId))
+            ->get()
+            ->contains(function (Appointment $appointment) use ($start, $end) {
+                $existingStart = $this->timeOnDate($appointment->appointment_date->format('Y-m-d'), substr((string) $appointment->start_time, 0, 5));
+                $existingEnd = $appointment->end_time
+                    ? $this->timeOnDate($appointment->appointment_date->format('Y-m-d'), substr((string) $appointment->end_time, 0, 5))
+                    : $existingStart->copy()->addMinutes($this->appointmentDuration($appointment->service));
 
-        if ($conflict) {
-            throw ValidationException::withMessages([
-                'start_time' => 'Ya existe una cita activa para este mÃ©dico en la misma fecha y hora.',
-            ]);
-        }
+                return $existingStart->lt($end) && $existingEnd->gt($start);
+            });
+    }
+
+    private function doctorProvidesService(Doctor $doctor, Service $service): bool
+    {
+        return $doctor->services()->whereKey($service->id)->exists();
+    }
+
+    private function appointmentDuration(?Service $service): int
+    {
+        return max((int) ($service?->duration_minutes ?: self::DEFAULT_APPOINTMENT_DURATION), 1);
+    }
+
+    private function timeOnDate(string $date, string $time): Carbon
+    {
+        return Carbon::createFromFormat('Y-m-d H:i', $date.' '.substr($time, 0, 5));
     }
 
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clÃ­nica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
 
         return (int) $clinicId;
     }
@@ -251,7 +453,7 @@ class AppointmentController extends Controller
                 $old = AuditLogger::modelSnapshot($payment);
                 $payment->update([
                     'payment_status' => 'cancelled',
-                    'notes' => 'Pago cancelado automÃ¡ticamente porque la cita fue cancelada.',
+                    'notes' => 'Pago cancelado automaticamente porque la cita fue cancelada.',
                 ]);
                 AuditLogger::log('payment.cancelled', 'payments', $payment, $old, AuditLogger::modelSnapshot($payment), 'Pago pendiente cancelado automaticamente desde cita medica.');
             }
@@ -271,8 +473,9 @@ class AppointmentController extends Controller
             $paymentData,
         );
 
-        AuditLogger::log($syncedPayment->wasRecentlyCreated ? 'payment.pending_created' : 'payment.updated', 'payments', $syncedPayment, $old, AuditLogger::modelSnapshot($syncedPayment), $syncedPayment->wasRecentlyCreated ? 'Pago pendiente generado automÃ¡ticamente desde cita mÃ©dica.' : 'Pago pendiente actualizado automÃ¡ticamente desde cita mÃ©dica.');
+        AuditLogger::log($syncedPayment->wasRecentlyCreated ? 'payment.pending_created' : 'payment.updated', 'payments', $syncedPayment, $old, AuditLogger::modelSnapshot($syncedPayment), $syncedPayment->wasRecentlyCreated ? 'Pago pendiente generado automaticamente desde cita medica.' : 'Pago pendiente actualizado automaticamente desde cita medica.');
     }
+
     private function appointmentAction(Appointment $appointment, ?string $oldStatus): string
     {
         if ($appointment->status !== $oldStatus && in_array($appointment->status, ['cancelled', 'confirmed', 'completed', 'no_show'], true)) {
@@ -285,7 +488,7 @@ class AppointmentController extends Controller
     private function pendingPaymentData(Appointment $appointment): array
     {
         $amount = (float) ($appointment->service?->price ?? 0);
-        $notes = 'Pago generado automÃ¡ticamente desde cita mÃ©dica.';
+        $notes = 'Pago generado automaticamente desde cita medica.';
 
         if ($amount <= 0) {
             $amount = (float) ($appointment->doctor?->consultation_fee ?? 0);
@@ -309,11 +512,14 @@ class AppointmentController extends Controller
         ];
     }
 
-    private function formData(int $clinicId): array
+    private function formData(int $clinicId, ?Appointment $appointment = null, mixed $prefillPatientId = null): array
     {
+        $selectedPatientId = old('patient_id', $appointment?->patient_id ?? $prefillPatientId);
+        $selectedDoctorId = old('doctor_id', $appointment?->doctor_id);
+
         return [
-            'patients' => Patient::where('clinic_id', $clinicId)->where('status', 'active')->orderBy('last_name')->orderBy('first_name')->get(),
-            'doctors' => $this->doctors($clinicId),
+            'selectedPatient' => $selectedPatientId ? Patient::where('clinic_id', $clinicId)->find($selectedPatientId) : null,
+            'selectedDoctor' => $selectedDoctorId ? Doctor::with(['user', 'specialty'])->where('clinic_id', $clinicId)->find($selectedDoctorId) : null,
             'services' => Service::where('clinic_id', $clinicId)->where('status', 'active')->orderBy('name')->get(),
         ];
     }
@@ -345,6 +551,3 @@ class AppointmentController extends Controller
             ->first();
     }
 }
-
-
-

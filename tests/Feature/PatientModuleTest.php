@@ -284,6 +284,38 @@ class PatientModuleTest extends TestCase
         ]);
     }
 
+    public function test_patient_blood_type_accepts_allowed_values(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+
+        foreach (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $bloodType) {
+            $this->actingAs($user)
+                ->post(route('patients.store'), $this->validPatientPayload([
+                    'identification_number' => 'BT-'.str_replace(['+', '-'], ['P', 'N'], $bloodType),
+                    'email' => strtolower(str_replace(['+', '-'], ['p', 'n'], $bloodType)).'@example.test',
+                    'blood_type' => $bloodType,
+                ]))
+                ->assertRedirect(route('patients.index'));
+
+            $this->assertDatabaseHas('patients', [
+                'clinic_id' => $clinic->id,
+                'blood_type' => $bloodType,
+            ]);
+        }
+    }
+
+    public function test_patient_blood_type_rejects_invalid_values(): void
+    {
+        $user = $this->userForClinic(Clinic::factory()->create());
+
+        $this->actingAs($user)
+            ->from(route('patients.create'))
+            ->post(route('patients.store'), $this->validPatientPayload(['blood_type' => 'X+']))
+            ->assertRedirect(route('patients.create'))
+            ->assertSessionHasErrors('blood_type');
+    }
+
     private function userForClinic(Clinic $clinic): User
     {
         return User::factory()->create([
@@ -328,3 +360,4 @@ class PatientModuleTest extends TestCase
         ], $overrides);
     }
 }
+

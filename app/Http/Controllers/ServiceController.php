@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreServiceRequest;
 use App\Http\Requests\UpdateServiceRequest;
+use App\Models\Doctor;
 use App\Models\Service;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class ServiceController extends Controller
@@ -39,17 +41,25 @@ class ServiceController extends Controller
 
     public function create(): View
     {
-        $this->clinicId();
+        $clinicId = $this->clinicId();
 
-        return view('services.create');
+        return view('services.create', [
+            'doctors' => $this->doctors($clinicId),
+        ]);
     }
 
     public function store(StoreServiceRequest $request): RedirectResponse
     {
-        Service::create([
-            ...$request->validated(),
-            'clinic_id' => $this->clinicId(),
+        $clinicId = $this->clinicId();
+        $validated = $request->validated();
+        $doctorIds = $this->doctorIdsForClinic($validated['doctor_ids'] ?? [], $clinicId);
+        unset($validated['doctor_ids']);
+
+        $service = Service::create([
+            ...$validated,
+            'clinic_id' => $clinicId,
         ]);
+        $service->doctors()->sync($doctorIds);
 
         return redirect()
             ->route('services.index')
@@ -62,7 +72,7 @@ class ServiceController extends Controller
         $clinicId = $this->clinicId();
 
         return view('services.show', [
-            'service' => $service->loadCount([
+            'service' => $service->load(['doctors.user', 'doctors.specialty'])->loadCount([
                 'appointments' => fn ($query) => $query->where('clinic_id', $clinicId),
                 'payments' => fn ($query) => $query->where('clinic_id', $clinicId),
             ]),
@@ -72,16 +82,24 @@ class ServiceController extends Controller
     public function edit(Service $service): View
     {
         $this->authorizeClinic($service);
+        $clinicId = $this->clinicId();
 
         return view('services.edit', [
-            'service' => $service,
+            'service' => $service->load('doctors'),
+            'doctors' => $this->doctors($clinicId),
         ]);
     }
 
     public function update(UpdateServiceRequest $request, Service $service): RedirectResponse
     {
         $this->authorizeClinic($service);
-        $service->update($request->validated());
+        $clinicId = $this->clinicId();
+        $validated = $request->validated();
+        $doctorIds = $this->doctorIdsForClinic($validated['doctor_ids'] ?? [], $clinicId);
+        unset($validated['doctor_ids']);
+
+        $service->update($validated);
+        $service->doctors()->sync($doctorIds);
 
         return redirect()
             ->route('services.show', $service)
@@ -110,5 +128,33 @@ class ServiceController extends Controller
     private function authorizeClinic(Service $service): void
     {
         abort_if((int) $service->clinic_id !== $this->clinicId(), 403);
+    }
+
+    private function doctors(int $clinicId)
+    {
+        return Doctor::with(['user', 'specialty'])
+            ->where('clinic_id', $clinicId)
+            ->where('status', 'active')
+            ->get()
+            ->sortBy(fn (Doctor $doctor) => $doctor->user?->name ?? '');
+    }
+
+    private function doctorIdsForClinic(array $doctorIds, int $clinicId): array
+    {
+        $doctorIds = array_values(array_unique(array_map('intval', $doctorIds)));
+
+        if ($doctorIds === []) {
+            return [];
+        }
+
+        $validIds = Doctor::where('clinic_id', $clinicId)->whereIn('id', $doctorIds)->pluck('id')->all();
+
+        if (count($validIds) !== count($doctorIds)) {
+            throw ValidationException::withMessages([
+                'doctor_ids' => 'Los médicos seleccionados no pertenecen a la clínica del usuario autenticado.',
+            ]);
+        }
+
+        return $validIds;
     }
 }

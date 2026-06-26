@@ -273,6 +273,7 @@ class AuditLogModuleTest extends TestCase
             'duration_minutes' => 30,
             'status' => 'active',
         ]);
+        $doctor->services()->syncWithoutDetaching([$service->id]);
 
         return [$admin, $patient, $doctor, $service];
     }
@@ -329,3 +330,5 @@ class AuditLogModuleTest extends TestCase
         return $prescription;
     }
 }
+
+

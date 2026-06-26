@@ -315,6 +315,10 @@ class ReceptionCashDoctorFlowTest extends TestCase
         $patient ??= $this->patientForClinic($clinic);
         $doctor ??= $this->doctorForClinic($clinic);
 
+        if ($service) {
+            $doctor->services()->syncWithoutDetaching([$service->id]);
+        }
+
         return Appointment::factory()->for($clinic)->for($patient)->for($doctor)->create([
             'service_id' => $service?->id,
             'appointment_date' => $date,
@@ -327,6 +331,10 @@ class ReceptionCashDoctorFlowTest extends TestCase
 
     private function appointmentPayload(Patient $patient, Doctor $doctor, ?Service $service, array $overrides = []): array
     {
+        if ($service) {
+            $doctor->services()->syncWithoutDetaching([$service->id]);
+        }
+
         return array_merge([
             'patient_id' => $patient->id,
             'doctor_id' => $doctor->id,
@@ -361,9 +369,9 @@ class ReceptionCashDoctorFlowTest extends TestCase
             'patient_id' => $patient->id,
             'doctor_id' => $doctor->id,
             'reason' => 'Dolor abdominal',
-            'symptoms' => 'Dolor y náuseas',
+            'symptoms' => 'Dolor y nÃƒÂ¡useas',
             'diagnosis' => 'Gastroenteritis',
-            'treatment' => 'Hidratación y reposo',
+            'treatment' => 'HidrataciÃƒÂ³n y reposo',
             'observations' => 'Control en 48 horas',
             'weight' => '70.50',
             'height' => '1.72',

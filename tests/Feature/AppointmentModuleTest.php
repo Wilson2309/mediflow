@@ -343,6 +343,156 @@ class AppointmentModuleTest extends TestCase
         $this->assertDatabaseHas('appointments', ['start_time' => '09:15', 'end_time' => '10:00']);
     }
 
+    public function test_patient_search_endpoint_respects_clinic_scope(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $otherClinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        $patient = $this->patientForClinic($clinic, 'Paciente Busqueda');
+        $otherPatient = $this->patientForClinic($otherClinic, 'Paciente Oculto');
+
+        $this->actingAs($user)
+            ->getJson(route('appointments.patients.search', ['q' => 'Paciente']))
+            ->assertOk()
+            ->assertJsonFragment(['id' => $patient->id, 'label' => $patient->full_name])
+            ->assertJsonMissing(['id' => $otherPatient->id, 'label' => $otherPatient->full_name]);
+    }
+
+    public function test_doctor_search_endpoint_respects_clinic_scope(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $otherClinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        $doctor = $this->doctorForClinic($clinic, 'Doctor Buscable');
+        $otherDoctor = $this->doctorForClinic($otherClinic, 'Doctor Oculto');
+
+        $this->actingAs($user)
+            ->getJson(route('appointments.doctors.search', ['q' => 'Doctor']))
+            ->assertOk()
+            ->assertJsonFragment(['id' => $doctor->id, 'label' => 'Doctor Buscable'])
+            ->assertJsonMissing(['id' => $otherDoctor->id, 'label' => 'Doctor Oculto']);
+    }
+
+    public function test_service_filter_returns_only_compatible_doctors(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        $service = $this->serviceForClinic($clinic);
+        $compatibleDoctor = $this->doctorForClinic($clinic, 'Doctor Compatible');
+        $incompatibleDoctor = $this->doctorForClinic($clinic, 'Doctor Incompatible');
+        $compatibleDoctor->services()->attach($service);
+
+        $this->actingAs($user)
+            ->getJson(route('appointments.doctors.search', ['service_id' => $service->id]))
+            ->assertOk()
+            ->assertJsonFragment(['id' => $compatibleDoctor->id, 'label' => 'Doctor Compatible'])
+            ->assertJsonMissing(['id' => $incompatibleDoctor->id, 'label' => 'Doctor Incompatible']);
+    }
+
+    public function test_appointment_cannot_be_created_with_doctor_that_does_not_offer_service(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        $patient = $this->patientForClinic($clinic);
+        $doctor = $this->doctorForClinic($clinic);
+        $service = $this->serviceForClinic($clinic);
+
+        $this->actingAs($user)
+            ->from(route('appointments.create'))
+            ->post(route('appointments.store'), $this->validPayload($patient, $doctor, $service))
+            ->assertRedirect(route('appointments.create'))
+            ->assertSessionHasErrors('doctor_id');
+    }
+
+    public function test_overlapping_appointment_is_rejected_using_service_duration(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        [$patient, $doctor, $service] = $this->relatedRecords($clinic);
+        $service->update(['duration_minutes' => 30]);
+        $this->appointmentForClinic($clinic, $patient, $doctor, $service, 'scheduled', '2026-07-01', '09:00');
+
+        $this->actingAs($user)
+            ->from(route('appointments.create'))
+            ->post(route('appointments.store'), $this->validPayload($patient, $doctor, $service, ['appointment_date' => '2026-07-01', 'start_time' => '09:15']))
+            ->assertRedirect(route('appointments.create'))
+            ->assertSessionHasErrors('start_time');
+    }
+
+    public function test_no_show_appointment_does_not_block_same_time(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        [$patient, $doctor, $service] = $this->relatedRecords($clinic);
+        $this->appointmentForClinic($clinic, $patient, $doctor, $service, 'no_show', '2026-07-01', '09:00');
+
+        $this->actingAs($user)
+            ->post(route('appointments.store'), $this->validPayload($patient, $doctor, $service, ['appointment_date' => '2026-07-01', 'start_time' => '09:00']))
+            ->assertRedirect(route('appointments.index'));
+    }
+
+    public function test_editing_appointment_does_not_conflict_with_itself(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        [$patient, $doctor, $service] = $this->relatedRecords($clinic);
+        $appointment = $this->appointmentForClinic($clinic, $patient, $doctor, $service, 'scheduled', '2026-07-01', '09:00');
+
+        $this->actingAs($user)
+            ->put(route('appointments.update', $appointment), $this->validPayload($patient, $doctor, $service, ['appointment_date' => '2026-07-01', 'start_time' => '09:00']))
+            ->assertRedirect(route('appointments.show', $appointment));
+    }
+
+    public function test_changing_service_revalidates_doctor_compatibility(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        [$patient, $doctor, $service] = $this->relatedRecords($clinic);
+        $newService = $this->serviceForClinic($clinic);
+        $appointment = $this->appointmentForClinic($clinic, $patient, $doctor, $service);
+
+        $this->actingAs($user)
+            ->from(route('appointments.edit', $appointment))
+            ->put(route('appointments.update', $appointment), $this->validPayload($patient, $doctor, $newService))
+            ->assertRedirect(route('appointments.edit', $appointment))
+            ->assertSessionHasErrors('doctor_id');
+    }
+
+    public function test_changing_date_or_time_revalidates_availability(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        [$patient, $doctor, $service] = $this->relatedRecords($clinic);
+        $appointment = $this->appointmentForClinic($clinic, $patient, $doctor, $service, 'scheduled', '2026-07-01', '09:00');
+        $otherAppointment = $this->appointmentForClinic($clinic, $this->patientForClinic($clinic, 'Otro Paciente'), $doctor, $service, 'scheduled', '2026-07-02', '10:00');
+
+        $this->actingAs($user)
+            ->from(route('appointments.edit', $appointment))
+            ->put(route('appointments.update', $appointment), $this->validPayload($patient, $doctor, $service, ['appointment_date' => '2026-07-02', 'start_time' => '10:00']))
+            ->assertRedirect(route('appointments.edit', $appointment))
+            ->assertSessionHasErrors('start_time');
+
+        $this->assertDatabaseHas('appointments', ['id' => $otherAppointment->id, 'start_time' => '10:00']);
+    }
+
+    public function test_availability_endpoint_returns_available_and_unavailable_slots(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        [$patient, $doctor, $service] = $this->relatedRecords($clinic);
+        $this->appointmentForClinic($clinic, $patient, $doctor, $service, 'scheduled', '2026-07-01', '09:00');
+
+        $this->actingAs($user)
+            ->getJson(route('appointments.availability', [
+                'doctor_id' => $doctor->id,
+                'service_id' => $service->id,
+                'date' => '2026-07-01',
+            ]))
+            ->assertOk()
+            ->assertJsonFragment(['duration' => 30])
+            ->assertJsonPath('unavailable_slots.1', '09:00');
+    }
+
     private function userForClinic(Clinic $clinic): User
     {
         return User::factory()->create(['clinic_id' => $clinic->id]);
@@ -367,7 +517,12 @@ class AppointmentModuleTest extends TestCase
 
     private function relatedRecords(Clinic $clinic): array
     {
-        return [$this->patientForClinic($clinic), $this->doctorForClinic($clinic), $this->serviceForClinic($clinic)];
+        $patient = $this->patientForClinic($clinic);
+        $doctor = $this->doctorForClinic($clinic);
+        $service = $this->serviceForClinic($clinic);
+        $doctor->services()->syncWithoutDetaching([$service->id]);
+
+        return [$patient, $doctor, $service];
     }
 
     private function appointmentForClinic(Clinic $clinic, ?Patient $patient = null, ?Doctor $doctor = null, ?Service $service = null, string $status = 'scheduled', string $date = '2026-07-01', string $time = '08:00', string $reason = 'Cita de prueba'): Appointment
@@ -375,6 +530,7 @@ class AppointmentModuleTest extends TestCase
         $patient ??= $this->patientForClinic($clinic);
         $doctor ??= $this->doctorForClinic($clinic);
         $service ??= $this->serviceForClinic($clinic);
+        $doctor->services()->syncWithoutDetaching([$service->id]);
 
         return Appointment::factory()->for($clinic)->for($patient)->for($doctor)->for($service)->create([
             'appointment_date' => $date,
@@ -431,3 +587,5 @@ class AppointmentModuleTest extends TestCase
         return [$this->userForClinic($clinic), $this->appointmentForClinic($otherClinic)];
     }
 }
+
+

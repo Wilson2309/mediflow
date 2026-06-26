@@ -1,4 +1,4 @@
-<x-app-layout>
+﻿<x-app-layout>
     <div class="space-y-6">
         <section class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -66,7 +66,12 @@
 
                 <div>
                     <label for="blood_type" class="mb-2 block text-sm font-semibold text-[#0F172A]">Tipo de sangre</label>
-                    <input id="blood_type" name="blood_type" type="text" value="{{ old('blood_type', $patient->blood_type) }}" maxlength="10" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                    <select id="blood_type" name="blood_type" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                        <option value="">No especificado</option>
+                        @foreach (['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $bloodType)
+                            <option value="{{ $bloodType }}" @selected(old('blood_type', $patient->blood_type) === $bloodType)>{{ $bloodType }}</option>
+                        @endforeach
+                    </select>
                     @error('blood_type') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
                 </div>
 
@@ -111,3 +116,4 @@
         </form>
     </div>
 </x-app-layout>
+

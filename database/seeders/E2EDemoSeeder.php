@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Clinic;
 use App\Models\Doctor;
+use App\Models\Service;
 use App\Models\Specialty;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -21,7 +22,7 @@ class E2EDemoSeeder extends Seeder
         $clinic = Clinic::firstOrCreate(
             ['ruc' => '0999999999001'],
             [
-                'name' => 'MediFlow Clínica E2E',
+                'name' => 'MediFlow Clinica E2E',
                 'address' => 'Av. Principal E2E',
                 'phone' => '0999999999',
                 'email' => 'contacto@mediflow-e2e.com',
@@ -44,7 +45,7 @@ class E2EDemoSeeder extends Seeder
         $receptionist = User::firstOrCreate(
             ['email' => 'recepcionista@mediflow.com'],
             [
-                'name' => 'Recepción E2E',
+                'name' => 'Recepcion E2E',
                 'password' => Hash::make('Password123*'),
                 'clinic_id' => $clinic->id,
             ]
@@ -66,7 +67,7 @@ class E2EDemoSeeder extends Seeder
         $doctorUser = User::firstOrCreate(
             ['email' => 'medico@mediflow.com'],
             [
-                'name' => 'Dr. Médico E2E',
+                'name' => 'Dr. Medico E2E',
                 'password' => Hash::make('Password123*'),
                 'clinic_id' => $clinic->id,
             ]
@@ -79,7 +80,7 @@ class E2EDemoSeeder extends Seeder
             ['description' => 'General testing specialty']
         );
 
-        Doctor::firstOrCreate(
+        $doctor = Doctor::firstOrCreate(
             ['user_id' => $doctorUser->id],
             [
                 'clinic_id' => $clinic->id,
@@ -90,5 +91,17 @@ class E2EDemoSeeder extends Seeder
                 'status' => 'active',
             ]
         );
+
+        $service = Service::firstOrCreate(
+            ['clinic_id' => $clinic->id, 'name' => 'Consulta general E2E'],
+            [
+                'description' => 'Servicio base para pruebas E2E.',
+                'price' => 35.00,
+                'duration_minutes' => 30,
+                'status' => 'active',
+            ]
+        );
+
+        $doctor->services()->syncWithoutDetaching([$service->id]);
     }
 }

@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Clinic;
+use App\Models\Doctor;
 use App\Models\Service;
 use Illuminate\Database\Seeder;
 
@@ -15,49 +16,55 @@ class ServiceSeeder extends Seeder
         $services = [
             [
                 'name' => 'Consulta general',
-                'description' => 'Evaluación médica general para diagnóstico y orientación inicial.',
+                'description' => 'Evaluacion medica general para diagnostico y orientacion inicial.',
                 'price' => 25.00,
                 'duration_minutes' => 30,
             ],
             [
                 'name' => 'Consulta especializada',
-                'description' => 'Atención médica con especialista según la necesidad clínica del paciente.',
+                'description' => 'Atencion medica con especialista segun la necesidad clinica del paciente.',
                 'price' => 40.00,
                 'duration_minutes' => 45,
             ],
             [
-                'name' => 'Control médico',
-                'description' => 'Seguimiento de evolución, tratamiento o condición previamente diagnosticada.',
+                'name' => 'Control medico',
+                'description' => 'Seguimiento de evolucion, tratamiento o condicion previamente diagnosticada.',
                 'price' => 20.00,
                 'duration_minutes' => 20,
             ],
             [
-                'name' => 'Certificado médico',
-                'description' => 'Emisión de certificado médico según evaluación profesional.',
+                'name' => 'Certificado medico',
+                'description' => 'Emision de certificado medico segun evaluacion profesional.',
                 'price' => 15.00,
                 'duration_minutes' => 15,
             ],
             [
-                'name' => 'Revisión de resultados',
-                'description' => 'Análisis de exámenes, estudios o resultados complementarios.',
+                'name' => 'Revision de resultados',
+                'description' => 'Analisis de examenes, estudios o resultados complementarios.',
                 'price' => 18.00,
                 'duration_minutes' => 20,
             ],
         ];
 
-        foreach ($services as $service) {
-            Service::updateOrCreate(
+        $doctorIds = Doctor::where('clinic_id', $clinic->id)->where('status', 'active')->pluck('id')->all();
+
+        foreach ($services as $serviceData) {
+            $service = Service::updateOrCreate(
                 [
                     'clinic_id' => $clinic->id,
-                    'name' => $service['name'],
+                    'name' => $serviceData['name'],
                 ],
                 [
-                    'description' => $service['description'],
-                    'price' => $service['price'],
-                    'duration_minutes' => $service['duration_minutes'],
+                    'description' => $serviceData['description'],
+                    'price' => $serviceData['price'],
+                    'duration_minutes' => $serviceData['duration_minutes'],
                     'status' => 'active',
                 ]
             );
+
+            if ($doctorIds !== []) {
+                $service->doctors()->syncWithoutDetaching($doctorIds);
+            }
         }
     }
 }

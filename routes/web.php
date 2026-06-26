@@ -151,6 +151,9 @@ Route::middleware('auth')->group(function () {
     Route::get('daily-agenda', [DailyAgendaController::class, 'index'])->middleware('permission:appointments.view')->name('daily-agenda.index');
     Route::patch('daily-agenda/appointments/{appointment}/cancel', [DailyAgendaController::class, 'cancel'])->middleware('permission:appointments.update')->name('daily-agenda.appointments.cancel');
     Route::patch('daily-agenda/appointments/{appointment}/no-show', [DailyAgendaController::class, 'markNoShow'])->middleware('permission:appointments.update')->name('daily-agenda.appointments.no-show');
+    Route::get('appointments/patients/search', [AppointmentController::class, 'searchPatients'])->middleware('permission:appointments.create')->name('appointments.patients.search');
+    Route::get('appointments/doctors/search', [AppointmentController::class, 'searchDoctors'])->middleware('permission:appointments.create')->name('appointments.doctors.search');
+    Route::get('appointments/availability', [AppointmentController::class, 'availability'])->middleware('permission:appointments.create')->name('appointments.availability');
     $protectedResource('appointments', AppointmentController::class, 'appointments');
     $protectedResource('consultations', ConsultationController::class, 'consultations');
     $protectedResource('medical-records', MedicalRecordController::class, 'medical_records');
@@ -184,3 +187,4 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+

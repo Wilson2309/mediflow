@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePatientRequest extends FormRequest
 {
@@ -25,7 +26,7 @@ class StorePatientRequest extends FormRequest
             'phone' => 'nullable|string|max:30',
             'email' => 'nullable|email|max:255',
             'address' => 'nullable|string|max:255',
-            'blood_type' => 'nullable|string|max:10',
+            'blood_type' => ['nullable', Rule::in(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'])],
             'allergies' => 'nullable|string',
             'emergency_contact_name' => 'nullable|string|max:255',
             'emergency_contact_phone' => 'nullable|string|max:30',
@@ -33,3 +34,4 @@ class StorePatientRequest extends FormRequest
         ];
     }
 }
+
