@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateDemoRequestStatusRequest;
 use App\Models\DemoRequest;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -46,10 +47,17 @@ class DemoRequestController extends Controller
             $data['contacted_at'] = now();
         }
 
+        $old = AuditLogger::modelSnapshot($demoRequest);
+        $oldStatus = $demoRequest->status;
         $demoRequest->update($data);
+        $demoRequest->refresh();
+        AuditLogger::log($oldStatus !== $demoRequest->status ? 'demo_request.status_changed' : 'demo_request.updated', 'demo_requests', $demoRequest, $old, AuditLogger::modelSnapshot($demoRequest), 'Solicitud de demo actualizada.');
 
         return redirect()
             ->route('demo-requests.show', $demoRequest)
             ->with('success', 'Solicitud de demo actualizada correctamente.');
     }
 }
+
+
+

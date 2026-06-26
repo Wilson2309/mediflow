@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AppointmentController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\ClinicSettingsController;
 use App\Http\Controllers\ConsultationController;
 use App\Http\Controllers\DoctorController;
@@ -169,6 +170,7 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/patients', [ReportController::class, 'patients'])->middleware('permission:reports.patients')->name('reports.patients');
     Route::get('reports/doctors', [ReportController::class, 'doctors'])->middleware('permission:reports.doctors')->name('reports.doctors');
     Route::get('reports/services', [ReportController::class, 'services'])->middleware('permission:reports.services')->name('reports.services');
+    Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit_logs.view')->name('audit-logs.index');
     Route::get('settings/clinic', [ClinicSettingsController::class, 'edit'])->middleware('permission:settings.clinic.view')->name('settings.clinic.edit');
     Route::match(['put', 'patch'], 'settings/clinic', [ClinicSettingsController::class, 'update'])->middleware('permission:settings.clinic.update')->name('settings.clinic.update');
 

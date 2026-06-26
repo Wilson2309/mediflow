@@ -6,6 +6,7 @@ use App\Http\Requests\StorePatientRequest;
 use App\Http\Requests\UpdatePatientRequest;
 use App\Models\Doctor;
 use App\Models\Patient;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -62,10 +63,12 @@ class PatientController extends Controller
 
     public function store(StorePatientRequest $request): RedirectResponse
     {
-        Patient::create([
+        $patient = Patient::create([
             ...$request->validated(),
             'clinic_id' => $this->clinicId(),
         ]);
+
+        AuditLogger::log('patient.created', 'patients', $patient, [], AuditLogger::modelSnapshot($patient), 'Paciente creado.');
 
         return redirect()
             ->route('patients.index')
@@ -94,7 +97,12 @@ class PatientController extends Controller
     {
         $this->authorizePatientAccess($patient);
 
+        $old = AuditLogger::modelSnapshot($patient);
+        $oldStatus = $patient->status;
+
         $patient->update($request->validated());
+
+        AuditLogger::log($oldStatus === 'active' && $patient->status === 'inactive' ? 'patient.deactivated' : 'patient.updated', 'patients', $patient, $old, AuditLogger::modelSnapshot($patient), 'Paciente actualizado.');
 
         return redirect()
             ->route('patients.show', $patient)
@@ -104,6 +112,9 @@ class PatientController extends Controller
     public function destroy(Patient $patient): RedirectResponse
     {
         $this->authorizePatientAccess($patient);
+
+        $old = AuditLogger::modelSnapshot($patient);
+        AuditLogger::log('patient.deleted', 'patients', $patient, $old, [], 'Paciente eliminado.');
 
         $patient->delete();
 

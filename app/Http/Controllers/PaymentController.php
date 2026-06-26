@@ -8,6 +8,7 @@ use App\Models\Appointment;
 use App\Models\Patient;
 use App\Models\Payment;
 use App\Models\Service;
+use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -104,6 +105,7 @@ class PaymentController extends Controller
     {
         $data = $this->prepareData($request->validated(), $this->clinicId());
         $payment = Payment::create($data);
+        AuditLogger::log($this->paymentAction($payment, null), 'payments', $payment, [], AuditLogger::modelSnapshot($payment), 'Pago creado.');
         $this->syncAppointmentAfterPayment($payment);
 
         return redirect()
@@ -133,8 +135,12 @@ class PaymentController extends Controller
     public function update(UpdatePaymentRequest $request, Payment $payment): RedirectResponse
     {
         $this->authorizeClinic($payment);
+        $old = AuditLogger::modelSnapshot($payment);
+        $oldStatus = $payment->payment_status;
         $payment->update($this->prepareData($request->validated(), $this->clinicId()));
-        $this->syncAppointmentAfterPayment($payment->refresh());
+        $payment->refresh();
+        AuditLogger::log($this->paymentAction($payment, $oldStatus), 'payments', $payment, $old, AuditLogger::modelSnapshot($payment), 'Pago actualizado.');
+        $this->syncAppointmentAfterPayment($payment);
 
         return redirect()
             ->route('payments.show', $payment)
@@ -144,6 +150,9 @@ class PaymentController extends Controller
     public function destroy(Payment $payment): RedirectResponse
     {
         $this->authorizeClinic($payment);
+        $old = AuditLogger::modelSnapshot($payment);
+        AuditLogger::log('payment.deleted', 'payments', $payment, $old, [], 'Pago eliminado.');
+
         $payment->delete();
 
         return redirect()
@@ -163,7 +172,7 @@ class PaymentController extends Controller
 
         if (! $patient || (($validated['appointment_id'] ?? null) && ! $appointment) || (($validated['service_id'] ?? null) && ! $service)) {
             throw ValidationException::withMessages([
-                'clinic_id' => 'Los datos seleccionados no pertenecen a la clínica del usuario autenticado.',
+                'clinic_id' => 'Los datos seleccionados no pertenecen a la clÃ­nica del usuario autenticado.',
             ]);
         }
 
@@ -194,7 +203,7 @@ class PaymentController extends Controller
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clÃ­nica asignada.');
 
         return (int) $clinicId;
     }
@@ -233,6 +242,28 @@ class PaymentController extends Controller
             ->orderBy('name')
             ->get();
     }
+
+    private function paymentAction(Payment $payment, ?string $oldStatus): string
+    {
+        if ($payment->payment_status === 'paid' && $oldStatus !== 'paid') {
+            return 'payment.paid';
+        }
+
+        if ($payment->payment_status === 'cancelled' && $oldStatus !== 'cancelled') {
+            return 'payment.cancelled';
+        }
+
+        if ($payment->payment_status === 'refunded' && $oldStatus !== 'refunded') {
+            return 'payment.refunded';
+        }
+
+        if ($payment->payment_status === 'pending' && $oldStatus === null) {
+            return 'payment.pending_created';
+        }
+
+        return 'payment.updated';
+    }
+
     private function syncAppointmentAfterPayment(Payment $payment): void
     {
         $appointment = $payment->appointment;
@@ -242,7 +273,11 @@ class PaymentController extends Controller
         }
 
         if ($appointment->status === 'scheduled') {
+            $old = AuditLogger::modelSnapshot($appointment);
             $appointment->update(['status' => 'confirmed']);
+            AuditLogger::log('appointment.confirmed', 'appointments', $appointment, $old, AuditLogger::modelSnapshot($appointment), 'Cita confirmada automÃ¡ticamente al registrar el pago.');
         }
     }
 }
+
+

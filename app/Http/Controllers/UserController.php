@@ -7,6 +7,7 @@ use App\Http\Requests\UpdateUserRequest;
 use App\Models\Doctor;
 use App\Models\Specialty;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ class UserController extends Controller
 {
     private const ROLES = [
         'administrador' => 'Administrador',
-        'medico' => 'Médico',
+        'medico' => 'MÃ©dico',
         'recepcionista' => 'Recepcionista',
         'caja_finanzas' => 'Caja / Finanzas',
     ];
@@ -73,7 +74,9 @@ class UserController extends Controller
         $validated = $request->validated();
         $this->ensureRole($validated['role']);
 
-        DB::transaction(function () use ($validated, $clinicId) {
+        $createdUser = null;
+
+        DB::transaction(function () use ($validated, $clinicId, &$createdUser) {
             $user = User::create([
                 'clinic_id' => $clinicId,
                 'name' => $validated['name'],
@@ -84,11 +87,16 @@ class UserController extends Controller
             ]);
 
             $user->syncRoles([$validated['role']]);
+            $createdUser = $user;
 
             if ($validated['role'] === 'medico') {
                 $this->createDoctorProfile($user, $validated, $clinicId);
             }
         });
+
+        if ($createdUser) {
+            AuditLogger::log('user.created', 'users', $createdUser, [], AuditLogger::modelSnapshot($createdUser, ['id', 'clinic_id', 'name', 'email', 'phone', 'status']), 'Usuario creado.');
+        }
 
         return redirect()->route('users.index')->with('success', 'Usuario creado correctamente.');
     }
@@ -123,14 +131,17 @@ class UserController extends Controller
         $this->protectPrimaryAdministrator($user, $validated);
 
         if ($currentRole === 'administrador' && $validated['role'] !== 'administrador' && $this->administratorCount($user->clinic_id) <= 1) {
-            throw ValidationException::withMessages(['role' => 'No puedes cambiar el rol del último administrador de la clínica.']);
+            throw ValidationException::withMessages(['role' => 'No puedes cambiar el rol del Ãºltimo administrador de la clÃ­nica.']);
         }
 
         if ($currentRole === 'administrador' && $user->status === 'active' && $validated['status'] === 'inactive' && $this->administratorCount($user->clinic_id, activeOnly: true) <= 1) {
-            throw ValidationException::withMessages(['status' => 'No puedes inactivar al último administrador activo de la clínica.']);
+            throw ValidationException::withMessages(['status' => 'No puedes inactivar al Ãºltimo administrador activo de la clÃ­nica.']);
         }
 
         $this->ensureRole($validated['role']);
+
+        $old = AuditLogger::modelSnapshot($user, ['id', 'clinic_id', 'name', 'email', 'phone', 'status']);
+        $old['role'] = $currentRole;
 
         DB::transaction(function () use ($user, $validated) {
             $data = [
@@ -154,6 +165,11 @@ class UserController extends Controller
             }
         });
 
+        $user->refresh();
+        $new = AuditLogger::modelSnapshot($user, ['id', 'clinic_id', 'name', 'email', 'phone', 'status']);
+        $new['role'] = $user->getRoleNames()->first();
+        AuditLogger::log($currentRole !== $new['role'] ? 'user.role_changed' : ($old['status'] === 'active' && $new['status'] === 'inactive' ? 'user.deactivated' : 'user.updated'), 'users', $user, $old, $new, 'Usuario actualizado.');
+
         return redirect()->route('users.show', $user)->with('success', 'Usuario actualizado correctamente.');
     }
 
@@ -170,8 +186,12 @@ class UserController extends Controller
         }
 
         if ($user->hasRole('administrador') && $this->administratorCount($user->clinic_id) <= 1) {
-            throw ValidationException::withMessages(['user' => 'No puedes eliminar al último administrador de la clínica.']);
+            throw ValidationException::withMessages(['user' => 'No puedes eliminar al Ãºltimo administrador de la clÃ­nica.']);
         }
+
+        $old = AuditLogger::modelSnapshot($user, ['id', 'clinic_id', 'name', 'email', 'phone', 'status']);
+        $old['role'] = $user->getRoleNames()->first();
+        AuditLogger::log('user.deleted', 'users', $user, $old, [], 'Usuario eliminado.');
 
         DB::transaction(fn () => $user->delete());
 
@@ -181,7 +201,7 @@ class UserController extends Controller
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clÃ­nica asignada.');
 
         return (int) $clinicId;
     }
@@ -293,3 +313,6 @@ class UserController extends Controller
         return strtolower($user->email) === 'admin@mediflow.com';
     }
 }
+
+
+
