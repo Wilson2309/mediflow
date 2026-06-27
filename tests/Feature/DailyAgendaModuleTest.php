@@ -200,6 +200,23 @@ class DailyAgendaModuleTest extends TestCase
             ->assertSee('Iniciar consulta');
     }
 
+    public function test_doctor_agenda_shows_one_payment_badge_and_distinct_warning(): void
+    {
+        [$clinic, $doctorUser, $doctor] = $this->doctorUser();
+        $appointment = $this->appointmentForClinic($clinic, $doctor, patientName: 'Paciente Pago Pendiente');
+        Payment::factory()->forAppointment($appointment)->create(['payment_status' => 'pending']);
+
+        $response = $this->actingAs($doctorUser)
+            ->get(route('daily-agenda.index', ['search' => 'Pago Pendiente']))
+            ->assertOk()
+            ->assertSee('Paciente Pago Pendiente')
+            ->assertSee('Pendiente de pago')
+            ->assertSee('No puede iniciar consulta hasta que caja registre el pago.')
+            ->assertDontSee('<p class="mt-2 text-xs font-semibold text-[#B45309]">Pendiente de pago</p>', false);
+
+        $this->assertSame(1, substr_count($response->getContent(), 'No puede iniciar consulta hasta que caja registre el pago.'));
+    }
+
     public function test_doctor_does_not_see_collect_button(): void
     {
         [$clinic, $doctorUser, $doctor] = $this->doctorUser();

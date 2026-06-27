@@ -358,16 +358,30 @@ class AppointmentModuleTest extends TestCase
             ->assertJsonMissing(['id' => $otherPatient->id, 'label' => $otherPatient->full_name]);
     }
 
+    public function test_doctor_search_endpoint_returns_empty_without_service(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userForClinic($clinic);
+        $this->doctorForClinic($clinic, 'Doctor Sin Servicio');
+
+        $this->actingAs($user)
+            ->getJson(route('appointments.doctors.search', ['q' => 'Doctor']))
+            ->assertOk()
+            ->assertExactJson([]);
+    }
+
     public function test_doctor_search_endpoint_respects_clinic_scope(): void
     {
         $clinic = Clinic::factory()->create();
         $otherClinic = Clinic::factory()->create();
         $user = $this->userForClinic($clinic);
+        $service = $this->serviceForClinic($clinic);
         $doctor = $this->doctorForClinic($clinic, 'Doctor Buscable');
         $otherDoctor = $this->doctorForClinic($otherClinic, 'Doctor Oculto');
+        $doctor->services()->syncWithoutDetaching([$service->id]);
 
         $this->actingAs($user)
-            ->getJson(route('appointments.doctors.search', ['q' => 'Doctor']))
+            ->getJson(route('appointments.doctors.search', ['q' => 'Doctor', 'service_id' => $service->id]))
             ->assertOk()
             ->assertJsonFragment(['id' => $doctor->id, 'label' => 'Doctor Buscable'])
             ->assertJsonMissing(['id' => $otherDoctor->id, 'label' => 'Doctor Oculto']);

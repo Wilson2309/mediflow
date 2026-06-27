@@ -198,7 +198,11 @@ class AppointmentController extends Controller
         $term = trim((string) $request->query('q'));
         $serviceId = $request->integer('service_id') ?: null;
 
-        if ($serviceId && ! Service::where('clinic_id', $clinicId)->whereKey($serviceId)->exists()) {
+        if (! $serviceId) {
+            return response()->json([]);
+        }
+
+        if (! Service::where('clinic_id', $clinicId)->whereKey($serviceId)->exists()) {
             abort(404);
         }
 
@@ -220,7 +224,7 @@ class AppointmentController extends Controller
             ->values()
             ->map(fn (Doctor $doctor) => [
                 'id' => $doctor->id,
-                'label' => $doctor->user?->name ?? 'Medico sin usuario',
+                'label' => $doctor->user?->name ?? 'Médico sin usuario',
                 'specialty' => $doctor->specialty?->name,
                 'license' => $doctor->license_number,
             ]);
@@ -244,14 +248,14 @@ class AppointmentController extends Controller
                 'available_slots' => [],
                 'unavailable_slots' => [],
                 'duration' => $this->appointmentDuration($service),
-                'message' => 'Este medico no ofrece el servicio seleccionado.',
+                'message' => 'Este médico no ofrece el servicio seleccionado.',
             ], 422);
         }
 
         try {
             $day = Carbon::createFromFormat('Y-m-d', $date)->startOfDay();
         } catch (\Throwable) {
-            return response()->json(['message' => 'Fecha invalida.'], 422);
+            return response()->json(['message' => 'Fecha inválida.'], 422);
         }
 
         $duration = $this->appointmentDuration($service);
@@ -283,7 +287,7 @@ class AppointmentController extends Controller
             'available_slots' => $available,
             'unavailable_slots' => $unavailable,
             'duration' => $duration,
-            'message' => $available === [] ? 'No hay horarios disponibles para este medico en la fecha seleccionada.' : null,
+            'message' => $available === [] ? 'No hay horarios disponibles para este médico en la fecha seleccionada.' : null,
         ]);
     }
 
@@ -297,7 +301,7 @@ class AppointmentController extends Controller
 
         if (! $patient || ! $doctor || (($validated['service_id'] ?? null) && ! $service)) {
             throw ValidationException::withMessages([
-                'clinic_id' => 'Los datos seleccionados no pertenecen a la clinica del usuario autenticado.',
+                'clinic_id' => 'Los datos seleccionados no pertenecen a la clínica del usuario autenticado.',
             ]);
         }
 
@@ -332,10 +336,10 @@ class AppointmentController extends Controller
         AuditLogger::log('appointment.doctor_service_mismatch', 'appointments', $appointment, [], [
             'doctor_id' => $doctor->id,
             'service_id' => $service->id,
-        ], 'Intento de asignar un medico incompatible con el servicio seleccionado.');
+        ], 'Intento de asignar un médico incompatible con el servicio seleccionado.');
 
         throw ValidationException::withMessages([
-            'doctor_id' => 'Este medico no ofrece el servicio seleccionado.',
+            'doctor_id' => 'Este médico no ofrece el servicio seleccionado.',
         ]);
     }
 
@@ -353,7 +357,7 @@ class AppointmentController extends Controller
         ], 'Intento de agendar una cita en un horario ocupado.');
 
         throw ValidationException::withMessages([
-            'start_time' => 'El medico ya tiene una cita programada en esa hora.',
+            'start_time' => 'El médico ya tiene una cita programada en esa hora.',
         ]);
     }
 
@@ -402,7 +406,7 @@ class AppointmentController extends Controller
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
 
         return (int) $clinicId;
     }

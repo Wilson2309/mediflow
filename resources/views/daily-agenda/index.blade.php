@@ -77,19 +77,19 @@
         </section>
 
         <section class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
-            <form method="GET" action="{{ route('daily-agenda.index') }}" class="grid gap-4 border-b border-[#E2E8F0] p-5 xl:grid-cols-[170px_1fr_210px_190px_190px_auto]">
+            <form method="GET" action="{{ route('daily-agenda.index') }}" class="grid gap-4 border-b border-[#E2E8F0] p-5 sm:grid-cols-2 lg:grid-cols-6 lg:items-end">
                 <div>
-                    <label for="date" class="mb-2 block text-sm font-semibold text-[#0F172A]">Fecha</label>
-                    <input id="date" name="date" type="date" value="{{ $selectedDate }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                    <label for="date" class="mb-2 block whitespace-nowrap text-sm font-semibold text-[#0F172A]">Fecha</label>
+                    <input id="date" name="date" type="date" value="{{ $selectedDate }}" class="h-11 w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                 </div>
-                <div>
-                    <label for="search" class="mb-2 block text-sm font-semibold text-[#0F172A]">Buscar paciente</label>
-                    <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Nombre, identificacion, medico o servicio" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                <div class="lg:col-span-2">
+                    <label for="search" class="mb-2 block whitespace-nowrap text-sm font-semibold text-[#0F172A]">Buscar paciente</label>
+                    <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Nombre, identificación, médico o servicio" class="h-11 w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                 </div>
                 @unless ($isDoctorView)
                     <div>
-                        <label for="doctor_id" class="mb-2 block text-sm font-semibold text-[#0F172A]">Medico</label>
-                        <select id="doctor_id" name="doctor_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                        <label for="doctor_id" class="mb-2 block whitespace-nowrap text-sm font-semibold text-[#0F172A]">Médico</label>
+                        <select id="doctor_id" name="doctor_id" class="h-11 w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                             <option value="">Todos</option>
                             @foreach ($doctors as $doctor)
                                 <option value="{{ $doctor->id }}" @selected((string) $doctorId === (string) $doctor->id)>{{ $doctor->user?->name ?? 'Usuario no asignado' }}</option>
@@ -98,8 +98,8 @@
                     </div>
                 @endunless
                 <div>
-                    <label for="status" class="mb-2 block text-sm font-semibold text-[#0F172A]">Estado cita</label>
-                    <select id="status" name="status" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                    <label for="status" class="mb-2 block whitespace-nowrap text-sm font-semibold text-[#0F172A]">Estado cita</label>
+                    <select id="status" name="status" class="h-11 w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                         <option value="">Todos</option>
                         @foreach ($appointmentStatusLabels as $value => $label)
                             <option value="{{ $value }}" @selected($status === $value)>{{ $label }}</option>
@@ -107,8 +107,8 @@
                     </select>
                 </div>
                 <div>
-                    <label for="payment_status" class="mb-2 block text-sm font-semibold text-[#0F172A]">Estado pago</label>
-                    <select id="payment_status" name="payment_status" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                    <label for="payment_status" class="mb-2 block whitespace-nowrap text-sm font-semibold text-[#0F172A]">Estado pago</label>
+                    <select id="payment_status" name="payment_status" class="h-11 w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                         <option value="">Todos</option>
                         @foreach ($paymentStatusLabels as $value => $label)
                             <option value="{{ $value }}" @selected($paymentStatus === $value)>{{ $label }}</option>
@@ -116,9 +116,9 @@
                         <option value="without_payment" @selected($paymentStatus === 'without_payment')>Sin pago</option>
                     </select>
                 </div>
-                <div class="flex items-end gap-2">
-                    <button type="submit" class="inline-flex h-10 items-center justify-center rounded-lg bg-[#0F172A] px-4 text-sm font-semibold text-white">Filtrar</button>
-                    <a href="{{ route('daily-agenda.index') }}" class="inline-flex h-10 items-center justify-center rounded-lg border border-[#E2E8F0] px-4 text-sm font-semibold text-[#475569]">Limpiar</a>
+                <div class="flex gap-2 sm:col-span-2 lg:col-span-6 lg:justify-end xl:col-span-1 xl:justify-start">
+                    <button type="submit" class="inline-flex h-11 items-center justify-center rounded-lg bg-[#0F172A] px-4 text-sm font-semibold text-white">Filtrar</button>
+                    <a href="{{ route('daily-agenda.index') }}" class="inline-flex h-11 items-center justify-center rounded-lg border border-[#E2E8F0] px-4 text-sm font-semibold text-[#475569]">Limpiar</a>
                 </div>
             </form>
 
@@ -173,7 +173,7 @@
                                         <p class="mt-2 text-xs font-bold text-[#0F172A]">${{ number_format((float) $payment->amount, 2) }}</p>
                                     @endif
                                     @if ($isDoctorView && ! $hasPaidPayment)
-                                        <p class="mt-2 text-xs font-semibold text-[#B45309]">Pendiente de pago</p>
+                                        <p class="mt-2 text-xs font-semibold text-[#B45309]">No puede iniciar consulta hasta que caja registre el pago.</p>
                                     @endif
                                 </td>
                                 <td class="whitespace-nowrap px-5 py-4">

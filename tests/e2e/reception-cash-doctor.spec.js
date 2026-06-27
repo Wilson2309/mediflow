@@ -1,4 +1,4 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { login, logout } from './helpers/auth.js';
 import { createUniquePatientData, createUniqueAppointmentData } from './helpers/data.js';
 
@@ -8,7 +8,8 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
 
     const patientData = createUniquePatientData();
     const appointmentData = createUniqueAppointmentData();
-    const appointmentDate = '2031-08-15';
+    const futureDate = new Date(Date.now() + (90 + Math.floor(Math.random() * 90)) * 24 * 60 * 60 * 1000);
+    const appointmentDate = futureDate.toISOString().slice(0, 10);
 
     await login(page, 'recepcionista@mediflow.com', 'Password123*');
     await page.goto('/patients');
@@ -36,14 +37,27 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     await page.fill('#doctor_search', 'Medico E2E');
     await page.getByRole('button', { name: /Medico E2E|Médico E2E/i }).click();
 
+    await page.selectOption('#service_id', '');
+    await expect(page.locator('#doctor_search')).toBeDisabled();
+    await expect(page.locator('#doctor_id')).toHaveValue('');
+    await expect(page.locator('#start_time')).toHaveValue('');
+    await expect(page.getByText('Seleccione primero un servicio para ver médicos compatibles.').first()).toBeVisible();
+
+    await page.selectOption('#service_id', firstServiceValue);
+    await page.fill('#doctor_search', 'Medico E2E');
+    await page.getByRole('button', { name: /Medico E2E|Médico E2E/i }).click();
+
     await page.fill('#appointment_date', appointmentDate);
-    await expect(page.locator('#start_time option[value="08:00"]')).toHaveCount(1);
-    await page.selectOption('#start_time', '08:00');
+    await expect(page.getByRole('button', { name: '08:00' })).toBeVisible();
+    await page.getByRole('button', { name: '08:00' }).click();
+    await expect(page.locator('#start_time')).toHaveValue('08:00');
     await page.fill('textarea[name="reason"]', appointmentData.reason);
     await page.fill('textarea[name="notes"]', appointmentData.notes);
     await page.click('button[type="submit"]');
 
-    await expect(page.getByText('Cita creada correctamente.')).toBeVisible();
+    await expect(page).toHaveURL(/\/appointments/);
+    await expect(page.getByText(patientData.first_name).first()).toBeVisible();
+    await expect(page.getByText(appointmentData.reason).first()).toBeVisible();
 
     await page.goto('/appointments/create');
     await page.fill('#patient_search', patientData.identification_number);
@@ -52,7 +66,7 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     await page.fill('#doctor_search', 'Medico E2E');
     await page.getByRole('button', { name: /Medico E2E|Médico E2E/i }).click();
     await page.fill('#appointment_date', appointmentDate);
-    await expect(page.locator('#start_time option[value="08:00"]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '08:00' })).toHaveCount(0);
     await logout(page);
 
     await login(page, 'caja@mediflow.com', 'Password123*');
@@ -61,8 +75,10 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     await logout(page);
 
     await login(page, 'medico@mediflow.com', 'Password123*');
-    await page.goto('/consultations');
-    await expect(page.getByRole('heading', { name: /Consultas/i })).toBeVisible();
+    await page.goto('/daily-agenda?date=' + appointmentDate + '&search=' + encodeURIComponent(patientData.first_name));
+    await expect(page.getByRole('heading', { name: /Agenda del d/i })).toBeVisible();
+    await expect(page.getByText('No puede iniciar consulta hasta que caja registre el pago.')).toHaveCount(1);
+    await expect(page.locator('td', { hasText: 'Pendiente de pago' }).getByText('Pendiente de pago')).toHaveCount(1);
     await logout(page);
 
     await login(page, 'admin@mediflow.com', 'Admin123*');

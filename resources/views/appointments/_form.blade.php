@@ -5,7 +5,7 @@
         'confirmed' => 'Confirmada',
         'completed' => 'Completada',
         'cancelled' => 'Cancelada',
-        'no_show' => 'No asistiÃ³',
+        'no_show' => 'No asistió',
     ];
     $selectedPatientData = $selectedPatient ? [
         'id' => $selectedPatient->id,
@@ -15,7 +15,7 @@
     ] : null;
     $selectedDoctorData = $selectedDoctor ? [
         'id' => $selectedDoctor->id,
-        'label' => $selectedDoctor->user?->name ?? 'MÃ©dico sin usuario',
+        'label' => $selectedDoctor->user?->name ?? 'Médico sin usuario',
         'specialty' => $selectedDoctor->specialty?->name,
         'license' => $selectedDoctor->license_number,
     ] : null;
@@ -40,17 +40,17 @@
 >
     <div>
         <label for="patient_search" class="mb-2 block text-sm font-semibold text-[#0F172A]">Paciente *</label>
-        <input id="patient_search" type="search" x-model="patientQuery" x-on:input.debounce.250ms="searchPatients()" x-on:focus="searchPatients()" placeholder="Buscar por nombre, cÃ©dula, telÃ©fono o correo" autocomplete="off" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+        <input id="patient_search" type="search" x-model="patientQuery" x-on:input.debounce.250ms="searchPatients()" x-on:focus="searchPatients()" placeholder="Buscar por nombre, cédula, teléfono o correo" autocomplete="off" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
         <input type="hidden" id="patient_id" name="patient_id" x-model="patientId">
         <div x-show="patientResults.length" class="mt-2 max-h-56 overflow-y-auto rounded-lg border border-[#E2E8F0] bg-white shadow-sm" x-cloak>
             <template x-for="patient in patientResults" :key="patient.id">
                 <button type="button" x-on:click="selectPatient(patient)" class="block w-full border-b border-[#E2E8F0] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[#F8FAFC]">
                     <span class="block font-semibold text-[#0F172A]" x-text="patient.label"></span>
-                    <span class="block text-xs text-[#475569]" x-text="[patient.identification || 'Sin identificaciÃ³n', patient.contact || 'Sin contacto'].join(' Â· ')"></span>
+                    <span class="block text-xs text-[#475569]" x-text="[patient.identification || 'Sin identificación', patient.contact || 'Sin contacto'].join(' · ')"></span>
                 </button>
             </template>
         </div>
-        <p class="mt-2 text-xs text-[#475569]">Escriba al menos parte del nombre, cÃ©dula, telÃ©fono o correo.</p>
+        <p class="mt-2 text-xs text-[#475569]">Escriba al menos parte del nombre, cédula, teléfono o correo.</p>
         @error('patient_id') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
     </div>
 
@@ -62,20 +62,21 @@
                 <option value="{{ $service->id }}">{{ $service->name }} - ${{ number_format((float) $service->price, 2) }} - {{ $service->duration_minutes }} min</option>
             @endforeach
         </select>
+        <p class="mt-2 text-xs text-[#475569]">Seleccione un servicio para cargar médicos compatibles y horarios disponibles.</p>
         @error('service_id') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
     </div>
 
     <div>
-        <label for="doctor_search" class="mb-2 block text-sm font-semibold text-[#0F172A]">MÃ©dico *</label>
+        <label for="doctor_search" class="mb-2 block text-sm font-semibold text-[#0F172A]">Médico *</label>
         <input id="doctor_search" type="search" x-model="doctorQuery" x-on:input.debounce.250ms="searchDoctors()" x-on:focus="searchDoctors()" :disabled="!serviceId" placeholder="Buscar por nombre, especialidad o licencia" autocomplete="off" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 focus:border-[#2563EB] focus:ring-[#2563EB]">
         <input type="hidden" id="doctor_id" name="doctor_id" x-model="doctorId">
-        <p x-show="!serviceId" class="mt-2 text-xs text-[#F59E0B]" x-cloak>Seleccione primero un servicio para ver mÃ©dicos compatibles.</p>
+        <p x-show="!serviceId" class="mt-2 text-xs text-[#F59E0B]" x-cloak>Seleccione primero un servicio para ver médicos compatibles.</p>
         <p x-show="doctorMessage" class="mt-2 text-xs text-[#EF4444]" x-text="doctorMessage" x-cloak></p>
         <div x-show="doctorResults.length" class="mt-2 max-h-56 overflow-y-auto rounded-lg border border-[#E2E8F0] bg-white shadow-sm" x-cloak>
             <template x-for="doctor in doctorResults" :key="doctor.id">
                 <button type="button" x-on:click="selectDoctor(doctor)" class="block w-full border-b border-[#E2E8F0] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[#F8FAFC]">
                     <span class="block font-semibold text-[#0F172A]" x-text="doctor.label"></span>
-                    <span class="block text-xs text-[#475569]" x-text="[doctor.specialty || 'Sin especialidad', doctor.license || 'Sin licencia'].join(' Â· ')"></span>
+                    <span class="block text-xs text-[#475569]" x-text="[doctor.specialty || 'Sin especialidad', doctor.license || 'Sin licencia'].join(' · ')"></span>
                 </button>
             </template>
         </div>
@@ -88,18 +89,22 @@
         @error('appointment_date') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
     </div>
 
-    <div>
-        <label for="start_time" class="mb-2 block text-sm font-semibold text-[#0F172A]">Hora inicio *</label>
-        <select id="start_time" name="start_time" x-model="startTime" x-on:change="syncEndTime()" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
-            <option value="">Seleccione una hora</option>
+    <div class="md:col-span-2">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <label class="block text-sm font-semibold text-[#0F172A]">Hora inicio *</label>
+                <p x-show="duration" class="mt-1 text-xs text-[#475569]" x-text="'Duración estimada: ' + duration + ' minutos'"></p>
+            </div>
+            <p x-show="availabilityMessage" class="text-sm font-semibold" :class="availabilityMessageType === 'error' ? 'text-[#EF4444]' : 'text-[#475569]'" x-text="availabilityMessage" x-cloak></p>
+        </div>
+        <input type="hidden" id="start_time" name="start_time" x-model="startTime" :value="startTime">
+        <input type="hidden" id="end_time" name="end_time" x-model="endTime" :value="endTime">
+        <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
             <template x-for="slot in availableSlots" :key="slot">
-                <option :value="slot" x-text="slot"></option>
+                <button type="button" x-on:click="selectSlot(slot)" class="rounded-lg border px-3 py-2 text-sm font-semibold transition" :class="startTime === slot ? 'border-[#2563EB] bg-[#2563EB] text-white shadow-sm shadow-blue-500/20' : 'border-[#E2E8F0] bg-white text-[#0F172A] hover:border-[#2563EB] hover:text-[#2563EB]'" x-text="slot"></button>
             </template>
-            <option x-show="startTime && !availableSlots.includes(startTime)" :value="startTime" x-text="startTime + ' (seleccionada)'"></option>
-        </select>
-        <input type="hidden" id="end_time" name="end_time" x-model="endTime">
-        <p x-show="availabilityMessage" class="mt-2 text-xs" :class="availableSlots.length ? 'text-[#475569]' : 'text-[#EF4444]'" x-text="availabilityMessage" x-cloak></p>
-        <p x-show="duration" class="mt-2 text-xs text-[#475569]" x-text="'DuraciÃ³n estimada: ' + duration + ' minutos'"></p>
+        </div>
+        <div x-show="!availableSlots.length && serviceId && doctorId && date && !availabilityMessage" class="mt-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3 text-sm text-[#475569]" x-cloak>No hay horarios disponibles para este médico en la fecha seleccionada.</div>
         @error('start_time') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
         @error('end_time') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
     </div>
@@ -147,10 +152,15 @@
             doctorResults: [],
             availableSlots: [],
             availabilityMessage: '',
+            availabilityMessageType: 'info',
             doctorMessage: '',
             async init() {
-                this.syncEndTime();
-                if (this.serviceId && this.doctorId && this.date) {
+                if (!this.serviceId) {
+                    this.clearDoctorAndAvailability('Seleccione primero un servicio para ver médicos compatibles.');
+                    return;
+                }
+
+                if (this.doctorId && this.date) {
                     await this.loadAvailability();
                 }
             },
@@ -166,17 +176,22 @@
             async searchDoctors() {
                 this.doctorMessage = '';
                 if (!this.serviceId) {
-                    this.doctorResults = [];
-                    this.doctorMessage = 'Seleccione primero un servicio para ver mÃ©dicos compatibles.';
+                    this.clearDoctorAndAvailability('Seleccione primero un servicio para ver médicos compatibles.');
                     return;
                 }
+
                 const response = await fetch(config.doctorSearchUrl + '?' + new URLSearchParams({ q: this.doctorQuery || '', service_id: this.serviceId }), { headers: { Accept: 'application/json' } });
                 this.doctorResults = response.ok ? await response.json() : [];
                 if (this.doctorResults.length === 0) {
-                    this.doctorMessage = 'No hay mÃ©dicos compatibles con ese servicio.';
+                    this.doctorMessage = 'No hay médicos compatibles con ese servicio.';
                 }
             },
             selectDoctor(doctor) {
+                if (!this.serviceId) {
+                    this.clearDoctorAndAvailability('Seleccione primero un servicio para ver médicos compatibles.');
+                    return;
+                }
+
                 this.doctorId = String(doctor.id);
                 this.doctorQuery = doctor.label;
                 this.doctorResults = [];
@@ -184,50 +199,98 @@
                 this.loadAvailability();
             },
             async handleServiceChange() {
-                this.availableSlots = [];
-                this.availabilityMessage = '';
+                this.clearAvailability();
+
                 if (!this.serviceId) {
-                    this.doctorId = '';
-                    this.doctorQuery = '';
-                    this.doctorMessage = 'Seleccione primero un servicio para ver mÃ©dicos compatibles.';
+                    this.clearDoctorAndAvailability('Seleccione primero un servicio para ver médicos compatibles.');
                     return;
                 }
+
                 const previousDoctorId = this.doctorId;
                 await this.searchDoctors();
+
                 if (previousDoctorId && !this.doctorResults.some((doctor) => String(doctor.id) === String(previousDoctorId))) {
                     this.doctorId = '';
                     this.doctorQuery = '';
-                    this.doctorMessage = 'Este mÃ©dico no ofrece el servicio seleccionado.';
+                    this.doctorMessage = 'Este médico no ofrece el servicio seleccionado.';
                 }
+
                 await this.loadAvailability();
             },
             async loadAvailability() {
-                this.availableSlots = [];
-                this.availabilityMessage = '';
+                this.clearAvailability();
+
+                if (!this.serviceId) {
+                    this.clearDoctorAndAvailability('Seleccione primero un servicio para ver médicos compatibles.');
+                    return;
+                }
+
                 if (!this.doctorId || !this.date) {
                     return;
                 }
+
                 const params = {
                     doctor_id: this.doctorId,
-                    service_id: this.serviceId || '',
+                    service_id: this.serviceId,
                     date: this.date,
                 };
                 if (config.appointmentId) {
                     params.appointment_id = config.appointmentId;
                 }
+
                 const response = await fetch(config.availabilityUrl + '?' + new URLSearchParams(params), { headers: { Accept: 'application/json' } });
                 const data = await response.json();
+
                 if (!response.ok) {
-                    this.availabilityMessage = data.message || 'No se pudo consultar la disponibilidad.';
+                    this.setAvailabilityMessage(data.message || 'No se pudo consultar la disponibilidad.', 'error');
                     return;
                 }
+
                 this.availableSlots = data.available_slots || [];
                 this.duration = data.duration || null;
-                this.availabilityMessage = data.message || (this.availableSlots.length ? 'Horarios disponibles cargados.' : 'No hay horarios disponibles para este mÃ©dico en la fecha seleccionada.');
-                if (this.startTime && !this.availableSlots.includes(this.startTime)) {
-                    this.availabilityMessage = 'El mÃ©dico ya tiene una cita programada en esa hora.';
+
+                if (!this.availableSlots.length) {
+                    this.setAvailabilityMessage(data.message || 'No hay horarios disponibles para este médico en la fecha seleccionada.', 'error');
+                    this.startTime = '';
+                    this.endTime = '';
+                    return;
                 }
+
+                if (this.startTime && !this.availableSlots.includes(this.startTime)) {
+                    this.startTime = '';
+                    this.endTime = '';
+                    this.setAvailabilityMessage('El médico ya tiene una cita programada en esa hora.', 'error');
+                    return;
+                }
+
+                this.availabilityMessage = '';
+                this.availabilityMessageType = 'info';
                 this.syncEndTime();
+            },
+            selectSlot(slot) {
+                this.startTime = slot;
+                this.availabilityMessage = '';
+                this.availabilityMessageType = 'info';
+                this.syncEndTime();
+            },
+            clearDoctorAndAvailability(message) {
+                this.doctorId = '';
+                this.doctorQuery = '';
+                this.doctorResults = [];
+                this.doctorMessage = message;
+                this.clearAvailability();
+            },
+            clearAvailability() {
+                this.availableSlots = [];
+                this.startTime = '';
+                this.endTime = '';
+                this.duration = null;
+                this.availabilityMessage = '';
+                this.availabilityMessageType = 'info';
+            },
+            setAvailabilityMessage(message, type = 'info') {
+                this.availabilityMessage = message;
+                this.availabilityMessageType = type;
             },
             syncEndTime() {
                 if (!this.startTime || !this.duration) {
