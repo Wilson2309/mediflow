@@ -7,6 +7,7 @@ use App\Http\Controllers\ConsultationController;
 use App\Http\Controllers\DailyAgendaController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\DemoRequestController;
+use App\Http\Controllers\FinancialAuditController;
 use App\Http\Controllers\MedicalRecordController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PaymentController;
@@ -178,6 +179,10 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/appointments', [ReportController::class, 'appointments'])->middleware('permission:reports.appointments')->name('reports.appointments');
     Route::get('reports/clinical', [ReportController::class, 'clinical'])->middleware('permission:reports.clinical')->name('reports.clinical');
     Route::get('reports/financial', [ReportController::class, 'financial'])->middleware('permission:reports.financial')->name('reports.financial');
+    Route::get('reports/financial/export/pdf', [ReportController::class, 'financialPdf'])->middleware('permission:reports.financial')->name('reports.financial.export.pdf');
+    Route::get('reports/financial/export/csv', [ReportController::class, 'financialCsv'])->middleware('permission:reports.financial')->name('reports.financial.export.csv');
+    Route::get('reports/financial/print', [ReportController::class, 'financialPrint'])->middleware('permission:reports.financial')->name('reports.financial.print');
+    Route::get('financial-audit', [FinancialAuditController::class, 'index'])->middleware('permission:reports.financial')->name('financial-audit.index');
     Route::get('reports/patients', [ReportController::class, 'patients'])->middleware('permission:reports.patients')->name('reports.patients');
     Route::get('reports/doctors', [ReportController::class, 'doctors'])->middleware('permission:reports.doctors')->name('reports.doctors');
     Route::get('reports/services', [ReportController::class, 'services'])->middleware('permission:reports.services')->name('reports.services');

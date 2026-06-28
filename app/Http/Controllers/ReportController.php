@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ReportFilterRequest;
 use App\Models\Appointment;
+use App\Models\Clinic;
 use App\Models\Consultation;
 use App\Models\Doctor;
 use App\Models\Patient;
@@ -11,16 +12,28 @@ use App\Models\Payment;
 use App\Models\Prescription;
 use App\Models\Service;
 use App\Models\Specialty;
+use App\Services\AuditLogger;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends Controller
 {
-    public function index(ReportFilterRequest $request): View
+    public function index(ReportFilterRequest $request): View|RedirectResponse
     {
         [$clinicId, $filters, $start, $end] = $this->context($request);
         $user = $request->user();
+
+        if (! $this->canViewGeneralReport($user)) {
+            $firstReportRoute = $this->firstAllowedReportRoute($user);
+            abort_if(! $firstReportRoute, 403);
+
+            return redirect()->route($firstReportRoute, $request->query());
+        }
         $appointments = $user->can('reports.appointments')
             ? $this->appointmentsQuery($clinicId, $start, $end)
             : Appointment::query()->whereRaw('1 = 0');
@@ -48,7 +61,7 @@ class ReportController extends Controller
                 'activeServices' => $user->can('services.view') ? Service::where('clinic_id', $clinicId)->where('status', 'active')->count() : 0,
                 'appointments' => (clone $appointments)->count(),
                 'todayAppointments' => $user->can('reports.appointments')
-                    ? Appointment::where('clinic_id', $clinicId)->whereDate('appointment_date', today())->count()
+                    ? Appointment::where('clinic_id', $clinicId)->whereDate('appointment_date', $this->localNow()->toDateString())->count()
                     : 0,
                 'completedAppointments' => (int) ($appointmentCounts['completed'] ?? 0),
                 'cancelledAppointments' => (int) ($appointmentCounts['cancelled'] ?? 0),
@@ -130,25 +143,92 @@ class ReportController extends Controller
     public function financial(ReportFilterRequest $request): View
     {
         [$clinicId, $filters, $start, $end] = $this->context($request);
-        $query = $this->paymentPeriod(Payment::where('clinic_id', $clinicId), $start, $end)
-            ->when($filters['payment_status'] ?? null, fn ($query, $status) => $query->where('payment_status', $status))
-            ->when($filters['payment_method'] ?? null, fn ($query, $method) => $query->where('payment_method', $method))
-            ->when($filters['service_id'] ?? null, fn ($query, $id) => $query->where('service_id', $id));
-        $paid = (clone $query)->where('payment_status', 'paid');
+        $report = $this->financialReportData($clinicId, $filters, $start, $end);
 
         return view('reports.financial', [
             ...$this->shared($clinicId, $filters, $start, $end),
-            'payments' => (clone $query)->with(['patient', 'service'])->latest('created_at')->paginate(15)->withQueryString(),
-            'metrics' => [
-                'paidIncome' => (float) (clone $paid)->sum('amount'),
-                'pending' => (clone $query)->where('payment_status', 'pending')->count(),
-                'cancelled' => (clone $query)->where('payment_status', 'cancelled')->count(),
-                'refunded' => (clone $query)->where('payment_status', 'refunded')->count(),
-                'averagePayment' => (float) ((clone $paid)->avg('amount') ?? 0),
-                'patientsWithPendingPayments' => (clone $query)->where('payment_status', 'pending')->distinct('patient_id')->count('patient_id'),
-            ],
-            'methodCounts' => (clone $query)->selectRaw('payment_method, COUNT(*) as total')->groupBy('payment_method')->pluck('total', 'payment_method'),
-            'incomeByService' => (clone $paid)->whereNotNull('service_id')->with('service:id,name')->selectRaw('service_id, SUM(amount) as total')->groupBy('service_id')->orderByDesc('total')->limit(10)->get(),
+            ...$report,
+            'payments' => (clone $report['query'])->paginate(15)->withQueryString(),
+        ]);
+    }
+
+    public function financialPdf(ReportFilterRequest $request): Response
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->financialReportData($clinicId, $filters, $start, $end);
+        $payments = (clone $report['query'])->get();
+
+        $this->auditFinancialExport('report.financial_exported_pdf', 'pdf', $clinicId, $filters, $report['metrics']);
+
+        return Pdf::loadView('reports.financial-print', [
+            ...$this->shared($clinicId, $filters, $start, $end),
+            ...$report,
+            'payments' => $payments,
+            'clinic' => Clinic::find($clinicId),
+            'generatedAt' => $this->localNow(),
+            'generatedBy' => $request->user(),
+            'forPdf' => true,
+        ])->setPaper('a4', 'landscape')->download('reporte-financiero-'.$this->localNow()->format('Y-m-d').'.pdf');
+    }
+
+    public function financialCsv(ReportFilterRequest $request): StreamedResponse
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->financialReportData($clinicId, $filters, $start, $end);
+        $payments = (clone $report['query'])->get();
+        $timezone = config('app.timezone', 'America/Guayaquil');
+
+        $this->auditFinancialExport('report.financial_exported_csv', 'csv', $clinicId, $filters, $report['metrics']);
+
+        return response()->streamDownload(function () use ($payments, $timezone): void {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($handle, [
+                'Número de pago',
+                'Fecha de pago',
+                'Paciente',
+                'Identificación',
+                'Servicio',
+                'Médico',
+                'Método de pago',
+                'Estado',
+                'Monto',
+            ], ';');
+
+            foreach ($payments as $payment) {
+                fputcsv($handle, [
+                    $this->paymentNumber($payment),
+                    $payment->payment_date?->timezone($timezone)->format('d/m/Y H:i') ?? 'Sin fecha',
+                    $payment->patient?->full_name ?? 'Sin paciente',
+                    $payment->patient?->identification_number ?? 'Sin registrar',
+                    $payment->service?->name ?? 'Sin servicio',
+                    $payment->appointment?->doctor?->user?->name ?? 'Sin médico',
+                    $this->paymentMethodLabels()[$payment->payment_method] ?? $payment->payment_method,
+                    $this->paymentStatusLabels()[$payment->payment_status] ?? $payment->payment_status,
+                    number_format((float) $payment->amount, 2, '.', ''),
+                ], ';');
+            }
+
+            fclose($handle);
+        }, 'reporte-financiero-'.$this->localNow()->format('Y-m-d').'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+    public function financialPrint(ReportFilterRequest $request): View
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->financialReportData($clinicId, $filters, $start, $end);
+
+        $this->auditFinancialExport('report.financial_printed', 'print', $clinicId, $filters, $report['metrics']);
+
+        return view('reports.financial-print', [
+            ...$this->shared($clinicId, $filters, $start, $end),
+            ...$report,
+            'payments' => (clone $report['query'])->get(),
+            'clinic' => Clinic::find($clinicId),
+            'generatedAt' => $this->localNow(),
+            'generatedBy' => $request->user(),
+            'forPdf' => false,
         ]);
     }
 
@@ -261,10 +341,12 @@ class ReportController extends Controller
     private function context(ReportFilterRequest $request): array
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
         $filters = $request->validated();
-        $start = Carbon::parse($filters['start_date'] ?? now()->startOfMonth()->toDateString())->startOfDay();
-        $end = Carbon::parse($filters['end_date'] ?? now()->endOfMonth()->toDateString())->endOfDay();
+        $timezone = config('app.timezone', 'America/Guayaquil');
+        $localNow = $this->localNow();
+        $start = Carbon::parse($filters['start_date'] ?? $localNow->copy()->startOfMonth()->toDateString(), $timezone)->startOfDay();
+        $end = Carbon::parse($filters['end_date'] ?? $localNow->copy()->endOfMonth()->toDateString(), $timezone)->endOfDay();
 
         return [(int) $clinicId, $filters, $start, $end];
     }
@@ -284,6 +366,100 @@ class ReportController extends Controller
         ];
     }
 
+    /** @return array<string, mixed> */
+    private function financialReportData(int $clinicId, array $filters, Carbon $start, Carbon $end): array
+    {
+        $query = $this->financialQuery($clinicId, $filters, $start, $end);
+        $paid = (clone $query)->where('payment_status', 'paid');
+        $pending = (clone $query)->where('payment_status', 'pending');
+        $cancelled = (clone $query)->where('payment_status', 'cancelled');
+        $refunded = (clone $query)->where('payment_status', 'refunded');
+        $totalPayments = (clone $query)->count();
+
+        return [
+            'query' => $query,
+            'metrics' => [
+                'totalAmount' => (float) (clone $query)->sum('amount'),
+                'paidIncome' => (float) (clone $paid)->sum('amount'),
+                'pendingAmount' => (float) (clone $pending)->sum('amount'),
+                'cancelledAmount' => (float) (clone $cancelled)->sum('amount'),
+                'refundedAmount' => (float) (clone $refunded)->sum('amount'),
+                'totalPayments' => $totalPayments,
+                'paidPayments' => (clone $paid)->count(),
+                'pending' => (clone $pending)->count(),
+                'cancelled' => (clone $cancelled)->count(),
+                'refunded' => (clone $refunded)->count(),
+                'averagePayment' => (float) ((clone $paid)->avg('amount') ?? 0),
+                'patientsWithPendingPayments' => (clone $pending)->distinct('patient_id')->count('patient_id'),
+            ],
+            'methodTotals' => (clone $query)
+                ->reorder()
+                ->selectRaw('payment_method, COUNT(*) as total_count, SUM(amount) as total_amount')
+                ->groupBy('payment_method')
+                ->get()
+                ->keyBy('payment_method'),
+            'incomeByService' => (clone $paid)
+                ->reorder()
+                ->whereNotNull('service_id')
+                ->with('service:id,name')
+                ->selectRaw('service_id, SUM(amount) as total')
+                ->groupBy('service_id')
+                ->orderByDesc('total')
+                ->limit(10)
+                ->get(),
+            'methodLabels' => $this->paymentMethodLabels(),
+            'statusLabels' => $this->paymentStatusLabels(),
+        ];
+    }
+
+    private function financialQuery(int $clinicId, array $filters, Carbon $start, Carbon $end): Builder
+    {
+        return $this->paymentPeriod(Payment::where('clinic_id', $clinicId), $start, $end)
+            ->with(['patient', 'service', 'appointment.doctor.user'])
+            ->when($filters['payment_status'] ?? null, fn ($query, $status) => $query->where('payment_status', $status))
+            ->when($filters['payment_method'] ?? null, fn ($query, $method) => $query->where('payment_method', $method))
+            ->when($filters['service_id'] ?? null, fn ($query, $id) => $query->where('service_id', $id))
+            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->whereHas('appointment', fn ($query) => $query->where('doctor_id', $id)))
+            ->orderByRaw('payment_date IS NULL')
+            ->orderByDesc('payment_date')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+    }
+
+    private function canViewGeneralReport($user): bool
+    {
+        return collect($this->sectionReportPermissions())->every(fn ($permission) => $user?->can($permission));
+    }
+
+    private function firstAllowedReportRoute($user): ?string
+    {
+        foreach ($this->sectionReportRoutes() as $route => $permission) {
+            if ($user?->can($permission)) {
+                return $route;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return array<string, string> */
+    private function sectionReportRoutes(): array
+    {
+        return [
+            'reports.appointments' => 'reports.appointments',
+            'reports.clinical' => 'reports.clinical',
+            'reports.financial' => 'reports.financial',
+            'reports.patients' => 'reports.patients',
+            'reports.doctors' => 'reports.doctors',
+            'reports.services' => 'reports.services',
+        ];
+    }
+
+    /** @return array<int, string> */
+    private function sectionReportPermissions(): array
+    {
+        return array_values($this->sectionReportRoutes());
+    }
     private function appointmentsQuery(int $clinicId, Carbon $start, Carbon $end): Builder
     {
         return Appointment::where('clinic_id', $clinicId)->whereBetween('appointment_date', [$start->toDateString(), $end->toDateString()]);
@@ -307,5 +483,42 @@ class ReportController extends Controller
                     $query->whereNull($paymentDate)->whereBetween($createdAt, [$start, $end]);
                 });
         });
+    }
+
+    /** @return array<string, string> */
+    private function paymentMethodLabels(): array
+    {
+        return ['cash' => 'Efectivo', 'card' => 'Tarjeta', 'transfer' => 'Transferencia', 'other' => 'Otro'];
+    }
+
+    /** @return array<string, string> */
+    private function paymentStatusLabels(): array
+    {
+        return ['pending' => 'Pendiente', 'paid' => 'Pagado', 'cancelled' => 'Cancelado', 'refunded' => 'Reembolsado'];
+    }
+
+    private function paymentNumber(Payment $payment): string
+    {
+        return 'PAG-'.str_pad((string) $payment->id, 6, '0', STR_PAD_LEFT);
+    }
+
+    private function localNow(): Carbon
+    {
+        return now(config('app.timezone', 'America/Guayaquil'));
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function auditFinancialExport(string $action, string $format, int $clinicId, array $filters, array $metrics): void
+    {
+        AuditLogger::log($action, 'reports', null, [], [
+            'date_from' => $filters['start_date'] ?? null,
+            'date_to' => $filters['end_date'] ?? null,
+            'filters' => $filters,
+            'user_id' => auth()->id(),
+            'clinic_id' => $clinicId,
+            'total_amount' => $metrics['paidIncome'] ?? 0,
+            'total_records' => $metrics['totalPayments'] ?? 0,
+            'format' => $format,
+        ], 'Reporte financiero exportado.');
     }
 }

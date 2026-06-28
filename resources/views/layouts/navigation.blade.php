@@ -42,6 +42,7 @@
         ['label' => 'Pagos y Finanzas', 'href' => route('payments.index'), 'active' => request()->routeIs('payments.*'), 'icon' => 'payments', 'permission' => 'payments.view', 'badge' => $pendingPaymentsBadge],
         ['label' => 'Servicios médicos', 'href' => route('services.index'), 'active' => request()->routeIs('services.*'), 'icon' => 'services', 'permission' => 'services.view'],
         ['label' => 'Reportes', 'href' => route('reports.index'), 'active' => request()->routeIs('reports.*'), 'icon' => 'reports', 'permission' => 'reports.view'],
+        ['label' => 'Registro de caja', 'href' => route('financial-audit.index'), 'active' => request()->routeIs('financial-audit.*'), 'icon' => 'audit', 'permission' => 'reports.financial'],
         ['label' => 'Auditoría', 'href' => route('audit-logs.index'), 'active' => request()->routeIs('audit-logs.*'), 'icon' => 'audit', 'permission' => 'audit_logs.view'],
         ['label' => 'Solicitudes de demo', 'href' => route('demo-requests.index'), 'active' => request()->routeIs('demo-requests.*'), 'icon' => 'demoRequests', 'permission' => 'demo_requests.view'],
         ['label' => 'Usuarios y Roles', 'href' => route('users.index'), 'active' => request()->routeIs('users.*'), 'icon' => 'users', 'permission' => 'users.view'],

@@ -62,11 +62,13 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     await page.getByRole('button', { name: /Medico E2E|M.dico E2E/i }).click();
 
     await page.fill('#appointment_date', appointmentDate);
-    await expect(page.getByRole('button', { name: '08:00' })).toBeVisible();
+    const firstAvailableSlot = page.getByRole('button', { name: /^\d{2}:\d{2}$/ }).first();
+    await expect(firstAvailableSlot).toBeVisible();
+    const selectedSlot = (await firstAvailableSlot.textContent()).trim();
     await page.fill('textarea[name="reason"]', appointmentData.reason);
     await page.fill('textarea[name="notes"]', appointmentData.notes);
-    await page.getByRole('button', { name: '08:00' }).click();
-    await expect(page.locator('#start_time')).toHaveValue('08:00');
+    await firstAvailableSlot.click();
+    await expect(page.locator('#start_time')).toHaveValue(selectedSlot);
     await page.click('button[type="submit"]');
 
     await expect(page).toHaveURL(/\/appointments/);
@@ -80,7 +82,7 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     await page.fill('#doctor_search', 'Medico E2E');
     await page.getByRole('button', { name: /Medico E2E|M.dico E2E/i }).click();
     await page.fill('#appointment_date', appointmentDate);
-    await expect(page.getByRole('button', { name: '08:00' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: selectedSlot })).toHaveCount(0);
     await logout(page);
 
     await login(page, 'caja@mediflow.com', 'Password123*');

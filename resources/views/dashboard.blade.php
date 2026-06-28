@@ -122,8 +122,22 @@
                 </div>
             </div>
             <div class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
-                <h2 class="text-base font-bold text-[#0F172A]">Actividad reciente</h2>
-                <p class="mt-2 text-sm leading-6 text-[#475569]">La auditoria y actividad del sistema estaran disponibles en una proxima fase.</p>
+                <h2 class="text-base font-bold text-[#0F172A]">Accesos operativos</h2>
+                <p class="mt-2 text-sm leading-6 text-[#475569]">Funciones disponibles para el flujo diario de recepcion, caja y seguimiento financiero.</p>
+                <div class="mt-5 grid gap-2">
+                    @can('appointments.view')
+                        <a href="{{ route('daily-agenda.index') }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm font-semibold text-[#2563EB] transition hover:border-[#2563EB] hover:bg-[#2563EB]/5">Agenda del dia</a>
+                    @endcan
+                    @can('payments.view')
+                        <a href="{{ route('payments.index', ['payment_status' => 'pending']) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm font-semibold text-[#B45309] transition hover:border-[#F59E0B] hover:bg-[#F59E0B]/5">Pendientes de cobro</a>
+                        <a href="{{ route('payments.index', ['payment_status' => 'paid', 'date_from' => now(config('app.timezone', 'America/Guayaquil'))->toDateString(), 'date_to' => now(config('app.timezone', 'America/Guayaquil'))->toDateString()]) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm font-semibold text-[#047857] transition hover:border-[#10B981] hover:bg-[#10B981]/5">Pagos del dia</a>
+                        <a href="{{ route('payments.index', ['payment_status' => 'paid']) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm font-semibold text-[#0F172A] transition hover:border-[#0F172A] hover:bg-slate-50">Recibos de pago</a>
+                    @endcan
+                    @can('reports.financial')
+                        <a href="{{ route('reports.financial') }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm font-semibold text-[#2563EB] transition hover:border-[#2563EB] hover:bg-[#2563EB]/5">Reporte financiero</a>
+                        <a href="{{ route('financial-audit.index') }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm font-semibold text-[#475569] transition hover:border-[#2563EB] hover:text-[#2563EB]">Registro de caja</a>
+                    @endcan
+                </div>
             </div>
         </section>
         @endcan

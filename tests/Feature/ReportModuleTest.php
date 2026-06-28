@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Appointment;
+use App\Models\AuditLog;
 use App\Models\Clinic;
 use App\Models\Consultation;
 use App\Models\Doctor;
@@ -139,27 +140,29 @@ class ReportModuleTest extends TestCase
     public function test_financial_report_filters_by_payment_method(): void
     {
         $clinic = Clinic::factory()->create();
-        $patient = $this->patientForClinic($clinic);
         $service = Service::factory()->for($clinic)->create();
-        $cash = $this->paymentForClinic($clinic, $patient, $service, 'paid', 'cash', 20, 'Pago efectivo visible');
-        $card = $this->paymentForClinic($clinic, $patient, $service, 'paid', 'card', 30, 'Pago tarjeta oculto');
+        $cashPatient = $this->patientForClinic($clinic, 'Paciente Efectivo Visible');
+        $cardPatient = $this->patientForClinic($clinic, 'Paciente Tarjeta Oculto');
+        $cash = $this->paymentForClinic($clinic, $cashPatient, $service, 'paid', 'cash', 20, 'Pago efectivo visible');
+        $card = $this->paymentForClinic($clinic, $cardPatient, $service, 'paid', 'card', 30, 'Pago tarjeta oculto');
 
         $this->actingAs($this->userForClinic($clinic))
             ->get(route('reports.financial', [...$this->currentPeriod(), 'payment_method' => 'cash']))
-            ->assertOk()->assertSee($cash->notes)->assertDontSee($card->notes);
+            ->assertOk()->assertSee($cash->patient->full_name)->assertDontSee($card->patient->full_name);
     }
 
     public function test_financial_report_filters_by_payment_status(): void
     {
         $clinic = Clinic::factory()->create();
-        $patient = $this->patientForClinic($clinic);
         $service = Service::factory()->for($clinic)->create();
-        $paid = $this->paymentForClinic($clinic, $patient, $service, 'paid', 'cash', 20, 'Pago pagado visible');
-        $pending = $this->paymentForClinic($clinic, $patient, $service, 'pending', 'cash', 30, 'Pago pendiente oculto');
+        $paidPatient = $this->patientForClinic($clinic, 'Paciente Pagado Visible');
+        $pendingPatient = $this->patientForClinic($clinic, 'Paciente Pendiente Oculto');
+        $paid = $this->paymentForClinic($clinic, $paidPatient, $service, 'paid', 'cash', 20, 'Pago pagado visible');
+        $pending = $this->paymentForClinic($clinic, $pendingPatient, $service, 'pending', 'cash', 30, 'Pago pendiente oculto');
 
         $this->actingAs($this->userForClinic($clinic))
             ->get(route('reports.financial', [...$this->currentPeriod(), 'payment_status' => 'paid']))
-            ->assertOk()->assertSee($paid->notes)->assertDontSee($pending->notes);
+            ->assertOk()->assertSee($paid->patient->full_name)->assertDontSee($pending->patient->full_name);
     }
 
     public function test_patients_report_filters_by_status(): void
@@ -228,6 +231,349 @@ class ReportModuleTest extends TestCase
             ->assertOk()->assertSee('Diagnóstico visible')->assertSee('Receta visible')->assertDontSee('Diagnóstico oculto')->assertDontSee('Receta oculta');
     }
 
+    public function test_admin_sees_all_report_sections(): void
+    {
+        $user = $this->userWithRole('administrador');
+
+        $this->actingAs($user)
+            ->get(route('reports.index'))
+            ->assertOk()
+            ->assertSee(route('reports.index'), false)
+            ->assertSee(route('reports.appointments'), false)
+            ->assertSee(route('reports.clinical'), false)
+            ->assertSee(route('reports.financial'), false)
+            ->assertSee(route('reports.patients'), false)
+            ->assertSee(route('reports.doctors'), false)
+            ->assertSee(route('reports.services'), false);
+    }
+
+    public function test_cashier_is_redirected_to_financial_report_and_only_sees_financial_navigation(): void
+    {
+        $user = $this->userWithRole('caja_finanzas');
+
+        $this->actingAs($user)
+            ->get(route('reports.index'))
+            ->assertRedirect(route('reports.financial'));
+
+        $this->actingAs($user)
+            ->get(route('reports.financial'))
+            ->assertOk()
+            ->assertSee('Reporte financiero')
+            ->assertSee(route('reports.financial'), false)
+            ->assertDontSee(route('reports.clinical'), false)
+            ->assertDontSee(route('reports.patients'), false)
+            ->assertDontSee(route('reports.doctors'), false);
+    }
+
+    public function test_cashier_cannot_access_clinical_doctor_patient_or_general_reports(): void
+    {
+        $user = $this->userWithRole('caja_finanzas');
+
+        $this->actingAs($user)->get(route('reports.clinical'))->assertForbidden();
+        $this->actingAs($user)->get(route('reports.doctors'))->assertForbidden();
+        $this->actingAs($user)->get(route('reports.patients'))->assertForbidden();
+    }
+
+    public function test_doctor_does_not_see_or_export_financial_reports(): void
+    {
+        $user = $this->userWithRole('medico');
+
+        $this->actingAs($user)
+            ->get(route('reports.index'))
+            ->assertRedirect(route('reports.appointments'));
+
+        $this->actingAs($user)->get(route('reports.financial'))->assertForbidden();
+        $this->actingAs($user)->get(route('reports.financial.export.pdf'))->assertForbidden();
+    }
+
+    public function test_receptionist_without_report_permission_cannot_access_financial_reports(): void
+    {
+        $user = $this->userWithRole('recepcionista');
+
+        $this->actingAs($user)->get(route('reports.index'))->assertForbidden();
+        $this->actingAs($user)->get(route('reports.financial'))->assertForbidden();
+        $this->actingAs($user)->get(route('reports.financial.export.csv'))->assertForbidden();
+    }
+
+    public function test_admin_and_cashier_can_export_financial_pdf(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $patient = $this->patientForClinic($clinic, 'Paciente PDF');
+        $service = Service::factory()->for($clinic)->create();
+        $this->paymentForClinic($clinic, $patient, $service, 'paid', 'cash', 75);
+
+        foreach (['administrador', 'caja_finanzas'] as $role) {
+            $this->actingAs($this->userWithRole($role, $clinic))
+                ->get(route('reports.financial.export.pdf', $this->currentPeriod()))
+                ->assertOk()
+                ->assertHeader('content-type', 'application/pdf');
+        }
+    }
+
+    public function test_admin_and_cashier_can_export_financial_csv(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $patient = $this->patientForClinic($clinic, 'Paciente CSV');
+        $service = Service::factory()->for($clinic)->create();
+        $this->paymentForClinic($clinic, $patient, $service, 'paid', 'transfer', 45);
+
+        foreach (['administrador', 'caja_finanzas'] as $role) {
+            $response = $this->actingAs($this->userWithRole($role, $clinic))
+                ->get(route('reports.financial.export.csv', $this->currentPeriod()))
+                ->assertOk();
+
+            $this->assertStringContainsString('Paciente CSV', $response->streamedContent());
+        }
+    }
+
+    public function test_financial_csv_export_respects_date_range(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $service = Service::factory()->for($clinic)->create();
+        $inside = $this->patientForClinic($clinic, 'Paciente Dentro CSV');
+        $outside = $this->patientForClinic($clinic, 'Paciente Fuera CSV');
+        $this->paymentForClinic($clinic, $inside, $service, 'paid', 'cash', 20, 'Dentro', '2026-06-10 10:00:00');
+        $this->paymentForClinic($clinic, $outside, $service, 'paid', 'cash', 30, 'Fuera', '2026-05-10 10:00:00');
+
+        $csv = $this->actingAs($this->userWithRole('administrador', $clinic))
+            ->get(route('reports.financial.export.csv', ['start_date' => '2026-06-01', 'end_date' => '2026-06-30']))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertStringContainsString('Paciente Dentro CSV', $csv);
+        $this->assertStringNotContainsString('Paciente Fuera CSV', $csv);
+    }
+
+    public function test_financial_csv_export_respects_payment_status(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $service = Service::factory()->for($clinic)->create();
+        $paid = $this->patientForClinic($clinic, 'Paciente Pagado CSV');
+        $pending = $this->patientForClinic($clinic, 'Paciente Pendiente CSV');
+        $this->paymentForClinic($clinic, $paid, $service, 'paid', 'cash', 20);
+        $this->paymentForClinic($clinic, $pending, $service, 'pending', 'cash', 30);
+
+        $csv = $this->actingAs($this->userWithRole('caja_finanzas', $clinic))
+            ->get(route('reports.financial.export.csv', [...$this->currentPeriod(), 'payment_status' => 'paid']))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertStringContainsString('Paciente Pagado CSV', $csv);
+        $this->assertStringNotContainsString('Paciente Pendiente CSV', $csv);
+    }
+
+    public function test_financial_csv_export_respects_clinic_scope(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $otherClinic = Clinic::factory()->create();
+        $service = Service::factory()->for($clinic)->create();
+        $otherService = Service::factory()->for($otherClinic)->create();
+        $own = $this->patientForClinic($clinic, 'Paciente Propio CSV');
+        $other = $this->patientForClinic($otherClinic, 'Paciente Ajeno CSV');
+        $this->paymentForClinic($clinic, $own, $service, 'paid', 'cash', 20);
+        $this->paymentForClinic($otherClinic, $other, $otherService, 'paid', 'cash', 30);
+
+        $csv = $this->actingAs($this->userWithRole('administrador', $clinic))
+            ->get(route('reports.financial.export.csv', $this->currentPeriod()))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertStringContainsString('Paciente Propio CSV', $csv);
+        $this->assertStringNotContainsString('Paciente Ajeno CSV', $csv);
+    }
+
+    public function test_financial_pdf_csv_and_print_register_audit_logs(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userWithRole('administrador', $clinic);
+        $patient = $this->patientForClinic($clinic, 'Paciente Auditoria');
+        $service = Service::factory()->for($clinic)->create();
+        $this->paymentForClinic($clinic, $patient, $service, 'paid', 'card', 88);
+
+        $this->actingAs($user)->get(route('reports.financial.export.pdf', $this->currentPeriod()))->assertOk();
+        $this->actingAs($user)->get(route('reports.financial.export.csv', $this->currentPeriod()))->assertOk();
+        $this->actingAs($user)->get(route('reports.financial.print', $this->currentPeriod()))->assertOk();
+
+        foreach (['report.financial_exported_pdf', 'report.financial_exported_csv', 'report.financial_printed'] as $action) {
+            $this->assertDatabaseHas('audit_logs', [
+                'clinic_id' => $clinic->id,
+                'user_id' => $user->id,
+                'action' => $action,
+                'module' => 'reports',
+            ]);
+        }
+
+        $log = AuditLog::where('action', 'report.financial_exported_csv')->firstOrFail();
+        $this->assertSame('csv', $log->new_values['format']);
+        $this->assertSame(1, $log->new_values['total_records']);
+    }
+
+    public function test_financial_report_uses_guayaquil_timezone_for_boundary_dates(): void
+    {
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-07-20 23:45:00', 'America/Guayaquil'));
+        $clinic = Clinic::factory()->create();
+        $patient = $this->patientForClinic($clinic, 'Paciente Hora Local');
+        $service = Service::factory()->for($clinic)->create();
+        $this->paymentForClinic($clinic, $patient, $service, 'paid', 'cash', 50, 'Pago local', '2026-07-20 23:30:00');
+
+        $this->actingAs($this->userWithRole('caja_finanzas', $clinic))
+            ->get(route('reports.financial', ['start_date' => '2026-07-20', 'end_date' => '2026-07-20']))
+            ->assertOk()
+            ->assertSee('20/07/2026 23:30')
+            ->assertDontSee('21/07/2026');
+    }
+    public function test_financial_print_view_is_landscape_and_uses_fixed_pdf_table(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userWithRole('caja_finanzas', $clinic);
+        $patient = $this->patientForClinic($clinic, 'Paciente PDF Landscape');
+        $service = Service::factory()->for($clinic)->create();
+        $this->paymentForClinic($clinic, $patient, $service, 'paid', 'cash', 75);
+
+        $this->actingAs($user)
+            ->get(route('reports.financial.print', $this->currentPeriod()))
+            ->assertOk()
+            ->assertSee('@page { size: A4 landscape;', false)
+            ->assertSee('table-layout: fixed', false)
+            ->assertSee('payments-table', false);
+    }
+
+    public function test_financial_csv_has_utf8_bom_semicolon_delimiter_and_accents(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $patient = $this->patientForClinic($clinic, 'José Ñúñez');
+        $service = Service::factory()->for($clinic)->create(['name' => 'Ecografía médica']);
+        $this->paymentForClinic($clinic, $patient, $service, 'paid', 'transfer', 45);
+
+        $csv = $this->actingAs($this->userWithRole('caja_finanzas', $clinic))
+            ->get(route('reports.financial.export.csv', $this->currentPeriod()))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $csv);
+        $lines = preg_split('/\r\n|\r|\n/', substr($csv, 3));
+        $this->assertStringContainsString(';', $lines[0]);
+        $this->assertSame([
+            'Número de pago',
+            'Fecha de pago',
+            'Paciente',
+            'Identificación',
+            'Servicio',
+            'Médico',
+            'Método de pago',
+            'Estado',
+            'Monto',
+        ], str_getcsv($lines[0], ';'));
+        $this->assertStringContainsString('José', $csv);
+        $this->assertStringContainsString('Ñúñez', $csv);
+        $this->assertStringContainsString('Ecografía médica', $csv);
+    }
+
+    public function test_doctor_cannot_export_financial_csv(): void
+    {
+        $this->actingAs($this->userWithRole('medico'))
+            ->get(route('reports.financial.export.csv'))
+            ->assertForbidden();
+    }
+
+    public function test_cashier_can_view_financial_audit_but_not_global_audit(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $cashier = $this->userWithRole('caja_finanzas', $clinic);
+        AuditLog::create([
+            'clinic_id' => $clinic->id,
+            'user_id' => $cashier->id,
+            'action' => 'payment.paid',
+            'module' => 'payments',
+            'description' => 'Pago registrado por caja.',
+            'new_values' => ['payment_id' => 123],
+        ]);
+
+        $this->actingAs($cashier)
+            ->get(route('financial-audit.index'))
+            ->assertOk()
+            ->assertSee('Registro de caja')
+            ->assertSee('Pago registrado por caja.');
+
+        $this->actingAs($cashier)
+            ->get(route('audit-logs.index'))
+            ->assertForbidden();
+    }
+
+    public function test_doctor_cannot_view_financial_audit(): void
+    {
+        $this->actingAs($this->userWithRole('medico'))
+            ->get(route('financial-audit.index'))
+            ->assertForbidden();
+    }
+
+    public function test_financial_audit_respects_clinic_scope(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $otherClinic = Clinic::factory()->create();
+        $cashier = $this->userWithRole('caja_finanzas', $clinic);
+        AuditLog::create([
+            'clinic_id' => $clinic->id,
+            'user_id' => $cashier->id,
+            'action' => 'payment.receipt_printed',
+            'module' => 'payments',
+            'description' => 'Recibo visible.',
+            'new_values' => ['payment_id' => 1],
+        ]);
+        AuditLog::create([
+            'clinic_id' => $otherClinic->id,
+            'user_id' => null,
+            'action' => 'payment.receipt_printed',
+            'module' => 'payments',
+            'description' => 'Recibo oculto.',
+            'new_values' => ['payment_id' => 2],
+        ]);
+
+        $this->actingAs($cashier)
+            ->get(route('financial-audit.index'))
+            ->assertOk()
+            ->assertSee('Recibo visible.')
+            ->assertDontSee('Recibo oculto.');
+    }
+
+    public function test_financial_audit_does_not_show_non_financial_events(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $cashier = $this->userWithRole('caja_finanzas', $clinic);
+        AuditLog::create([
+            'clinic_id' => $clinic->id,
+            'user_id' => $cashier->id,
+            'action' => 'consultation.created',
+            'module' => 'consultations',
+            'description' => 'Evento clinico oculto.',
+            'new_values' => [],
+        ]);
+
+        $this->actingAs($cashier)
+            ->get(route('financial-audit.index'))
+            ->assertOk()
+            ->assertDontSee('Evento clinico oculto.');
+    }
+
+    public function test_cashier_dashboard_has_real_financial_links_and_no_obsolete_phase_text(): void
+    {
+        $cashier = $this->userWithRole('caja_finanzas');
+
+        $this->actingAs($cashier)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Registro de caja')
+            ->assertSee(route('financial-audit.index'), false)
+            ->assertSee(route('reports.financial'), false)
+            ->assertSee(route('payments.index', ['payment_status' => 'pending']), false)
+            ->assertDontSee('siguiente fase')
+            ->assertDontSee('proxima fase')
+            ->assertDontSee(route('audit-logs.index'), false);
+
+        $this->actingAs($cashier)->get(route('financial-audit.index'))->assertOk();
+        $this->actingAs($cashier)->get(route('reports.financial'))->assertOk();
+        $this->actingAs($cashier)->get(route('payments.index'))->assertOk();
+    }
     public function test_invalid_filters_return_validation_errors_without_server_error(): void
     {
         $user = $this->userForClinic(Clinic::factory()->create());
@@ -262,12 +608,20 @@ class ReportModuleTest extends TestCase
     /** @return array<int, string> */
     private function reportRoutes(): array
     {
-        return ['reports.index', 'reports.appointments', 'reports.clinical', 'reports.financial', 'reports.patients', 'reports.doctors', 'reports.services'];
+        return ['reports.index', 'reports.appointments', 'reports.clinical', 'reports.financial', 'reports.financial.export.pdf', 'reports.financial.export.csv', 'reports.financial.print', 'financial-audit.index', 'reports.patients', 'reports.doctors', 'reports.services'];
     }
 
     private function userForClinic(Clinic $clinic): User
     {
         return User::factory()->create(['clinic_id' => $clinic->id]);
+    }
+
+    private function userWithRole(string $role, ?Clinic $clinic = null): User
+    {
+        $user = $this->userForClinic($clinic ?? Clinic::factory()->create());
+        $user->syncRoles([$role]);
+
+        return $user;
     }
 
     private function patientForClinic(Clinic $clinic, string $name = 'Paciente Prueba', string $status = 'active'): Patient
@@ -305,7 +659,7 @@ class ReportModuleTest extends TestCase
         ]);
     }
 
-    private function paymentForClinic(Clinic $clinic, Patient $patient, Service $service, string $status, string $method, float $amount, string $notes = 'Pago de prueba'): Payment
+    private function paymentForClinic(Clinic $clinic, Patient $patient, Service $service, string $status, string $method, float $amount, string $notes = 'Pago de prueba', ?string $paymentDate = null): Payment
     {
         return Payment::factory()->create([
             'clinic_id' => $clinic->id,
@@ -314,7 +668,7 @@ class ReportModuleTest extends TestCase
             'amount' => $amount,
             'payment_status' => $status,
             'payment_method' => $method,
-            'payment_date' => $status === 'pending' ? null : now(),
+            'payment_date' => $status === 'pending' ? null : ($paymentDate ?? now()),
             'notes' => $notes,
         ]);
     }
