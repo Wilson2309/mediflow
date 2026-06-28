@@ -119,7 +119,7 @@ class DailyAgendaController extends Controller
             return $date;
         }
 
-        return today()->toDateString();
+        return today(config('app.timezone', 'America/Guayaquil'))->toDateString();
     }
 
     private function incomeForDate(int $clinicId, string $date, bool $isDoctorView, ?Doctor $doctor): float

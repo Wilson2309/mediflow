@@ -27,7 +27,7 @@
         'without_payment' => 'border-slate-200 bg-slate-100 text-[#475569]',
     ];
     $quickFilters = [
-        ['label' => 'Hoy', 'query' => ['date' => today()->toDateString(), 'status' => null, 'payment_status' => null]],
+        ['label' => 'Hoy', 'query' => ['date' => today(config('app.timezone', 'America/Guayaquil'))->toDateString(), 'status' => null, 'payment_status' => null]],
         ['label' => 'Pendientes de pago', 'query' => ['payment_status' => 'pending']],
         ['label' => 'Pagadas', 'query' => ['payment_status' => 'paid']],
         ['label' => 'Atendidas', 'query' => ['status' => 'completed']],
@@ -50,7 +50,7 @@
                 <p class="mt-2 text-sm leading-6 text-[#475569]">{{ $isDoctorView ? 'Citas asignadas a tu atencion medica.' : 'Vista rapida de recepcion, caja y atencion medica del dia.' }}</p>
             </div>
             <div class="flex flex-col gap-3 sm:flex-row">
-                <a href="{{ route('daily-agenda.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-semibold text-[#475569] shadow-sm">{{ now()->format('d/m/Y') }}</a>
+                <a href="{{ route('daily-agenda.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-semibold text-[#475569] shadow-sm">{{ now(config('app.timezone', 'America/Guayaquil'))->format('d/m/Y') }}</a>
                 @can('appointments.create')
                     <a href="{{ route('appointments.create') }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 transition hover:bg-blue-700">Nueva cita</a>
                 @endcan
@@ -84,11 +84,11 @@
                 </div>
                 <div class="lg:col-span-2">
                     <label for="search" class="mb-2 block whitespace-nowrap text-sm font-semibold text-[#0F172A]">Buscar paciente</label>
-                    <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Nombre, identificación, médico o servicio" class="h-11 w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                    <input id="search" name="search" type="search" value="{{ $search }}" placeholder="Nombre, identificacion, medico o servicio" class="h-11 w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                 </div>
                 @unless ($isDoctorView)
                     <div>
-                        <label for="doctor_id" class="mb-2 block whitespace-nowrap text-sm font-semibold text-[#0F172A]">Médico</label>
+                        <label for="doctor_id" class="mb-2 block whitespace-nowrap text-sm font-semibold text-[#0F172A]">Medico</label>
                         <select id="doctor_id" name="doctor_id" class="h-11 w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                             <option value="">Todos</option>
                             @foreach ($doctors as $doctor)

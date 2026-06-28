@@ -9,10 +9,13 @@ use App\Models\Patient;
 use App\Models\Payment;
 use App\Models\Service;
 use App\Services\AuditLogger;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class PaymentController extends Controller
 {
@@ -24,9 +27,10 @@ class PaymentController extends Controller
         $paymentMethod = $request->query('payment_method');
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
+        $localNow = $this->localNow();
+        $localToday = $localNow->toDateString();
 
         $baseQuery = Payment::where('clinic_id', $clinicId);
-
 
         $showPendingQueue = ($search === '' && blank($paymentStatus) && blank($paymentMethod) && blank($dateFrom) && blank($dateTo))
             || $paymentStatus === 'pending';
@@ -69,20 +73,20 @@ class PaymentController extends Controller
             'services' => $this->services($clinicId, onlyActive: false),
             'monthlyPaidIncome' => (clone $baseQuery)
                 ->where('payment_status', 'paid')
-                ->whereMonth('payment_date', now()->month)
-                ->whereYear('payment_date', now()->year)
+                ->whereMonth('payment_date', $localNow->month)
+                ->whereYear('payment_date', $localNow->year)
                 ->sum('amount'),
             'todayPaidIncome' => (clone $baseQuery)
                 ->where('payment_status', 'paid')
-                ->whereDate('payment_date', today())
+                ->whereDate('payment_date', $localToday)
                 ->sum('amount'),
             'todayPaidPaymentsCount' => (clone $baseQuery)
                 ->where('payment_status', 'paid')
-                ->whereDate('payment_date', today())
+                ->whereDate('payment_date', $localToday)
                 ->count(),
             'todayPendingPaymentsCount' => (clone $baseQuery)
                 ->where('payment_status', 'pending')
-                ->whereDate('created_at', today())
+                ->whereDate('created_at', $localToday)
                 ->count(),
             'pendingPaymentsAmount' => (clone $baseQuery)->where('payment_status', 'pending')->sum('amount'),
             'pendingPaymentsCount' => (clone $baseQuery)->where('payment_status', 'pending')->count(),
@@ -118,7 +122,8 @@ class PaymentController extends Controller
         $this->authorizeClinic($payment);
 
         return view('payments.show', [
-            'payment' => $payment->load(['patient', 'appointment.doctor.user', 'service']),
+            'payment' => $this->loadForReceipt($payment),
+            'receiptNumber' => $this->receiptNumber($payment),
         ]);
     }
 
@@ -137,7 +142,7 @@ class PaymentController extends Controller
         $this->authorizeClinic($payment);
         $old = AuditLogger::modelSnapshot($payment);
         $oldStatus = $payment->payment_status;
-        $payment->update($this->prepareData($request->validated(), $this->clinicId()));
+        $payment->update($this->prepareData($request->validated(), $this->clinicId(), $payment));
         $payment->refresh();
         AuditLogger::log($this->paymentAction($payment, $oldStatus), 'payments', $payment, $old, AuditLogger::modelSnapshot($payment), 'Pago actualizado.');
         $this->syncAppointmentAfterPayment($payment);
@@ -160,7 +165,55 @@ class PaymentController extends Controller
             ->with('success', 'Pago eliminado correctamente.');
     }
 
-    private function prepareData(array $validated, int $clinicId): array
+    public function receipt(Payment $payment): Response
+    {
+        $this->authorizeReceipt($payment);
+        $payment = $this->loadForReceipt($payment);
+
+        AuditLogger::log(
+            'payment.receipt_downloaded',
+            'payments',
+            $payment,
+            [],
+            $this->receiptAuditContext($payment),
+            'Recibo PDF de pago descargado.'
+        );
+
+        return Pdf::loadView('payments.receipt-print', [
+            'payment' => $payment,
+            'clinic' => $payment->clinic,
+            'receiptNumber' => $this->receiptNumber($payment),
+            'generatedAt' => $this->localNow(),
+            'generatedBy' => auth()->user(),
+            'forPdf' => true,
+        ])->setPaper('a4')->download($this->receiptFileName($payment));
+    }
+
+    public function receiptPrint(Payment $payment): View
+    {
+        $this->authorizeReceipt($payment);
+        $payment = $this->loadForReceipt($payment);
+
+        AuditLogger::log(
+            'payment.receipt_printed',
+            'payments',
+            $payment,
+            [],
+            $this->receiptAuditContext($payment),
+            'Recibo de pago abierto para impresion.'
+        );
+
+        return view('payments.receipt-print', [
+            'payment' => $payment,
+            'clinic' => $payment->clinic,
+            'receiptNumber' => $this->receiptNumber($payment),
+            'generatedAt' => $this->localNow(),
+            'generatedBy' => auth()->user(),
+            'forPdf' => false,
+        ]);
+    }
+
+    private function prepareData(array $validated, int $clinicId, ?Payment $payment = null): array
     {
         $patient = Patient::where('clinic_id', $clinicId)->find($validated['patient_id']);
         $appointment = isset($validated['appointment_id']) && $validated['appointment_id']
@@ -172,7 +225,7 @@ class PaymentController extends Controller
 
         if (! $patient || (($validated['appointment_id'] ?? null) && ! $appointment) || (($validated['service_id'] ?? null) && ! $service)) {
             throw ValidationException::withMessages([
-                'clinic_id' => 'Los datos seleccionados no pertenecen a la clÃ­nica del usuario autenticado.',
+                'clinic_id' => 'Los datos seleccionados no pertenecen a la clinica del usuario autenticado.',
             ]);
         }
 
@@ -184,7 +237,9 @@ class PaymentController extends Controller
 
         $paymentDate = $validated['payment_date'] ?? null;
         if ($validated['payment_status'] === 'paid' && blank($paymentDate)) {
-            $paymentDate = now();
+            $paymentDate = $payment?->payment_status === 'paid' && $payment->payment_date
+                ? $payment->payment_date
+                : $this->localNow();
         }
 
         return [
@@ -200,10 +255,15 @@ class PaymentController extends Controller
         ];
     }
 
+    private function localNow(): Carbon
+    {
+        return now(config('app.timezone', 'America/Guayaquil'));
+    }
+
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clÃ­nica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
 
         return (int) $clinicId;
     }
@@ -211,6 +271,12 @@ class PaymentController extends Controller
     private function authorizeClinic(Payment $payment): void
     {
         abort_if((int) $payment->clinic_id !== $this->clinicId(), 403);
+    }
+
+    private function authorizeReceipt(Payment $payment): void
+    {
+        abort_unless(auth()->user()?->can('payments.view'), 403);
+        $this->authorizeClinic($payment);
     }
 
     private function formData(int $clinicId): array
@@ -275,9 +341,41 @@ class PaymentController extends Controller
         if ($appointment->status === 'scheduled') {
             $old = AuditLogger::modelSnapshot($appointment);
             $appointment->update(['status' => 'confirmed']);
-            AuditLogger::log('appointment.confirmed', 'appointments', $appointment, $old, AuditLogger::modelSnapshot($appointment), 'Cita confirmada automÃ¡ticamente al registrar el pago.');
+            AuditLogger::log('appointment.confirmed', 'appointments', $appointment, $old, AuditLogger::modelSnapshot($appointment), 'Cita confirmada automaticamente al registrar el pago.');
         }
     }
+
+    private function loadForReceipt(Payment $payment): Payment
+    {
+        return $payment->load([
+            'clinic',
+            'patient.clinic',
+            'appointment.doctor.user',
+            'appointment.service',
+            'service',
+        ]);
+    }
+
+    private function receiptNumber(Payment $payment): string
+    {
+        return 'REC-'.str_pad((string) $payment->id, 6, '0', STR_PAD_LEFT);
+    }
+
+    private function receiptFileName(Payment $payment): string
+    {
+        return 'recibo-pago-'.$this->receiptNumber($payment).'.pdf';
+    }
+
+    private function receiptAuditContext(Payment $payment): array
+    {
+        return [
+            'payment_id' => $payment->id,
+            'patient_id' => $payment->patient_id,
+            'appointment_id' => $payment->appointment_id,
+            'amount' => $payment->amount,
+            'status' => $payment->payment_status,
+            'method' => $payment->payment_method,
+            'receipt_number' => $this->receiptNumber($payment),
+        ];
+    }
 }
-
-

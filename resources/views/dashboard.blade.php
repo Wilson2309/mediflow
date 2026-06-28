@@ -32,7 +32,7 @@
         ['permission' => ['payments.view', 'reports.financial'], 'label' => 'Pagos pendientes', 'value' => number_format($pendingPaymentsCount), 'summary' => 'Cobros por confirmar', 'icon' => 'pending', 'iconClass' => 'bg-[#F59E0B]/15 text-[#F59E0B]', 'trend' => 'Real'],
         ['permission' => 'doctors.view', 'label' => 'Medicos activos', 'value' => number_format($activeDoctorCount), 'summary' => 'Profesionales activos', 'icon' => 'doctors', 'iconClass' => 'bg-[#EF4444]/10 text-[#EF4444]', 'trend' => 'Real'],
         ['permission' => 'services.view', 'label' => 'Servicios activos', 'value' => number_format($activeServiceCount), 'summary' => 'Servicios disponibles', 'icon' => 'services', 'iconClass' => 'bg-[#2563EB]/10 text-[#2563EB]', 'trend' => 'Real'],
-        ['permission' => 'users.view', 'label' => 'Usuarios activos', 'value' => number_format($activeUserCount), 'summary' => 'Usuarios de tu clínica', 'icon' => 'users', 'iconClass' => 'bg-[#38BDF8]/15 text-[#2563EB]', 'trend' => 'Real'],
+        ['permission' => 'users.view', 'label' => 'Usuarios activos', 'value' => number_format($activeUserCount), 'summary' => 'Usuarios de tu clinica', 'icon' => 'users', 'iconClass' => 'bg-[#38BDF8]/15 text-[#2563EB]', 'trend' => 'Real'],
         ['permission' => 'demo_requests.view', 'label' => 'Solicitudes de demo', 'value' => number_format($pendingDemoRequestCount), 'summary' => 'Prospectos pendientes', 'icon' => 'demoRequests', 'iconClass' => 'bg-[#F59E0B]/15 text-[#B45309]', 'trend' => 'Real'],
     ];
 
@@ -58,10 +58,10 @@
             <div>
                 <p class="text-sm font-semibold uppercase tracking-wide text-[#2563EB]">Panel principal</p>
                 <h1 class="mt-2 text-2xl font-bold tracking-tight text-[#0F172A] sm:text-3xl">Dashboard de MediFlow</h1>
-                <p class="mt-2 max-w-2xl text-sm leading-6 text-[#475569]">Vista operativa para seguimiento clínico, agenda médica y control financiero del consultorio.</p>
+                <p class="mt-2 max-w-2xl text-sm leading-6 text-[#475569]">Vista operativa para seguimiento clinico, agenda medica y control financiero del consultorio.</p>
             </div>
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div class="rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-semibold text-[#475569] shadow-sm">{{ now()->format('d/m/Y') }}</div>
+                <div class="rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-semibold text-[#475569] shadow-sm">{{ now(config('app.timezone', 'America/Guayaquil'))->format('d/m/Y') }}</div>
                 @can('appointments.view')
                     <a href="{{ route('daily-agenda.index') }}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-[#E2E8F0] bg-white px-4 py-3 text-sm font-semibold text-[#2563EB] shadow-sm transition hover:border-[#2563EB] hover:bg-[#2563EB]/5">Agenda del dia</a>
                 @endcan
@@ -98,7 +98,7 @@
         <section class="grid gap-6 xl:grid-cols-3">
             <div class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm xl:col-span-2">
                 <div class="flex flex-col gap-3 border-b border-[#E2E8F0] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div><h2 class="text-base font-bold text-[#0F172A]">{{ $isDoctorDashboard ? 'Mis próximas citas' : 'Próximas citas' }}</h2><p class="mt-1 text-sm text-[#475569]">{{ $isDoctorDashboard ? 'Agenda médica asignada para los próximos días.' : 'Agenda clínica priorizada para los próximos días.' }}</p></div>
+                    <div><h2 class="text-base font-bold text-[#0F172A]">{{ $isDoctorDashboard ? 'Mis prÃ³ximas citas' : 'PrÃ³ximas citas' }}</h2><p class="mt-1 text-sm text-[#475569]">{{ $isDoctorDashboard ? 'Agenda medica asignada para los prÃ³ximos dÃ­as.' : 'Agenda clinica priorizada para los prÃ³ximos dÃ­as.' }}</p></div>
                     <a href="{{ route('appointments.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm font-semibold text-[#2563EB] transition hover:border-[#2563EB] hover:bg-[#2563EB]/5">Ver agenda</a>
                 </div>
                 <div class="overflow-x-auto">
@@ -115,7 +115,7 @@
                                     <td class="whitespace-nowrap px-5 py-4"><span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-bold {{ $statusClasses[$appointment->status] ?? 'border-slate-200 bg-slate-100 text-slate-600' }}">{{ $statusLabels[$appointment->status] ?? $appointment->status }}</span></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="6" class="px-5 py-10 text-center text-sm text-[#475569]">No hay próximas citas programadas.</td></tr>
+                                <tr><td colspan="6" class="px-5 py-10 text-center text-sm text-[#475569]">No hay prÃ³ximas citas programadas.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

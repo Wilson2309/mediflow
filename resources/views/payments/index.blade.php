@@ -1,7 +1,7 @@
 @php
     $methodLabels = ['cash' => 'Efectivo', 'card' => 'Tarjeta', 'transfer' => 'Transferencia', 'other' => 'Otro'];
     $statusLabels = ['pending' => 'Pendiente', 'paid' => 'Pagado', 'cancelled' => 'Cancelado', 'refunded' => 'Reembolsado'];
-    $appointmentStatusLabels = ['scheduled' => 'Programada', 'confirmed' => 'Confirmada', 'completed' => 'Completada', 'cancelled' => 'Cancelada', 'no_show' => 'No asistió'];
+    $appointmentStatusLabels = ['scheduled' => 'Programada', 'confirmed' => 'Confirmada', 'completed' => 'Completada', 'cancelled' => 'Cancelada', 'no_show' => 'No asistio'];
     $statusClasses = [
         'pending' => 'border-[#F59E0B]/20 bg-[#F59E0B]/10 text-[#F59E0B]',
         'paid' => 'border-[#10B981]/20 bg-[#10B981]/10 text-[#10B981]',
@@ -42,7 +42,7 @@
                 <p class="mt-3 text-2xl font-bold text-[#10B981]">{{ number_format($todayPaidPaymentsCount) }}</p>
             </article>
             <article class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
-                <p class="text-sm font-semibold text-[#475569]">Ingresos del día</p>
+                <p class="text-sm font-semibold text-[#475569]">Ingresos del dia</p>
                 <p class="mt-3 text-2xl font-bold text-[#10B981]">${{ number_format((float) $todayPaidIncome, 2) }}</p>
                 <p class="mt-1 text-xs font-medium text-[#475569]">Mes: ${{ number_format((float) $monthlyPaidIncome, 2) }}</p>
             </article>
@@ -56,7 +56,7 @@
             <div class="flex flex-col gap-2 border-b border-[#E2E8F0] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 class="text-base font-bold text-[#0F172A]">Pendientes de cobro</h2>
-                    <p class="mt-1 text-sm text-[#475569]">Citas y pagos que deben ser cobrados antes de la atención médica.</p>
+                    <p class="mt-1 text-sm text-[#475569]">Citas y pagos que deben ser cobrados antes de la atencion medica.</p>
                 </div>
                 <span class="inline-flex w-fit rounded-full border border-[#F59E0B]/20 bg-[#F59E0B]/10 px-3 py-1 text-xs font-bold text-[#B45309]">{{ number_format($pendingPaymentsCount) }} pendientes</span>
             </div>
@@ -66,11 +66,11 @@
                         <tr>
                             <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Paciente</th>
                             <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Cita</th>
-                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Médico</th>
+                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Medico</th>
                             <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Servicio</th>
                             <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Monto</th>
                             <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Estado cita</th>
-                            <th class="px-5 py-3 text-right text-xs font-bold uppercase tracking-wide text-[#475569]">Acción</th>
+                            <th class="px-5 py-3 text-right text-xs font-bold uppercase tracking-wide text-[#475569]">Accion</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-[#E2E8F0] bg-white">
@@ -78,16 +78,16 @@
                             <tr class="hover:bg-[#F8FAFC]">
                                 <td class="px-5 py-4">
                                     <p class="text-sm font-semibold text-[#0F172A]">{{ $payment->patient?->full_name }}</p>
-                                    <p class="mt-1 text-xs text-[#475569]">{{ $payment->patient?->identification_number ?: 'Sin identificación' }}</p>
+                                    <p class="mt-1 text-xs text-[#475569]">{{ $payment->patient?->identification_number ?: 'Sin identificacion' }}</p>
                                 </td>
                                 <td class="whitespace-nowrap px-5 py-4 text-sm text-[#475569]">
                                     @if ($payment->appointment)
-                                        {{ $payment->appointment->appointment_date?->format('d/m/Y') }} · {{ substr((string) $payment->appointment->start_time, 0, 5) }}
+                                        {{ $payment->appointment->appointment_date?->format('d/m/Y') }} - {{ substr((string) $payment->appointment->start_time, 0, 5) }}
                                     @else
                                         Sin cita
                                     @endif
                                 </td>
-                                <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->appointment?->doctor?->user?->name ?: 'Sin médico' }}</td>
+                                <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->appointment?->doctor?->user?->name ?: 'Sin medico' }}</td>
                                 <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->service?->name ?: 'Sin servicio' }}</td>
                                 <td class="px-5 py-4 text-sm font-bold text-[#0F172A]">
                                     @if ((float) $payment->amount > 0)
@@ -129,7 +129,7 @@
                     </select>
                 </div>
                 <div>
-                    <label for="payment_method" class="mb-2 block text-sm font-semibold text-[#0F172A]">Método</label>
+                    <label for="payment_method" class="mb-2 block text-sm font-semibold text-[#0F172A]">Metodo</label>
                     <select id="payment_method" name="payment_method" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                         <option value="">Todos</option>
                         @foreach ($methodLabels as $value => $label)
@@ -165,7 +165,7 @@
                             <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Servicio</th>
                             <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Cita asociada</th>
                             <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Monto</th>
-                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Método</th>
+                            <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Metodo</th>
                             <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-[#475569]">Estado</th>
                             <th class="px-5 py-3 text-right text-xs font-bold uppercase tracking-wide text-[#475569]">Acciones</th>
                         </tr>
@@ -173,7 +173,7 @@
                     <tbody class="divide-y divide-[#E2E8F0] bg-white">
                         @forelse ($payments as $payment)
                             <tr class="hover:bg-[#F8FAFC]">
-                                <td class="whitespace-nowrap px-5 py-4 text-sm text-[#0F172A]">{{ $payment->payment_date?->format('d/m/Y H:i') ?: 'Sin fecha' }}</td>
+                                <td class="whitespace-nowrap px-5 py-4 text-sm text-[#0F172A]">{{ $payment->payment_date?->timezone(config('app.timezone', 'America/Guayaquil'))->format('d/m/Y H:i') ?: 'Sin fecha' }}</td>
                                 <td class="px-5 py-4 text-sm font-semibold text-[#0F172A]">{{ $payment->patient?->full_name }}</td>
                                 <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->service?->name ?: 'Sin servicio' }}</td>
                                 <td class="px-5 py-4 text-sm text-[#475569]">{{ $payment->appointment ? $payment->appointment->appointment_date?->format('d/m/Y').' '.substr((string) $payment->appointment->start_time, 0, 5) : 'Sin cita' }}</td>
@@ -184,7 +184,7 @@
                                     <div class="flex justify-end gap-2">
                                         <a href="{{ route('payments.show', $payment) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#2563EB]">Ver</a>
                                         @can('payments.update')<a href="{{ route('payments.edit', $payment) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#475569]">{{ $payment->payment_status === 'pending' ? 'Cobrar' : 'Editar' }}</a>@endcan
-                                        @can('payments.delete')<form method="POST" action="{{ route('payments.destroy', $payment) }}" onsubmit="return confirm('¿Eliminar este pago?');">
+                                        @can('payments.delete')<form method="POST" action="{{ route('payments.destroy', $payment) }}" onsubmit="return confirm('Eliminar este pago?');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="rounded-lg border border-[#EF4444]/30 px-3 py-2 text-xs font-semibold text-[#EF4444]">Eliminar</button>

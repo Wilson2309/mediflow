@@ -46,6 +46,8 @@ Route::get('/dashboard', function () {
         ? Doctor::where('clinic_id', $clinicId)->where('user_id', $user->id)->first()
         : null;
     $canViewFinance = $user?->canAny(['payments.view', 'reports.financial']);
+    $localNow = now(config('app.timezone', 'America/Guayaquil'));
+    $localToday = $localNow->toDateString();
 
     $patientCount = $clinicId && $user?->can('patients.view')
         ? Patient::where('clinic_id', $clinicId)
@@ -70,7 +72,7 @@ Route::get('/dashboard', function () {
             ->when($isDoctorDashboard, function ($query) use ($doctor) {
                 $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
             })
-            ->whereDate('appointment_date', today())
+            ->whereDate('appointment_date', $localToday)
             ->whereIn('status', ['scheduled', 'confirmed'])
             ->count()
         : 0;
@@ -92,8 +94,8 @@ Route::get('/dashboard', function () {
     $monthlyPaidIncome = $clinicId && $canViewFinance
         ? Payment::where('clinic_id', $clinicId)
             ->where('payment_status', 'paid')
-            ->whereMonth('payment_date', now()->month)
-            ->whereYear('payment_date', now()->year)
+            ->whereMonth('payment_date', $localNow->month)
+            ->whereYear('payment_date', $localNow->year)
             ->sum('amount')
         : 0;
     $pendingPaymentsCount = $clinicId && $canViewFinance
@@ -114,7 +116,7 @@ Route::get('/dashboard', function () {
             ->when($isDoctorDashboard, function ($query) use ($doctor) {
                 $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
             })
-            ->whereDate('appointment_date', '>=', today())
+            ->whereDate('appointment_date', '>=', $localToday)
             ->whereIn('status', ['scheduled', 'confirmed'])
             ->orderBy('appointment_date')
             ->orderBy('start_time')
@@ -162,6 +164,8 @@ Route::middleware('auth')->group(function () {
     Route::post('prescriptions/{prescription}/send-email', [PrescriptionController::class, 'sendEmail'])->middleware('permission:prescriptions.update')->name('prescriptions.send-email');
     Route::post('prescriptions/{prescription}/sign', [PrescriptionController::class, 'sign'])->middleware('permission:prescriptions.update')->name('prescriptions.sign');
     $protectedResource('prescriptions', PrescriptionController::class, 'prescriptions');
+    Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt'])->middleware('permission:payments.view')->name('payments.receipt');
+    Route::get('payments/{payment}/receipt/print', [PaymentController::class, 'receiptPrint'])->middleware('permission:payments.view')->name('payments.receipt.print');
     $protectedResource('payments', PaymentController::class, 'payments');
     $protectedResource('services', ServiceController::class, 'services');
     $protectedResource('users', UserController::class, 'users');
@@ -187,4 +191,3 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
-
