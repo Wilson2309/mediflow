@@ -33,13 +33,13 @@ class ClinicSettingsController extends Controller
 
         return redirect()
             ->route('settings.clinic.edit')
-            ->with('success', 'ConfiguraciÃ³n del consultorio actualizada correctamente.');
+            ->with('success', 'Configuración del consultorio actualizada correctamente.');
     }
 
     private function clinic(): Clinic
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clÃ­nica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
 
         return Clinic::findOrFail($clinicId);
     }

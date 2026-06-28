@@ -135,7 +135,7 @@ class PrescriptionController extends Controller
             $prescription->items()->createMany($data['items']);
         });
 
-        AuditLogger::log($prescription->status === 'cancelled' ? 'prescription.cancelled' : 'prescription.updated', 'prescriptions', $prescription->refresh()->load('patient'), $old, AuditLogger::modelSnapshot($prescription), 'Receta mÃ©dica actualizada.');
+        AuditLogger::log($prescription->status === 'cancelled' ? 'prescription.cancelled' : 'prescription.updated', 'prescriptions', $prescription->refresh()->load('patient'), $old, AuditLogger::modelSnapshot($prescription), 'Receta médica actualizada.');
 
         return redirect()
             ->route('prescriptions.show', $prescription)
@@ -146,7 +146,7 @@ class PrescriptionController extends Controller
     {
         $this->authorizeClinic($prescription);
         $old = AuditLogger::modelSnapshot($prescription);
-        AuditLogger::log('prescription.deleted', 'prescriptions', $prescription->load('patient'), $old, [], 'Receta mÃ©dica eliminada.');
+        AuditLogger::log('prescription.deleted', 'prescriptions', $prescription->load('patient'), $old, [], 'Receta médica eliminada.');
 
         $prescription->delete();
 
@@ -216,7 +216,7 @@ class PrescriptionController extends Controller
         } catch (Throwable $exception) {
             report($exception);
 
-            return back()->with('error', 'No se pudo enviar la receta por correo. Revise la configuraciÃ³n de correo e intÃ©ntelo nuevamente.');
+            return back()->with('error', 'No se pudo enviar la receta por correo. Revise la configuración de correo e inténtelo nuevamente.');
         }
 
         return back()->with('success', 'Receta enviada por correo correctamente.');
@@ -297,13 +297,13 @@ class PrescriptionController extends Controller
 
         if (! $patient || ! $doctor || (($validated['consultation_id'] ?? null) && ! $consultation)) {
             throw ValidationException::withMessages([
-                'clinic_id' => 'Los datos seleccionados no pertenecen a la clÃ­nica del usuario autenticado.',
+                'clinic_id' => 'Los datos seleccionados no pertenecen a la clínica del usuario autenticado.',
             ]);
         }
 
         if ($consultation && ((int) $consultation->patient_id !== (int) $patient->id || (int) $consultation->doctor_id !== (int) $doctor->id)) {
             throw ValidationException::withMessages([
-                'consultation_id' => 'La consulta seleccionada no coincide con el paciente y mÃ©dico indicados.',
+                'consultation_id' => 'La consulta seleccionada no coincide con el paciente y médico indicados.',
             ]);
         }
 
@@ -329,7 +329,7 @@ class PrescriptionController extends Controller
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clÃ­nica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
 
         return (int) $clinicId;
     }

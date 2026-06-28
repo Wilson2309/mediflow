@@ -21,7 +21,7 @@ class UserController extends Controller
 {
     private const ROLES = [
         'administrador' => 'Administrador',
-        'medico' => 'MÃ©dico',
+        'medico' => 'Médico',
         'recepcionista' => 'Recepcionista',
         'caja_finanzas' => 'Caja / Finanzas',
     ];
@@ -131,11 +131,11 @@ class UserController extends Controller
         $this->protectPrimaryAdministrator($user, $validated);
 
         if ($currentRole === 'administrador' && $validated['role'] !== 'administrador' && $this->administratorCount($user->clinic_id) <= 1) {
-            throw ValidationException::withMessages(['role' => 'No puedes cambiar el rol del Ãºltimo administrador de la clÃ­nica.']);
+            throw ValidationException::withMessages(['role' => 'No puedes cambiar el rol del último administrador de la clínica.']);
         }
 
         if ($currentRole === 'administrador' && $user->status === 'active' && $validated['status'] === 'inactive' && $this->administratorCount($user->clinic_id, activeOnly: true) <= 1) {
-            throw ValidationException::withMessages(['status' => 'No puedes inactivar al Ãºltimo administrador activo de la clÃ­nica.']);
+            throw ValidationException::withMessages(['status' => 'No puedes inactivar al último administrador activo de la clínica.']);
         }
 
         $this->ensureRole($validated['role']);
@@ -186,7 +186,7 @@ class UserController extends Controller
         }
 
         if ($user->hasRole('administrador') && $this->administratorCount($user->clinic_id) <= 1) {
-            throw ValidationException::withMessages(['user' => 'No puedes eliminar al Ãºltimo administrador de la clÃ­nica.']);
+            throw ValidationException::withMessages(['user' => 'No puedes eliminar al último administrador de la clínica.']);
         }
 
         $old = AuditLogger::modelSnapshot($user, ['id', 'clinic_id', 'name', 'email', 'phone', 'status']);
@@ -201,7 +201,7 @@ class UserController extends Controller
     private function clinicId(): int
     {
         $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clÃ­nica asignada.');
+        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
 
         return (int) $clinicId;
     }

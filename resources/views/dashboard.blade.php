@@ -98,7 +98,7 @@
         <section class="grid gap-6 xl:grid-cols-3">
             <div class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm xl:col-span-2">
                 <div class="flex flex-col gap-3 border-b border-[#E2E8F0] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div><h2 class="text-base font-bold text-[#0F172A]">{{ $isDoctorDashboard ? 'Mis prÃ³ximas citas' : 'PrÃ³ximas citas' }}</h2><p class="mt-1 text-sm text-[#475569]">{{ $isDoctorDashboard ? 'Agenda medica asignada para los prÃ³ximos dÃ­as.' : 'Agenda clinica priorizada para los prÃ³ximos dÃ­as.' }}</p></div>
+                    <div><h2 class="text-base font-bold text-[#0F172A]">{{ $isDoctorDashboard ? 'Mis próximas citas' : 'Próximas citas' }}</h2><p class="mt-1 text-sm text-[#475569]">{{ $isDoctorDashboard ? 'Agenda medica asignada para los próximos días.' : 'Agenda clinica priorizada para los próximos días.' }}</p></div>
                     <a href="{{ route('appointments.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-3 py-2 text-sm font-semibold text-[#2563EB] transition hover:border-[#2563EB] hover:bg-[#2563EB]/5">Ver agenda</a>
                 </div>
                 <div class="overflow-x-auto">
@@ -115,7 +115,7 @@
                                     <td class="whitespace-nowrap px-5 py-4"><span class="inline-flex rounded-full border px-2.5 py-1 text-xs font-bold {{ $statusClasses[$appointment->status] ?? 'border-slate-200 bg-slate-100 text-slate-600' }}">{{ $statusLabels[$appointment->status] ?? $appointment->status }}</span></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="6" class="px-5 py-10 text-center text-sm text-[#475569]">No hay prÃ³ximas citas programadas.</td></tr>
+                                <tr><td colspan="6" class="px-5 py-10 text-center text-sm text-[#475569]">No hay próximas citas programadas.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
