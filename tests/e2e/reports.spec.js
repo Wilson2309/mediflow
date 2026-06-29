@@ -4,7 +4,7 @@ import { login, logout } from './helpers/auth.js';
 const currentDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil' }).format(new Date());
 
 test.describe('Reports by role', () => {
-  test('Cashier only sees financial reports, exports CSV, and can open financial audit', async ({ page }) => {
+  test('Cashier only sees financial reports, exports CSV and Excel, and can open financial audit', async ({ page }) => {
     await login(page, 'caja@mediflow.com', 'Password123*');
 
     await page.goto('/dashboard');
@@ -30,17 +30,26 @@ test.describe('Reports by role', () => {
 
     const pdfLink = page.getByRole('link', { name: 'Exportar PDF' });
     const csvLink = page.getByRole('link', { name: 'Exportar CSV' });
+    const excelLink = page.getByRole('link', { name: 'Exportar Excel' });
     const printLink = page.getByRole('link', { name: 'Imprimir' });
     await expect(pdfLink).toBeVisible();
     await expect(csvLink).toBeVisible();
+    await expect(excelLink).toBeVisible();
     await expect(printLink).toBeVisible();
     await expect(csvLink).toHaveAttribute('href', /\/reports\/financial\/export\/csv/);
+    await expect(excelLink).toHaveAttribute('href', /\/reports\/financial\/export\/xlsx/);
 
     const [download] = await Promise.all([
       page.waitForEvent('download'),
       csvLink.click(),
     ]);
     expect(download.suggestedFilename()).toMatch(/^reporte-financiero-\d{4}-\d{2}-\d{2}\.csv$/);
+
+    const [excelDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      excelLink.click(),
+    ]);
+    expect(excelDownload.suggestedFilename()).toMatch(/^reporte-financiero-\d{4}-\d{2}-\d{2}\.xlsx$/);
 
     await printLink.click();
     await expect(page.getByText('Reporte financiero').first()).toBeVisible();
@@ -76,9 +85,13 @@ test.describe('Reports by role', () => {
     await page.goto('/reports');
     await expect(page).toHaveURL(/\/reports\/appointments/);
     await expect(page.locator('nav[aria-label="Secciones de reportes"] a[href$="/reports/financial"]')).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Exportar Excel' })).toHaveCount(0);
 
     const financialResponse = await page.goto('/reports/financial');
     expect(financialResponse?.status()).toBe(403);
+
+    const xlsxResponse = await page.goto('/reports/financial/export/xlsx');
+    expect(xlsxResponse?.status()).toBe(403);
 
     const auditResponse = await page.goto('/financial-audit');
     expect(auditResponse?.status()).toBe(403);

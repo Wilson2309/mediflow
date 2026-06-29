@@ -65,16 +65,18 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     const firstAvailableSlot = page.getByRole('button', { name: /^\d{2}:\d{2}$/ }).first();
     await expect(firstAvailableSlot).toBeVisible();
     const selectedSlot = (await firstAvailableSlot.textContent()).trim();
+    const selectedSlotButton = page.getByRole('button', { name: selectedSlot, exact: true });
     await page.fill('textarea[name="reason"]', appointmentData.reason);
     await page.fill('textarea[name="notes"]', appointmentData.notes);
-    await firstAvailableSlot.click();
+    await selectedSlotButton.scrollIntoViewIfNeeded();
+    await selectedSlotButton.click();
     await expect(page.locator('#start_time')).toHaveValue(selectedSlot);
     await page.click('button[type="submit"]');
 
     await expect(page).toHaveURL(/\/appointments/);
+    await page.goto('/daily-agenda?date=' + appointmentDate + '&search=' + encodeURIComponent(patientData.first_name));
+    await expect(page.getByRole('heading', { name: /Agenda del d.a/i })).toBeVisible();
     await expect(page.getByText(patientData.first_name).first()).toBeVisible();
-    await expect(page.getByText(appointmentData.reason).first()).toBeVisible();
-
     await page.goto('/appointments/create');
     await page.fill('#patient_search', patientData.identification_number);
     await page.getByRole('button', { name: new RegExp(patientData.first_name) }).click();

@@ -16,6 +16,7 @@ class FinancialAuditController extends Controller
         'payment.receipt_printed',
         'report.financial_exported_pdf',
         'report.financial_exported_csv',
+        'report.financial_exported_xlsx',
         'report.financial_printed',
     ];
 

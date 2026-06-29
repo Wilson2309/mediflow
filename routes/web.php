@@ -181,6 +181,7 @@ Route::middleware('auth')->group(function () {
     Route::get('reports/financial', [ReportController::class, 'financial'])->middleware('permission:reports.financial')->name('reports.financial');
     Route::get('reports/financial/export/pdf', [ReportController::class, 'financialPdf'])->middleware('permission:reports.financial')->name('reports.financial.export.pdf');
     Route::get('reports/financial/export/csv', [ReportController::class, 'financialCsv'])->middleware('permission:reports.financial')->name('reports.financial.export.csv');
+    Route::get('reports/financial/export/xlsx', [ReportController::class, 'financialXlsx'])->middleware('permission:reports.financial')->name('reports.financial.export.xlsx');
     Route::get('reports/financial/print', [ReportController::class, 'financialPrint'])->middleware('permission:reports.financial')->name('reports.financial.print');
     Route::get('financial-audit', [FinancialAuditController::class, 'index'])->middleware('permission:reports.financial')->name('financial-audit.index');
     Route::get('reports/patients', [ReportController::class, 'patients'])->middleware('permission:reports.patients')->name('reports.patients');

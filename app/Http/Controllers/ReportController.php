@@ -13,6 +13,7 @@ use App\Models\Prescription;
 use App\Models\Service;
 use App\Models\Specialty;
 use App\Services\AuditLogger;
+use App\Services\FinancialXlsxExporter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -212,6 +213,32 @@ class ReportController extends Controller
             fclose($handle);
         }, 'reporte-financiero-'.$this->localNow()->format('Y-m-d').'.csv', [
             'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+    public function financialXlsx(ReportFilterRequest $request, FinancialXlsxExporter $exporter): StreamedResponse
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->financialReportData($clinicId, $filters, $start, $end);
+        $shared = $this->shared($clinicId, $filters, $start, $end);
+        $payments = (clone $report['query'])->get();
+        $timezone = config('app.timezone', 'America/Guayaquil');
+        $generatedAt = $this->localNow();
+
+        $this->auditFinancialExport('report.financial_exported_xlsx', 'xlsx', $clinicId, $filters, $report['metrics']);
+
+        return response()->streamDownload(function () use ($exporter, $payments, $report, $shared, $timezone, $generatedAt, $request): void {
+            $exporter->stream(
+                payments: $payments,
+                metrics: $report['metrics'],
+                methodLabels: $report['methodLabels'],
+                statusLabels: $report['statusLabels'],
+                periodLabel: $shared['periodLabel'],
+                generatedAt: $generatedAt,
+                generatedBy: $request->user(),
+                timezone: $timezone,
+            );
+        }, 'reporte-financiero-'.$generatedAt->format('Y-m-d').'.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
     public function financialPrint(ReportFilterRequest $request): View

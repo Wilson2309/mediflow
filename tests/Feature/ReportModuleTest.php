@@ -326,6 +326,151 @@ class ReportModuleTest extends TestCase
         }
     }
 
+    public function test_admin_and_cashier_can_export_financial_xlsx(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $service = Service::factory()->for($clinic)->create(['name' => 'Ecografía Excel']);
+        $paidPatient = $this->patientForClinic($clinic, 'Paciente Pagado Excel');
+        $pendingPatient = $this->patientForClinic($clinic, 'Paciente Pendiente Excel');
+        $cancelledPatient = $this->patientForClinic($clinic, 'Paciente Cancelado Excel');
+        $refundedPatient = $this->patientForClinic($clinic, 'Paciente Reembolsado Excel');
+
+        $this->paymentForClinic($clinic, $paidPatient, $service, 'paid', 'card', 120);
+        $this->paymentForClinic($clinic, $pendingPatient, $service, 'pending', 'cash', 80);
+        $this->paymentForClinic($clinic, $cancelledPatient, $service, 'cancelled', 'transfer', 60);
+        $this->paymentForClinic($clinic, $refundedPatient, $service, 'refunded', 'card', 40);
+
+        foreach (['administrador', 'caja_finanzas'] as $role) {
+            $response = $this->actingAs($this->userWithRole($role, $clinic))
+                ->get(route('reports.financial.export.xlsx', $this->currentPeriod()))
+                ->assertOk();
+
+            $xlsx = $response->streamedContent();
+            $this->assertStringStartsWith('PK', $xlsx);
+            $this->assertStringContainsString('.xlsx', $response->headers->get('content-disposition'));
+            $this->assertStringContainsString('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $response->headers->get('content-type'));
+            $this->assertStringContainsString('Reporte financiero', $xlsx);
+            $this->assertStringContainsString('Monto registrado', $xlsx);
+            $this->assertStringContainsString('Cancelados/reembolsados', $xlsx);
+            $this->assertStringContainsString('Número de pago', $xlsx);
+            $this->assertStringContainsString('Paciente Pagado Excel', $xlsx);
+            $this->assertStringContainsString('Paciente Pendiente Excel', $xlsx);
+            $this->assertStringContainsString('Paciente Cancelado Excel', $xlsx);
+            $this->assertStringContainsString('Paciente Reembolsado Excel', $xlsx);
+            $this->assertStringContainsString('Ecografía Excel', $xlsx);
+            $this->assertStringContainsString('Pagado', $xlsx);
+            $this->assertStringContainsString('Pendiente', $xlsx);
+            $this->assertStringContainsString('Cancelado', $xlsx);
+            $this->assertStringContainsString('Reembolsado', $xlsx);
+            $this->assertStringContainsString('FF047857', $xlsx);
+            $this->assertStringContainsString('FFB45309', $xlsx);
+            $this->assertStringContainsString('FFDC2626', $xlsx);
+            $this->assertStringContainsString('FFFEF3C7', $xlsx);
+            $this->assertStringContainsString('FFFEE2E2', $xlsx);
+            $this->assertStringContainsString('wrapText="1"', $xlsx);
+            $this->assertStringContainsString('pane ySplit="10"', $xlsx);
+            $this->assertStringContainsString('autoFilter ref="A10:I', $xlsx);
+        }
+    }
+
+    public function test_doctor_and_receptionist_cannot_export_financial_xlsx(): void
+    {
+        $this->actingAs($this->userWithRole('medico'))
+            ->get(route('reports.financial.export.xlsx'))
+            ->assertForbidden();
+
+        $this->actingAs($this->userWithRole('recepcionista'))
+            ->get(route('reports.financial.export.xlsx'))
+            ->assertForbidden();
+    }
+
+    public function test_financial_xlsx_respects_clinic_and_filters(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $otherClinic = Clinic::factory()->create();
+        $doctor = $this->doctorForClinic($clinic, 'Doctora Excel Visible');
+        $otherDoctor = $this->doctorForClinic($clinic, 'Doctor Excel Oculto');
+        $service = Service::factory()->for($clinic)->create(['name' => 'Servicio Excel Visible']);
+        $otherService = Service::factory()->for($clinic)->create(['name' => 'Servicio Excel Oculto']);
+        $foreignService = Service::factory()->for($otherClinic)->create(['name' => 'Servicio Otra Clinica']);
+
+        $visiblePatient = $this->patientForClinic($clinic, 'Paciente Excel Visible');
+        $appointment = $this->appointmentForClinic($clinic, $visiblePatient, $doctor, date: '2026-06-10');
+        $appointment->update(['service_id' => $service->id]);
+        Payment::factory()->forAppointment($appointment)->create([
+            'amount' => 120,
+            'payment_status' => 'paid',
+            'payment_method' => 'card',
+            'payment_date' => '2026-06-10 10:00:00',
+        ]);
+
+        $hiddenByStatus = $this->patientForClinic($clinic, 'Paciente Estado Oculto');
+        $this->paymentForClinic($clinic, $hiddenByStatus, $service, 'pending', 'card', 90, paymentDate: null);
+
+        $hiddenByMethod = $this->patientForClinic($clinic, 'Paciente Metodo Oculto');
+        $this->paymentForClinic($clinic, $hiddenByMethod, $service, 'paid', 'cash', 90, paymentDate: '2026-06-10 11:00:00');
+
+        $hiddenByServicePatient = $this->patientForClinic($clinic, 'Paciente Servicio Oculto');
+        $this->paymentForClinic($clinic, $hiddenByServicePatient, $otherService, 'paid', 'card', 90, paymentDate: '2026-06-10 12:00:00');
+
+        $hiddenByDoctorPatient = $this->patientForClinic($clinic, 'Paciente Doctor Oculto');
+        $hiddenAppointment = $this->appointmentForClinic($clinic, $hiddenByDoctorPatient, $otherDoctor, date: '2026-06-10');
+        $hiddenAppointment->update(['service_id' => $service->id]);
+        Payment::factory()->forAppointment($hiddenAppointment)->create([
+            'amount' => 90,
+            'payment_status' => 'paid',
+            'payment_method' => 'card',
+            'payment_date' => '2026-06-10 13:00:00',
+        ]);
+
+        $foreignPatient = $this->patientForClinic($otherClinic, 'Paciente Otra Clinica');
+        $this->paymentForClinic($otherClinic, $foreignPatient, $foreignService, 'paid', 'card', 90, paymentDate: '2026-06-10 14:00:00');
+
+        $xlsx = $this->actingAs($this->userWithRole('caja_finanzas', $clinic))
+            ->get(route('reports.financial.export.xlsx', [
+                'start_date' => '2026-06-01',
+                'end_date' => '2026-06-30',
+                'payment_status' => 'paid',
+                'payment_method' => 'card',
+                'service_id' => $service->id,
+                'doctor_id' => $doctor->id,
+            ]))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertStringContainsString('Paciente Excel Visible', $xlsx);
+        $this->assertStringContainsString('Servicio Excel Visible', $xlsx);
+        $this->assertStringContainsString('Doctora Excel Visible', $xlsx);
+        $this->assertStringNotContainsString('Paciente Estado Oculto', $xlsx);
+        $this->assertStringNotContainsString('Paciente Metodo Oculto', $xlsx);
+        $this->assertStringNotContainsString('Paciente Servicio Oculto', $xlsx);
+        $this->assertStringNotContainsString('Paciente Doctor Oculto', $xlsx);
+        $this->assertStringNotContainsString('Paciente Otra Clinica', $xlsx);
+    }
+
+    public function test_financial_xlsx_registers_audit_log(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $user = $this->userWithRole('caja_finanzas', $clinic);
+        $patient = $this->patientForClinic($clinic, 'Paciente Auditoria Excel');
+        $service = Service::factory()->for($clinic)->create();
+        $this->paymentForClinic($clinic, $patient, $service, 'paid', 'transfer', 65);
+
+        $this->actingAs($user)
+            ->get(route('reports.financial.export.xlsx', $this->currentPeriod()))
+            ->assertOk();
+
+        $this->assertDatabaseHas('audit_logs', [
+            'clinic_id' => $clinic->id,
+            'user_id' => $user->id,
+            'action' => 'report.financial_exported_xlsx',
+            'module' => 'reports',
+        ]);
+
+        $log = AuditLog::where('action', 'report.financial_exported_xlsx')->firstOrFail();
+        $this->assertSame('xlsx', $log->new_values['format']);
+        $this->assertSame(1, $log->new_values['total_records']);
+    }
     public function test_financial_csv_export_respects_date_range(): void
     {
         $clinic = Clinic::factory()->create();
@@ -608,7 +753,7 @@ class ReportModuleTest extends TestCase
     /** @return array<int, string> */
     private function reportRoutes(): array
     {
-        return ['reports.index', 'reports.appointments', 'reports.clinical', 'reports.financial', 'reports.financial.export.pdf', 'reports.financial.export.csv', 'reports.financial.print', 'financial-audit.index', 'reports.patients', 'reports.doctors', 'reports.services'];
+        return ['reports.index', 'reports.appointments', 'reports.clinical', 'reports.financial', 'reports.financial.export.pdf', 'reports.financial.export.csv', 'reports.financial.export.xlsx', 'reports.financial.print', 'financial-audit.index', 'reports.patients', 'reports.doctors', 'reports.services'];
     }
 
     private function userForClinic(Clinic $clinic): User

@@ -8,6 +8,7 @@
         'payment.receipt_printed' => 'Recibo impreso',
         'report.financial_exported_pdf' => 'Reporte financiero PDF',
         'report.financial_exported_csv' => 'Reporte financiero CSV',
+        'report.financial_exported_xlsx' => 'Reporte financiero Excel',
         'report.financial_printed' => 'Reporte financiero impreso',
     ];
 @endphp

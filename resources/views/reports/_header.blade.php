@@ -25,6 +25,7 @@
             <div class="flex flex-wrap gap-2">
                 <a href="{{ route('reports.financial.export.pdf', $financialQuery) }}" class="rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 text-xs font-semibold text-[#0F172A] transition hover:border-[#2563EB] hover:text-[#2563EB]">Exportar PDF</a>
                 <a href="{{ route('reports.financial.export.csv', $financialQuery) }}" class="rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 text-xs font-semibold text-[#0F172A] transition hover:border-[#2563EB] hover:text-[#2563EB]">Exportar CSV</a>
+                <a href="{{ route('reports.financial.export.xlsx', $financialQuery) }}" class="rounded-lg border border-[#E2E8F0] bg-white px-3 py-2 text-xs font-semibold text-[#047857] transition hover:border-[#10B981] hover:text-[#047857]">Exportar Excel</a>
                 <a href="{{ route('reports.financial.print', $financialQuery) }}" class="rounded-lg bg-[#0F172A] px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800">Imprimir</a>
             </div>
         @endif
