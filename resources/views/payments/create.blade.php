@@ -9,7 +9,7 @@
             <a href="{{ route('payments.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569]">Volver</a>
         </header>
 
-        <form method="POST" action="{{ route('payments.store') }}" class="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+        <form method="POST" action="{{ route('payments.store') }}" class="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm" data-requires-online="true" data-offline-block-message="No se puede registrar ni modificar pagos sin conexión. Esta acción se habilitará cuando vuelva la conexión.">
             @csrf
             @include('payments._form', ['payment' => null, 'buttonText' => 'Guardar pago'])
         </form>

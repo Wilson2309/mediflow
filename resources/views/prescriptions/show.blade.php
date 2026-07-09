@@ -19,7 +19,7 @@
                 @endcan
                 @can('prescriptions.update')
                     @if (! $prescription->isSigned() && $prescription->status !== 'cancelled')
-                        <form method="POST" action="{{ route('prescriptions.sign', $prescription) }}" onsubmit="return confirm('¿Firmar electrónicamente esta receta? Después de firmar no se podrá editar.');">
+                        <form method="POST" action="{{ route('prescriptions.sign', $prescription) }}" data-requires-online="true" data-offline-block-message="No se puede firmar ni enviar recetas sin conexión." onsubmit="return confirm('¿Firmar electrónicamente esta receta? Después de firmar no se podrá editar.');">
                             @csrf
                             <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-[#10B981] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-500/20">Firmar receta</button>
                         </form>
@@ -104,7 +104,7 @@
         @can('prescriptions.update')
             <section class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
                 <h2 class="text-base font-bold text-[#0F172A]">Enviar por correo</h2>
-                <form method="POST" action="{{ route('prescriptions.send-email', $prescription) }}" class="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+                <form method="POST" action="{{ route('prescriptions.send-email', $prescription) }}" class="mt-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end" data-requires-online="true" data-offline-block-message="No se puede firmar ni enviar recetas sin conexión.">
                     @csrf
                     <div>
                         <label for="email" class="mb-2 block text-sm font-semibold text-[#0F172A]">Correo destino</label>

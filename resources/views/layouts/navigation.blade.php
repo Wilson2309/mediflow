@@ -262,6 +262,11 @@
         </div>
 
         <div class="flex flex-1 items-center justify-end gap-2 md:flex-none">
+            <div id="connection-status" class="hidden items-center gap-2 rounded-full border border-[#10B981]/20 bg-[#10B981]/10 px-3 py-2 text-xs font-bold text-[#047857] sm:inline-flex" data-status="connected" aria-live="polite">
+                <span class="h-2 w-2 rounded-full bg-[#10B981]" data-connection-dot></span>
+                <span data-connection-label>Conectado</span>
+            </div>
+
             <button type="button" class="relative grid h-10 w-10 place-items-center rounded-lg border border-[#E2E8F0] bg-white text-slate-500 transition hover:border-[#38BDF8] hover:text-[#2563EB]">
                 <span class="sr-only">Notificaciones</span>
                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">

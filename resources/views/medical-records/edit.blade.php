@@ -11,7 +11,7 @@
             </div>
         </header>
 
-        <form method="POST" action="{{ route('medical-records.update', $medicalRecord) }}">
+        <form method="POST" action="{{ route('medical-records.update', $medicalRecord) }}" data-offline-draft="true" data-draft-form="medical-records" data-draft-record="{{ $medicalRecord->id }}" data-offline-draft-message="No hay conexión. El contenido fue guardado como borrador local. Revísalo y envíalo cuando vuelva la conexión.">
             @include('medical-records._form', [
                 'method' => 'PUT',
                 'submitLabel' => 'Actualizar historial',

@@ -9,7 +9,7 @@
             <a href="{{ route('appointments.show', $appointment) }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569]">Volver</a>
         </section>
 
-        <form method="POST" action="{{ route('appointments.update', $appointment) }}" class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+        <form method="POST" action="{{ route('appointments.update', $appointment) }}" class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm" data-offline-draft="true" data-draft-form="appointments" data-draft-record="{{ $appointment->id }}" data-offline-draft-message="No hay conexión. El formulario fue guardado como borrador local. Revísalo y envíalo cuando vuelva la conexión.">
             @csrf
             @method('PUT')
             @include('appointments._form', ['appointment' => $appointment, 'buttonText' => 'Actualizar cita'])

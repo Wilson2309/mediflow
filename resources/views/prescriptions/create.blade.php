@@ -9,7 +9,7 @@
             <a href="{{ route('prescriptions.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569]">Volver</a>
         </header>
 
-        <form method="POST" action="{{ route('prescriptions.store') }}" class="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+        <form method="POST" action="{{ route('prescriptions.store') }}" class="overflow-hidden rounded-lg border border-[#E2E8F0] bg-white shadow-sm" data-offline-draft="true" data-draft-form="prescriptions" data-draft-record="new" data-offline-draft-message="No hay conexión. El contenido fue guardado como borrador local. Revísalo y envíalo cuando vuelva la conexión.">
             @csrf
             @include('prescriptions._form', ['prescription' => null, 'buttonText' => 'Guardar receta'])
         </form>

@@ -33,6 +33,12 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/app-health', fn () => response()->json([
+    'ok' => true,
+    'timestamp' => now(config('app.timezone', 'America/Guayaquil'))->toIso8601String(),
+    'app' => 'MediFlow',
+]))->name('app-health');
+
 Route::post('/demo-requests', [PublicDemoRequestController::class, 'store'])
     ->middleware('throttle:5,1')
     ->name('demo-requests.store');

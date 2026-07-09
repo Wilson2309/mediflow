@@ -15,9 +15,21 @@
 
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
-    <body class="bg-[#F8FAFC] font-sans text-[#0F172A] antialiased">
+    @php
+        $layoutUser = auth()->user();
+        $layoutRole = $layoutUser && method_exists($layoutUser, 'getRoleNames') ? ($layoutUser->getRoleNames()->first() ?: 'sin_rol') : 'guest';
+        $layoutClinicId = $layoutUser?->activeClinicId();
+    @endphp
+    <body
+        class="bg-[#F8FAFC] font-sans text-[#0F172A] antialiased"
+        data-user-id="{{ $layoutUser?->id ?? 'guest' }}"
+        data-active-clinic-id="{{ $layoutClinicId ?? 'none' }}"
+        data-user-role="{{ $layoutRole }}"
+    >
         <div x-data="{ sidebarOpen: false }" class="min-h-screen">
             @include('layouts.navigation')
+
+            <div id="connection-toast-container" class="fixed right-4 top-20 z-[80] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3"></div>
 
             <div class="lg:pl-72">
                 <main class="min-h-screen pt-20">

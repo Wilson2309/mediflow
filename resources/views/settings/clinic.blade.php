@@ -15,7 +15,7 @@
 
         <section class="grid gap-6 xl:grid-cols-3">
             <div class="space-y-6 xl:col-span-2">
-                <form method="POST" action="{{ route('settings.clinic.update') }}" enctype="multipart/form-data" class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+                <form method="POST" action="{{ route('settings.clinic.update') }}" enctype="multipart/form-data" class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm" data-requires-online="true" data-offline-block-message="No se pueden realizar cambios administrativos sin conexión.">
                     @csrf
                     @method('PUT')
                     <div class="border-b border-[#E2E8F0] px-5 py-4">

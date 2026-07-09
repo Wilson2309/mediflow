@@ -9,7 +9,7 @@
             <a href="{{ route('medical-records.index') }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#475569]">Volver</a>
         </header>
 
-        <form method="POST" action="{{ route('medical-records.store') }}">
+        <form method="POST" action="{{ route('medical-records.store') }}" data-offline-draft="true" data-draft-form="medical-records" data-draft-record="new" data-offline-draft-message="No hay conexión. El contenido fue guardado como borrador local. Revísalo y envíalo cuando vuelva la conexión.">
             @include('medical-records._form', [
                 'medicalRecord' => null,
                 'method' => 'POST',

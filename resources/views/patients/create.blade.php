@@ -12,7 +12,7 @@
             </a>
         </section>
 
-        <form method="POST" action="{{ route('patients.store') }}" class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+        <form method="POST" action="{{ route('patients.store') }}" class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm" data-offline-draft="true" data-draft-form="patients" data-draft-record="new" data-offline-draft-message="No hay conexión. El formulario fue guardado como borrador local. Revísalo y envíalo cuando vuelva la conexión.">
             @csrf
 
             <div class="grid gap-5 p-5 md:grid-cols-2">
@@ -115,4 +115,3 @@
         </form>
     </div>
 </x-app-layout>
-
