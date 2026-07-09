@@ -38,8 +38,8 @@ class UserController extends Controller
         $status = $request->query('status');
 
         $users = User::query()
-            ->with(['clinic', 'roles'])
-            ->where('clinic_id', $clinicId)
+            ->with(['clinic', 'clinics', 'roles'])
+            ->whereHas('clinics', fn ($query) => $query->where('clinics.id', $clinicId))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('name', 'like', "%{$search}%")
@@ -95,11 +95,8 @@ class UserController extends Controller
             $user->syncRoles([$validated['role']]);
             $createdUser = $user;
 
-            // Sync clinics: always include the current clinic + any extra selected
             $clinicIds = array_unique(array_merge([$clinicId], $validated['clinic_ids'] ?? []));
-            // Security: only allow clinics the admin themselves has access to
-            $allowedClinicIds = auth()->user()->clinics()->pluck('clinics.id')->toArray();
-            $clinicIds = array_values(array_intersect($clinicIds, $allowedClinicIds));
+            $this->ensureAllowedClinicAssignments($clinicIds);
             $user->clinics()->sync($clinicIds);
 
             if ($validated['role'] === 'medico') {
@@ -143,12 +140,13 @@ class UserController extends Controller
         $currentRole = $user->getRoleNames()->first();
 
         $this->protectPrimaryAdministrator($user, $validated);
+        $clinicId = $this->clinicId();
 
-        if ($currentRole === 'administrador' && $validated['role'] !== 'administrador' && $this->administratorCount($user->clinic_id) <= 1) {
+        if ($currentRole === 'administrador' && $validated['role'] !== 'administrador' && $this->administratorCount($clinicId) <= 1) {
             throw ValidationException::withMessages(['role' => 'No puedes cambiar el rol del último administrador de la clínica.']);
         }
 
-        if ($currentRole === 'administrador' && $user->status === 'active' && $validated['status'] === 'inactive' && $this->administratorCount($user->clinic_id, activeOnly: true) <= 1) {
+        if ($currentRole === 'administrador' && $user->status === 'active' && $validated['status'] === 'inactive' && $this->administratorCount($clinicId, activeOnly: true) <= 1) {
             throw ValidationException::withMessages(['status' => 'No puedes inactivar al último administrador activo de la clínica.']);
         }
 
@@ -157,7 +155,7 @@ class UserController extends Controller
         $old = AuditLogger::modelSnapshot($user, ['id', 'clinic_id', 'name', 'email', 'phone', 'status']);
         $old['role'] = $currentRole;
 
-        DB::transaction(function () use ($user, $validated) {
+        DB::transaction(function () use ($user, $validated, $clinicId) {
             $data = [
                 'name' => $validated['name'],
                 'email' => $validated['email'],
@@ -172,19 +170,33 @@ class UserController extends Controller
             $user->update($data);
             $user->syncRoles([$validated['role']]);
 
-            // Sync clinics
             if (isset($validated['clinic_ids'])) {
-                $allowedClinicIds = auth()->user()->clinics()->pluck('clinics.id')->toArray();
-                $clinicIds = array_values(array_intersect($validated['clinic_ids'], $allowedClinicIds));
-                // Always keep at least the current clinic
-                if (!in_array((int) $user->clinic_id, $clinicIds)) {
-                    $clinicIds[] = (int) $user->clinic_id;
+                $clinicIds = array_values(array_unique(array_map('intval', $validated['clinic_ids'])));
+                $clinicIds[] = $clinicId;
+                $clinicIds = array_values(array_unique($clinicIds));
+
+                $this->ensureAllowedClinicAssignments($clinicIds);
+
+                $fallbackClinicId = $clinicIds[0] ?? $clinicId;
+                $clinicData = [];
+
+                if (! in_array((int) $user->clinic_id, $clinicIds, true)) {
+                    $clinicData['clinic_id'] = $fallbackClinicId;
                 }
+
+                if (! in_array((int) $user->current_clinic_id, $clinicIds, true)) {
+                    $clinicData['current_clinic_id'] = $fallbackClinicId;
+                }
+
+                if ($clinicData !== []) {
+                    $user->update($clinicData);
+                }
+
                 $user->clinics()->sync($clinicIds);
             }
 
             if ($validated['role'] === 'medico') {
-                $this->updateOrCreateDoctorProfile($user, $validated);
+                $this->updateOrCreateDoctorProfile($user, $validated, $clinicId);
             } elseif ($user->doctor) {
                 $user->doctor->update(['status' => 'inactive']);
             }
@@ -210,7 +222,7 @@ class UserController extends Controller
             throw ValidationException::withMessages(['user' => 'El administrador principal de MediFlow no puede eliminarse.']);
         }
 
-        if ($user->hasRole('administrador') && $this->administratorCount($user->clinic_id) <= 1) {
+        if ($user->hasRole('administrador') && $this->administratorCount($this->clinicId()) <= 1) {
             throw ValidationException::withMessages(['user' => 'No puedes eliminar al último administrador de la clínica.']);
         }
 
@@ -226,7 +238,9 @@ class UserController extends Controller
 
     private function authorizeClinic(User $user): void
     {
-        abort_if((int) $user->clinic_id !== $this->clinicId(), 403);
+        $clinicId = $this->clinicId();
+
+        abort_unless($user->clinics()->where('clinics.id', $clinicId)->exists(), 403);
     }
 
     /** @return array<string, string> */
@@ -267,18 +281,18 @@ class UserController extends Controller
     }
 
     /** @param array<string, mixed> $validated */
-    private function updateOrCreateDoctorProfile(User $user, array $validated): Doctor
+    private function updateOrCreateDoctorProfile(User $user, array $validated, int $clinicId): Doctor
     {
         $doctor = $user->doctor;
 
         if ($doctor) {
-            abort_if((int) $doctor->clinic_id !== (int) $user->clinic_id, 403);
+            abort_if((int) $doctor->clinic_id !== $clinicId, 403);
             $doctor->update($this->doctorData($validated));
 
             return $doctor;
         }
 
-        return $this->createDoctorProfile($user, $validated, (int) $user->clinic_id);
+        return $this->createDoctorProfile($user, $validated, $clinicId);
     }
 
     /** @param array<string, mixed> $validated
@@ -297,7 +311,7 @@ class UserController extends Controller
 
     private function administratorCount(int $clinicId, bool $activeOnly = false): int
     {
-        return User::where('clinic_id', $clinicId)
+        return User::whereHas('clinics', fn ($query) => $query->where('clinics.id', $clinicId))
             ->when($activeOnly, fn ($query) => $query->where('status', 'active'))
             ->whereHas('roles', fn ($query) => $query->where('name', 'administrador'))
             ->count();
@@ -331,12 +345,29 @@ class UserController extends Controller
         return strtolower($user->email) === 'admin@mediflow.com';
     }
 
+    /** @param array<int, int|string> $clinicIds */
+    private function ensureAllowedClinicAssignments(array $clinicIds): void
+    {
+        $clinicIds = array_values(array_unique(array_map('intval', $clinicIds)));
+        $allowedClinicIds = auth()->user()
+            ->clinics()
+            ->where('status', 'active')
+            ->pluck('clinics.id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $invalidClinicIds = array_values(array_diff($clinicIds, $allowedClinicIds));
+
+        if ($invalidClinicIds !== []) {
+            throw ValidationException::withMessages([
+                'clinic_ids' => 'No puedes asignar usuarios a clinicas que no administras.',
+            ]);
+        }
+    }
+
     /** Get the clinics that the current admin has access to (for assigning to staff) */
     private function adminClinics(): \Illuminate\Support\Collection
     {
         return auth()->user()->clinics()->where('status', 'active')->orderBy('name')->get();
     }
 }
-
-
-

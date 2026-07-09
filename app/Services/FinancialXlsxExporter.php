@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Clinic;
 use App\Models\Payment;
 use App\Models\User;
 use Carbon\Carbon;
@@ -15,9 +16,9 @@ class FinancialXlsxExporter
      * @param array<string, string> $methodLabels
      * @param array<string, string> $statusLabels
      */
-    public function stream(Collection $payments, array $metrics, array $methodLabels, array $statusLabels, string $periodLabel, Carbon $generatedAt, ?User $generatedBy, string $timezone): void
+    public function stream(Collection $payments, array $metrics, array $methodLabels, array $statusLabels, Clinic $clinic, string $periodLabel, Carbon $generatedAt, ?User $generatedBy, string $timezone): void
     {
-        echo $this->build($payments, $metrics, $methodLabels, $statusLabels, $periodLabel, $generatedAt, $generatedBy, $timezone);
+        echo $this->build($payments, $metrics, $methodLabels, $statusLabels, $clinic, $periodLabel, $generatedAt, $generatedBy, $timezone);
     }
 
     /**
@@ -26,9 +27,9 @@ class FinancialXlsxExporter
      * @param array<string, string> $methodLabels
      * @param array<string, string> $statusLabels
      */
-    public function build(Collection $payments, array $metrics, array $methodLabels, array $statusLabels, string $periodLabel, Carbon $generatedAt, ?User $generatedBy, string $timezone): string
+    public function build(Collection $payments, array $metrics, array $methodLabels, array $statusLabels, Clinic $clinic, string $periodLabel, Carbon $generatedAt, ?User $generatedBy, string $timezone): string
     {
-        return $this->zip($this->files($payments, $metrics, $methodLabels, $statusLabels, $periodLabel, $generatedAt, $generatedBy, $timezone));
+        return $this->zip($this->files($payments, $metrics, $methodLabels, $statusLabels, $clinic, $periodLabel, $generatedAt, $generatedBy, $timezone));
     }
 
     /**
@@ -38,7 +39,7 @@ class FinancialXlsxExporter
      * @param array<string, string> $statusLabels
      * @return array<string, string>
      */
-    private function files(Collection $payments, array $metrics, array $methodLabels, array $statusLabels, string $periodLabel, Carbon $generatedAt, ?User $generatedBy, string $timezone): array
+    private function files(Collection $payments, array $metrics, array $methodLabels, array $statusLabels, Clinic $clinic, string $periodLabel, Carbon $generatedAt, ?User $generatedBy, string $timezone): array
     {
         return [
             '[Content_Types].xml' => $this->contentTypesXml(),
@@ -48,7 +49,7 @@ class FinancialXlsxExporter
             'xl/workbook.xml' => $this->workbookXml(),
             'xl/_rels/workbook.xml.rels' => $this->workbookRelationshipsXml(),
             'xl/styles.xml' => $this->stylesXml(),
-            'xl/worksheets/sheet1.xml' => $this->worksheetXml($payments, $metrics, $methodLabels, $statusLabels, $periodLabel, $generatedAt, $generatedBy, $timezone),
+            'xl/worksheets/sheet1.xml' => $this->worksheetXml($payments, $metrics, $methodLabels, $statusLabels, $clinic, $periodLabel, $generatedAt, $generatedBy, $timezone),
         ];
     }
 
@@ -89,37 +90,48 @@ class FinancialXlsxExporter
         return [$time, $date];
     }
 
-    private function worksheetXml(Collection $payments, array $metrics, array $methodLabels, array $statusLabels, string $periodLabel, Carbon $generatedAt, ?User $generatedBy, string $timezone): string
+    private function worksheetXml(Collection $payments, array $metrics, array $methodLabels, array $statusLabels, Clinic $clinic, string $periodLabel, Carbon $generatedAt, ?User $generatedBy, string $timezone): string
     {
         $rows = [];
         $rows[] = $this->row(1, [$this->inlineCell('A1', 'Reporte financiero', 1)]);
-        $rows[] = $this->row(2, [$this->inlineCell('A2', 'Periodo: '.$periodLabel, 2)]);
-        $rows[] = $this->row(3, [$this->inlineCell('A3', 'Generado: '.$generatedAt->timezone($timezone)->format('d/m/Y H:i'), 2)]);
-        $rows[] = $this->row(4, [$this->inlineCell('A4', 'Usuario: '.($generatedBy?->name ?? 'Sistema'), 2)]);
-        $rows[] = $this->row(6, [$this->inlineCell('A6', 'Resumen', 1)]);
-        $rows[] = $this->row(7, [
-            $this->inlineCell('A7', 'Monto registrado', 3),
-            $this->inlineCell('B7', 'Ingresos pagados', 3),
-            $this->inlineCell('C7', 'Pagos pendientes', 3),
-            $this->inlineCell('D7', 'Cancelados/reembolsados', 3),
-            $this->inlineCell('E7', 'Registros exportados', 3),
+
+        $headerLines = $this->headerLines($clinic, $periodLabel, $generatedAt, $generatedBy, $timezone);
+        $rowNumber = 2;
+        foreach ($headerLines as $line) {
+            $rows[] = $this->row($rowNumber, [$this->inlineCell('A'.$rowNumber, $line, 2)]);
+            $rowNumber++;
+        }
+
+        $summaryTitleRow = $rowNumber + 1;
+        $summaryHeaderRow = $summaryTitleRow + 1;
+        $summaryValueRow = $summaryHeaderRow + 1;
+        $tableHeaderRow = $summaryValueRow + 2;
+        $firstDataRow = $tableHeaderRow + 1;
+
+        $rows[] = $this->row($summaryTitleRow, [$this->inlineCell('A'.$summaryTitleRow, 'Resumen', 1)]);
+        $rows[] = $this->row($summaryHeaderRow, [
+            $this->inlineCell('A'.$summaryHeaderRow, 'Monto registrado', 3),
+            $this->inlineCell('B'.$summaryHeaderRow, 'Ingresos pagados', 3),
+            $this->inlineCell('C'.$summaryHeaderRow, 'Pagos pendientes', 3),
+            $this->inlineCell('D'.$summaryHeaderRow, 'Cancelados/reembolsados', 3),
+            $this->inlineCell('E'.$summaryHeaderRow, 'Registros exportados', 3),
         ]);
-        $rows[] = $this->row(8, [
-            $this->numberCell('A8', (float) ($metrics['totalAmount'] ?? 0), 9),
-            $this->numberCell('B8', (float) ($metrics['paidIncome'] ?? 0), 11),
-            $this->numberCell('C8', (int) ($metrics['pending'] ?? 0), 4),
-            $this->numberCell('D8', (int) ($metrics['cancelled'] ?? 0) + (int) ($metrics['refunded'] ?? 0), 4),
-            $this->numberCell('E8', $payments->count(), 4),
+        $rows[] = $this->row($summaryValueRow, [
+            $this->numberCell('A'.$summaryValueRow, (float) ($metrics['totalAmount'] ?? 0), 9),
+            $this->numberCell('B'.$summaryValueRow, (float) ($metrics['paidIncome'] ?? 0), 11),
+            $this->numberCell('C'.$summaryValueRow, (int) ($metrics['pending'] ?? 0), 4),
+            $this->numberCell('D'.$summaryValueRow, (int) ($metrics['cancelled'] ?? 0) + (int) ($metrics['refunded'] ?? 0), 4),
+            $this->numberCell('E'.$summaryValueRow, $payments->count(), 4),
         ]);
 
         $headers = ['Número de pago', 'Fecha de pago', 'Paciente', 'Identificación', 'Servicio', 'Médico', 'Método de pago', 'Estado', 'Monto'];
         $headerCells = [];
         foreach ($headers as $index => $header) {
-            $headerCells[] = $this->inlineCell($this->cellRef($index + 1, 10), $header, 5);
+            $headerCells[] = $this->inlineCell($this->cellRef($index + 1, $tableHeaderRow), $header, 5);
         }
-        $rows[] = $this->row(10, $headerCells);
+        $rows[] = $this->row($tableHeaderRow, $headerCells);
 
-        $rowNumber = 11;
+        $rowNumber = $firstDataRow;
         foreach ($payments as $payment) {
             $rows[] = $this->row($rowNumber, [
                 $this->inlineCell('A'.$rowNumber, $this->paymentNumber($payment), $this->statusStyleForStatus($payment->payment_status)),
@@ -135,18 +147,47 @@ class FinancialXlsxExporter
             $rowNumber++;
         }
 
-        $lastRow = max(10, $rowNumber - 1);
+        $lastRow = max($tableHeaderRow, $rowNumber - 1);
+        $mergeCells = [];
+        for ($headerRow = 1; $headerRow < $summaryTitleRow; $headerRow++) {
+            $mergeCells[] = '<mergeCell ref="A'.$headerRow.':I'.$headerRow.'"/>';
+        }
+        $mergeCells[] = '<mergeCell ref="A'.$summaryTitleRow.':I'.$summaryTitleRow.'"/>';
 
         return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'.
             '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'.
-            '<sheetViews><sheetView workbookViewId="0"><pane ySplit="10" topLeftCell="A11" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A11" sqref="A11"/></sheetView></sheetViews>'.
+            '<sheetViews><sheetView workbookViewId="0"><pane ySplit="'.$tableHeaderRow.'" topLeftCell="A'.$firstDataRow.'" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A'.$firstDataRow.'" sqref="A'.$firstDataRow.'"/></sheetView></sheetViews>'.
             '<sheetFormatPr defaultRowHeight="18"/>'.
             '<cols><col min="1" max="1" width="16" customWidth="1"/><col min="2" max="2" width="20" customWidth="1"/><col min="3" max="3" width="30" customWidth="1"/><col min="4" max="4" width="18" customWidth="1"/><col min="5" max="5" width="30" customWidth="1"/><col min="6" max="6" width="28" customWidth="1"/><col min="7" max="7" width="18" customWidth="1"/><col min="8" max="8" width="16" customWidth="1"/><col min="9" max="9" width="14" customWidth="1"/></cols>'.
             '<sheetData>'.implode('', $rows).'</sheetData>'.
-            '<autoFilter ref="A10:I'.$lastRow.'"/>'.
-            '<mergeCells count="5"><mergeCell ref="A1:I1"/><mergeCell ref="A2:I2"/><mergeCell ref="A3:I3"/><mergeCell ref="A4:I4"/><mergeCell ref="A6:I6"/></mergeCells>'.
+            '<autoFilter ref="A'.$tableHeaderRow.':I'.$lastRow.'"/>'.
+            '<mergeCells count="'.count($mergeCells).'">'.implode('', $mergeCells).'</mergeCells>'.
             '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>'.
             '</worksheet>';
+    }
+
+    /** @return array<int, string> */
+    private function headerLines(Clinic $clinic, string $periodLabel, Carbon $generatedAt, ?User $generatedBy, string $timezone): array
+    {
+        $lines = ['Clínica: '.$clinic->name];
+
+        if ($clinic->ruc) {
+            $lines[] = 'RUC: '.$clinic->ruc;
+        }
+
+        if ($clinic->address) {
+            $lines[] = 'Dirección: '.$clinic->address;
+        }
+
+        if ($clinic->phone) {
+            $lines[] = 'Teléfono: '.$clinic->phone;
+        }
+
+        $lines[] = 'Rango: '.$periodLabel;
+        $lines[] = 'Generado por: '.($generatedBy?->name ?? 'Sistema');
+        $lines[] = 'Generado el: '.$generatedAt->timezone($timezone)->format('d/m/Y H:i');
+
+        return $lines;
     }
 
     /** @param array<int, string> $cells */

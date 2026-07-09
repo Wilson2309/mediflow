@@ -15,7 +15,7 @@ class UpdateUserRequest extends FormRequest
 
         return $target instanceof User
             && $clinicId
-            && (int) $target->clinic_id === (int) $clinicId;
+            && $target->clinics()->where('clinics.id', $clinicId)->exists();
     }
 
     /** @return array<string, mixed> */

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -50,7 +51,7 @@ class User extends Authenticatable
     }
 
     /** Many-to-many: all clinics this user has access to */
-    public function clinics(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    public function clinics(): BelongsToMany
     {
         return $this->belongsToMany(Clinic::class, 'clinic_user')->withTimestamps();
     }
@@ -61,9 +62,52 @@ class User extends Authenticatable
         return $this->belongsTo(Clinic::class, 'current_clinic_id');
     }
 
-    /** Resolve the active clinic_id (current_clinic_id first, fallback to clinic_id) */
+    public function resolvedClinic(): ?Clinic
+    {
+        if (! $this->exists) {
+            return null;
+        }
+
+        if ($this->current_clinic_id) {
+            $clinic = $this->clinics()->whereKey($this->current_clinic_id)->first();
+
+            if ($clinic) {
+                return $clinic;
+            }
+
+            $this->forceFill(['current_clinic_id' => null])->saveQuietly();
+            $this->current_clinic_id = null;
+        }
+
+        $clinic = $this->clinics()
+            ->where('status', 'active')
+            ->orderBy('clinics.id')
+            ->first();
+
+        if ($clinic) {
+            $updates = ['current_clinic_id' => $clinic->id];
+
+            if (! $this->clinic_id) {
+                $updates['clinic_id'] = $clinic->id;
+            }
+
+            $this->forceFill($updates)->saveQuietly();
+            $this->forceFill($updates);
+        }
+
+        return $clinic;
+    }
+
+    public function activeClinic(): ?Clinic
+    {
+        $clinic = $this->resolvedClinic();
+
+        return $clinic?->status === 'active' ? $clinic : null;
+    }
+
+    /** Resolve the active clinic_id from the validated clinic_user assignment. */
     public function activeClinicId(): ?int
     {
-        return $this->current_clinic_id ?? $this->clinic_id;
+        return $this->activeClinic()?->id;
     }
 }

@@ -20,6 +20,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -185,24 +186,26 @@ class ReportController extends Controller
         [$clinicId, $filters, $start, $end] = $this->context($request);
         $report = $this->financialReportData($clinicId, $filters, $start, $end);
         $shared = $this->shared($clinicId, $filters, $start, $end);
+        $clinic = Clinic::findOrFail($clinicId);
         $payments = (clone $report['query'])->get();
         $timezone = config('app.timezone', 'America/Guayaquil');
         $generatedAt = $this->localNow();
 
         $this->auditFinancialExport('report.financial_exported_xlsx', 'xlsx', $clinicId, $filters, $report['metrics']);
 
-        return response()->streamDownload(function () use ($exporter, $payments, $report, $shared, $timezone, $generatedAt, $request): void {
+        return response()->streamDownload(function () use ($exporter, $payments, $report, $shared, $clinic, $timezone, $generatedAt, $request): void {
             $exporter->stream(
                 payments: $payments,
                 metrics: $report['metrics'],
                 methodLabels: $report['methodLabels'],
                 statusLabels: $report['statusLabels'],
+                clinic: $clinic,
                 periodLabel: $shared['periodLabel'],
                 generatedAt: $generatedAt,
                 generatedBy: $request->user(),
                 timezone: $timezone,
             );
-        }, 'reporte-financiero-'.$generatedAt->format('Y-m-d').'.xlsx', [
+        }, $this->financialXlsxFileName($clinic, $generatedAt), [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ]);
     }
@@ -346,12 +349,18 @@ class ReportController extends Controller
     /** @return array<string, mixed> */
     private function shared(int $clinicId, array $filters, Carbon $start, Carbon $end): array
     {
+        $doctorQuery = Doctor::with('user')->where('clinic_id', $clinicId)->orderBy('id');
+        if (auth()->user()?->hasRole('medico')) {
+            $doctorId = $this->doctorIdForReportUser($clinicId);
+            $doctorId ? $doctorQuery->whereKey($doctorId) : $doctorQuery->whereRaw('1 = 0');
+        }
+
         return [
             'filters' => $filters,
             'startDate' => $start->toDateString(),
             'endDate' => $end->toDateString(),
             'periodLabel' => $start->format('d/m/Y').' - '.$end->format('d/m/Y'),
-            'doctors' => Doctor::with('user')->where('clinic_id', $clinicId)->orderBy('id')->get(),
+            'doctors' => $doctorQuery->get(),
             'services' => Service::where('clinic_id', $clinicId)->orderBy('name')->get(),
             'patientsList' => Patient::where('clinic_id', $clinicId)->orderBy('last_name')->orderBy('first_name')->get(),
             'specialties' => Specialty::whereHas('doctors', fn ($query) => $query->where('clinic_id', $clinicId))->orderBy('name')->get(),
@@ -407,10 +416,12 @@ class ReportController extends Controller
     /** @return array<string, mixed> */
     private function appointmentsReportData(int $clinicId, array $filters, Carbon $start, Carbon $end): array
     {
+        $doctorFilter = auth()->user()?->hasRole('medico') ? null : ($filters['doctor_id'] ?? null);
         $query = $this->appointmentsQuery($clinicId, $start, $end)
-            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->where('doctor_id', $id))
+            ->when($doctorFilter, fn ($query, $id) => $query->where('doctor_id', $id))
             ->when($filters['service_id'] ?? null, fn ($query, $id) => $query->where('service_id', $id))
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status));
+        $this->scopeDoctorReportQuery($query, $clinicId);
         $total = (clone $query)->count();
         $statusCounts = (clone $query)->selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
 
@@ -436,12 +447,15 @@ class ReportController extends Controller
     /** @return array<string, mixed> */
     private function clinicalReportData(int $clinicId, array $filters, Carbon $start, Carbon $end): array
     {
+        $doctorFilter = auth()->user()?->hasRole('medico') ? null : ($filters['doctor_id'] ?? null);
         $consultations = $this->consultationsQuery($clinicId, $start, $end)
-            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->where('doctor_id', $id))
+            ->when($doctorFilter, fn ($query, $id) => $query->where('doctor_id', $id))
             ->when($filters['patient_id'] ?? null, fn ($query, $id) => $query->where('patient_id', $id));
         $prescriptions = $this->prescriptionsQuery($clinicId, $start, $end)
-            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->where('doctor_id', $id))
+            ->when($doctorFilter, fn ($query, $id) => $query->where('doctor_id', $id))
             ->when($filters['patient_id'] ?? null, fn ($query, $id) => $query->where('patient_id', $id));
+        $this->scopeDoctorReportQuery($consultations, $clinicId);
+        $this->scopeDoctorReportQuery($prescriptions, $clinicId);
         $patients = Patient::where('clinic_id', $clinicId);
 
         return [
@@ -536,6 +550,31 @@ class ReportController extends Controller
         });
     }
 
+    private function scopeDoctorReportQuery(Builder $query, int $clinicId): void
+    {
+        $user = auth()->user();
+
+        if (! $user?->hasRole('medico')) {
+            return;
+        }
+
+        $doctorId = $this->doctorIdForReportUser($clinicId);
+        $doctorId ? $query->where('doctor_id', $doctorId) : $query->whereRaw('1 = 0');
+    }
+
+    private function doctorIdForReportUser(int $clinicId): ?int
+    {
+        $user = auth()->user();
+
+        if (! $user?->hasRole('medico')) {
+            return null;
+        }
+
+        return Doctor::where('clinic_id', $clinicId)
+            ->where('user_id', $user->id)
+            ->value('id');
+    }
+
     /** @return array<string, string> */
     private function paymentMethodLabels(): array
     {
@@ -556,6 +595,13 @@ class ReportController extends Controller
     private function localNow(): Carbon
     {
         return now(config('app.timezone', 'America/Guayaquil'));
+    }
+
+    private function financialXlsxFileName(Clinic $clinic, Carbon $generatedAt): string
+    {
+        $clinicSlug = Str::slug($clinic->name);
+
+        return 'reporte-financiero-'.($clinicSlug ?: 'clinica').'-'.$generatedAt->format('Y-m-d').'.xlsx';
     }
 
     /** @param array<string, mixed> $filters */

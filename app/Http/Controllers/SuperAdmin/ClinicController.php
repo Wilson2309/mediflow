@@ -5,7 +5,9 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\Clinic;
 use App\Models\User;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -80,19 +82,36 @@ class ClinicController extends Controller
             $data['logo_path'] = $request->file('logo')->store('logos', 'public');
         }
 
-        $clinic = Clinic::create($data);
+        DB::transaction(function () use ($data, $validated): void {
+            $clinic = Clinic::create($data);
 
-        $admin = User::create([
-            'clinic_id' => $clinic->id,
-            'name' => $validated['admin_name'],
-            'email' => $validated['admin_email'],
-            'password' => Hash::make($validated['admin_password']),
-            'status' => 'active',
-        ]);
+            $admin = User::create([
+                'clinic_id' => $clinic->id,
+                'current_clinic_id' => $clinic->id,
+                'name' => $validated['admin_name'],
+                'email' => $validated['admin_email'],
+                'password' => Hash::make($validated['admin_password']),
+                'status' => 'active',
+            ]);
 
-        $admin->assignRole('administrador');
-        $admin->clinics()->sync([$clinic->id]);
-        $admin->update(['current_clinic_id' => $clinic->id]);
+            $admin->assignRole('administrador');
+            $admin->clinics()->sync([$clinic->id]);
+
+            AuditLogger::log('superadmin.clinic_created', 'super-admin', $clinic, [], [
+                'clinic_id' => $clinic->id,
+                'name' => $clinic->name,
+                'status' => $clinic->status,
+                'admin_user_id' => $admin->id,
+            ], 'Clinica creada por SuperAdmin.');
+
+            if (($clinic->subscription_plan ?? null) || ($clinic->subscription_end_date ?? null)) {
+                AuditLogger::log('superadmin.subscription_updated', 'super-admin', $clinic, [], [
+                    'clinic_id' => $clinic->id,
+                    'subscription_plan' => $clinic->subscription_plan,
+                    'subscription_end_date' => $clinic->subscription_end_date?->toDateString(),
+                ], 'Suscripcion configurada por SuperAdmin.');
+            }
+        });
 
         return redirect()->route('super-admin.clinics.index')
             ->with('status', 'Clínica y administrador creados exitosamente.');
@@ -107,6 +126,8 @@ class ClinicController extends Controller
 
     public function update(Request $request, Clinic $clinic): RedirectResponse
     {
+        $old = AuditLogger::modelSnapshot($clinic);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'legal_name' => ['nullable', 'string', 'max:255'],
@@ -146,6 +167,11 @@ class ClinicController extends Controller
         }
 
         $clinic->update($data);
+
+        AuditLogger::log('superadmin.subscription_updated', 'super-admin', $clinic, $old, [
+            ...AuditLogger::modelSnapshot($clinic),
+            'clinic_id' => $clinic->id,
+        ], 'Clinica actualizada por SuperAdmin.');
 
         return redirect()->route('super-admin.clinics.index')
             ->with('status', 'Clínica actualizada exitosamente.');

@@ -140,34 +140,34 @@ Route::get('/dashboard', function () {
         'upcomingAppointments' => $upcomingAppointments,
         'isDoctorDashboard' => $isDoctorDashboard,
     ]);
-})->middleware(['auth', 'verified', 'permission:dashboard.view'])->name('dashboard');
+})->middleware(['auth', 'verified', 'active_clinic', 'permission:dashboard.view'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     $protectedResource = static function (string $uri, string $controller, string $permission): void {
-        Route::resource($uri, $controller)->only(['create', 'store'])->middleware("permission:{$permission}.create");
-        Route::resource($uri, $controller)->only(['index', 'show'])->middleware("permission:{$permission}.view");
-        Route::resource($uri, $controller)->only(['edit', 'update'])->middleware("permission:{$permission}.update");
-        Route::resource($uri, $controller)->only('destroy')->middleware("permission:{$permission}.delete");
+        Route::resource($uri, $controller)->only(['create', 'store'])->middleware(['active_clinic', "permission:{$permission}.create"]);
+        Route::resource($uri, $controller)->only(['index', 'show'])->middleware(['active_clinic', "permission:{$permission}.view"]);
+        Route::resource($uri, $controller)->only(['edit', 'update'])->middleware(['active_clinic', "permission:{$permission}.update"]);
+        Route::resource($uri, $controller)->only('destroy')->middleware(['active_clinic', "permission:{$permission}.delete"]);
     };
 
     $protectedResource('patients', PatientController::class, 'patients');
     $protectedResource('doctors', DoctorController::class, 'doctors');
-    Route::get('daily-agenda', [DailyAgendaController::class, 'index'])->middleware('permission:appointments.view')->name('daily-agenda.index');
-    Route::patch('daily-agenda/appointments/{appointment}/cancel', [DailyAgendaController::class, 'cancel'])->middleware('permission:appointments.update')->name('daily-agenda.appointments.cancel');
-    Route::patch('daily-agenda/appointments/{appointment}/no-show', [DailyAgendaController::class, 'markNoShow'])->middleware('permission:appointments.update')->name('daily-agenda.appointments.no-show');
-    Route::get('appointments/patients/search', [AppointmentController::class, 'searchPatients'])->middleware('permission:appointments.create')->name('appointments.patients.search');
-    Route::get('appointments/doctors/search', [AppointmentController::class, 'searchDoctors'])->middleware('permission:appointments.create')->name('appointments.doctors.search');
-    Route::get('appointments/availability', [AppointmentController::class, 'availability'])->middleware('permission:appointments.create')->name('appointments.availability');
+    Route::get('daily-agenda', [DailyAgendaController::class, 'index'])->middleware(['active_clinic', 'permission:appointments.view'])->name('daily-agenda.index');
+    Route::patch('daily-agenda/appointments/{appointment}/cancel', [DailyAgendaController::class, 'cancel'])->middleware(['active_clinic', 'permission:appointments.update'])->name('daily-agenda.appointments.cancel');
+    Route::patch('daily-agenda/appointments/{appointment}/no-show', [DailyAgendaController::class, 'markNoShow'])->middleware(['active_clinic', 'permission:appointments.update'])->name('daily-agenda.appointments.no-show');
+    Route::get('appointments/patients/search', [AppointmentController::class, 'searchPatients'])->middleware(['active_clinic', 'permission:appointments.create'])->name('appointments.patients.search');
+    Route::get('appointments/doctors/search', [AppointmentController::class, 'searchDoctors'])->middleware(['active_clinic', 'permission:appointments.create'])->name('appointments.doctors.search');
+    Route::get('appointments/availability', [AppointmentController::class, 'availability'])->middleware(['active_clinic', 'permission:appointments.create'])->name('appointments.availability');
     $protectedResource('appointments', AppointmentController::class, 'appointments');
     $protectedResource('consultations', ConsultationController::class, 'consultations');
     $protectedResource('medical-records', MedicalRecordController::class, 'medical_records');
-    Route::get('prescriptions/{prescription}/print', [PrescriptionController::class, 'print'])->middleware('permission:prescriptions.view')->name('prescriptions.print');
-    Route::get('prescriptions/{prescription}/pdf', [PrescriptionController::class, 'pdf'])->middleware('permission:prescriptions.view')->name('prescriptions.pdf');
-    Route::post('prescriptions/{prescription}/send-email', [PrescriptionController::class, 'sendEmail'])->middleware('permission:prescriptions.update')->name('prescriptions.send-email');
-    Route::post('prescriptions/{prescription}/sign', [PrescriptionController::class, 'sign'])->middleware('permission:prescriptions.update')->name('prescriptions.sign');
+    Route::get('prescriptions/{prescription}/print', [PrescriptionController::class, 'print'])->middleware(['active_clinic', 'permission:prescriptions.view'])->name('prescriptions.print');
+    Route::get('prescriptions/{prescription}/pdf', [PrescriptionController::class, 'pdf'])->middleware(['active_clinic', 'permission:prescriptions.view'])->name('prescriptions.pdf');
+    Route::post('prescriptions/{prescription}/send-email', [PrescriptionController::class, 'sendEmail'])->middleware(['active_clinic', 'permission:prescriptions.update'])->name('prescriptions.send-email');
+    Route::post('prescriptions/{prescription}/sign', [PrescriptionController::class, 'sign'])->middleware(['active_clinic', 'permission:prescriptions.update'])->name('prescriptions.sign');
     $protectedResource('prescriptions', PrescriptionController::class, 'prescriptions');
-    Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt'])->middleware('permission:payments.view')->name('payments.receipt');
-    Route::get('payments/{payment}/receipt/print', [PaymentController::class, 'receiptPrint'])->middleware('permission:payments.view')->name('payments.receipt.print');
+    Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt'])->middleware(['active_clinic', 'permission:payments.view'])->name('payments.receipt');
+    Route::get('payments/{payment}/receipt/print', [PaymentController::class, 'receiptPrint'])->middleware(['active_clinic', 'permission:payments.view'])->name('payments.receipt.print');
     $protectedResource('payments', PaymentController::class, 'payments');
     $protectedResource('services', ServiceController::class, 'services');
     $protectedResource('users', UserController::class, 'users');
@@ -176,29 +176,29 @@ Route::middleware('auth')->group(function () {
     Route::get('demo-requests/{demo_request}', [DemoRequestController::class, 'show'])->middleware('permission:demo_requests.view')->name('demo-requests.show');
     Route::patch('demo-requests/{demo_request}', [DemoRequestController::class, 'update'])->middleware('permission:demo_requests.update')->name('demo-requests.update');
 
-    Route::get('reports', [ReportController::class, 'index'])->middleware('permission:reports.view')->name('reports.index');
-    Route::get('reports/appointments', [ReportController::class, 'appointments'])->middleware('permission:reports.appointments')->name('reports.appointments');
-    Route::get('reports/appointments/export/pdf', [ReportController::class, 'appointmentsPdf'])->middleware('permission:reports.appointments')->name('reports.appointments.export.pdf');
-    Route::get('reports/appointments/export/csv', [ReportController::class, 'appointmentsCsv'])->middleware('permission:reports.appointments')->name('reports.appointments.export.csv');
-    Route::get('reports/appointments/export/xlsx', [ReportController::class, 'appointmentsXlsx'])->middleware('permission:reports.appointments')->name('reports.appointments.export.xlsx');
-    Route::get('reports/appointments/print', [ReportController::class, 'appointmentsPrint'])->middleware('permission:reports.appointments')->name('reports.appointments.print');
-    Route::get('reports/clinical', [ReportController::class, 'clinical'])->middleware('permission:reports.clinical')->name('reports.clinical');
-    Route::get('reports/clinical/export/pdf', [ReportController::class, 'clinicalPdf'])->middleware('permission:reports.clinical')->name('reports.clinical.export.pdf');
-    Route::get('reports/clinical/export/csv', [ReportController::class, 'clinicalCsv'])->middleware('permission:reports.clinical')->name('reports.clinical.export.csv');
-    Route::get('reports/clinical/export/xlsx', [ReportController::class, 'clinicalXlsx'])->middleware('permission:reports.clinical')->name('reports.clinical.export.xlsx');
-    Route::get('reports/clinical/print', [ReportController::class, 'clinicalPrint'])->middleware('permission:reports.clinical')->name('reports.clinical.print');
-    Route::get('reports/financial', [ReportController::class, 'financial'])->middleware('permission:reports.financial')->name('reports.financial');
-    Route::get('reports/financial/export/pdf', [ReportController::class, 'financialPdf'])->middleware('permission:reports.financial')->name('reports.financial.export.pdf');
-    Route::get('reports/financial/export/csv', [ReportController::class, 'financialCsv'])->middleware('permission:reports.financial')->name('reports.financial.export.csv');
-    Route::get('reports/financial/export/xlsx', [ReportController::class, 'financialXlsx'])->middleware('permission:reports.financial')->name('reports.financial.export.xlsx');
-    Route::get('reports/financial/print', [ReportController::class, 'financialPrint'])->middleware('permission:reports.financial')->name('reports.financial.print');
-    Route::get('financial-audit', [FinancialAuditController::class, 'index'])->middleware('permission:reports.financial')->name('financial-audit.index');
-    Route::get('reports/patients', [ReportController::class, 'patients'])->middleware('permission:reports.patients')->name('reports.patients');
-    Route::get('reports/doctors', [ReportController::class, 'doctors'])->middleware('permission:reports.doctors')->name('reports.doctors');
-    Route::get('reports/services', [ReportController::class, 'services'])->middleware('permission:reports.services')->name('reports.services');
-    Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware('permission:audit_logs.view')->name('audit-logs.index');
-    Route::get('settings/clinic', [ClinicSettingsController::class, 'edit'])->middleware('permission:settings.clinic.view')->name('settings.clinic.edit');
-    Route::match(['put', 'patch'], 'settings/clinic', [ClinicSettingsController::class, 'update'])->middleware('permission:settings.clinic.update')->name('settings.clinic.update');
+    Route::get('reports', [ReportController::class, 'index'])->middleware(['active_clinic', 'permission:reports.view'])->name('reports.index');
+    Route::get('reports/appointments', [ReportController::class, 'appointments'])->middleware(['active_clinic', 'permission:reports.appointments'])->name('reports.appointments');
+    Route::get('reports/appointments/export/pdf', [ReportController::class, 'appointmentsPdf'])->middleware(['active_clinic', 'permission:reports.appointments'])->name('reports.appointments.export.pdf');
+    Route::get('reports/appointments/export/csv', [ReportController::class, 'appointmentsCsv'])->middleware(['active_clinic', 'permission:reports.appointments'])->name('reports.appointments.export.csv');
+    Route::get('reports/appointments/export/xlsx', [ReportController::class, 'appointmentsXlsx'])->middleware(['active_clinic', 'permission:reports.appointments'])->name('reports.appointments.export.xlsx');
+    Route::get('reports/appointments/print', [ReportController::class, 'appointmentsPrint'])->middleware(['active_clinic', 'permission:reports.appointments'])->name('reports.appointments.print');
+    Route::get('reports/clinical', [ReportController::class, 'clinical'])->middleware(['active_clinic', 'permission:reports.clinical'])->name('reports.clinical');
+    Route::get('reports/clinical/export/pdf', [ReportController::class, 'clinicalPdf'])->middleware(['active_clinic', 'permission:reports.clinical'])->name('reports.clinical.export.pdf');
+    Route::get('reports/clinical/export/csv', [ReportController::class, 'clinicalCsv'])->middleware(['active_clinic', 'permission:reports.clinical'])->name('reports.clinical.export.csv');
+    Route::get('reports/clinical/export/xlsx', [ReportController::class, 'clinicalXlsx'])->middleware(['active_clinic', 'permission:reports.clinical'])->name('reports.clinical.export.xlsx');
+    Route::get('reports/clinical/print', [ReportController::class, 'clinicalPrint'])->middleware(['active_clinic', 'permission:reports.clinical'])->name('reports.clinical.print');
+    Route::get('reports/financial', [ReportController::class, 'financial'])->middleware(['active_clinic', 'permission:reports.financial'])->name('reports.financial');
+    Route::get('reports/financial/export/pdf', [ReportController::class, 'financialPdf'])->middleware(['active_clinic', 'permission:reports.financial'])->name('reports.financial.export.pdf');
+    Route::get('reports/financial/export/csv', [ReportController::class, 'financialCsv'])->middleware(['active_clinic', 'permission:reports.financial'])->name('reports.financial.export.csv');
+    Route::get('reports/financial/export/xlsx', [ReportController::class, 'financialXlsx'])->middleware(['active_clinic', 'permission:reports.financial'])->name('reports.financial.export.xlsx');
+    Route::get('reports/financial/print', [ReportController::class, 'financialPrint'])->middleware(['active_clinic', 'permission:reports.financial'])->name('reports.financial.print');
+    Route::get('financial-audit', [FinancialAuditController::class, 'index'])->middleware(['active_clinic', 'permission:reports.financial'])->name('financial-audit.index');
+    Route::get('reports/patients', [ReportController::class, 'patients'])->middleware(['active_clinic', 'permission:reports.patients'])->name('reports.patients');
+    Route::get('reports/doctors', [ReportController::class, 'doctors'])->middleware(['active_clinic', 'permission:reports.doctors'])->name('reports.doctors');
+    Route::get('reports/services', [ReportController::class, 'services'])->middleware(['active_clinic', 'permission:reports.services'])->name('reports.services');
+    Route::get('audit-logs', [AuditLogController::class, 'index'])->middleware(['active_clinic', 'permission:audit_logs.view'])->name('audit-logs.index');
+    Route::get('settings/clinic', [ClinicSettingsController::class, 'edit'])->middleware(['active_clinic', 'permission:settings.clinic.view'])->name('settings.clinic.edit');
+    Route::match(['put', 'patch'], 'settings/clinic', [ClinicSettingsController::class, 'update'])->middleware(['active_clinic', 'permission:settings.clinic.update'])->name('settings.clinic.update');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

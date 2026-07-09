@@ -17,7 +17,7 @@ class ReportFilterRequest extends FormRequest
      */
     public function rules(): array
     {
-        $clinicId = auth()->user()?->clinic_id;
+        $clinicId = auth()->user()?->activeClinicId();
         $routeName = (string) $this->route()?->getName();
         $rules = [
             'start_date' => ['nullable', 'date'],

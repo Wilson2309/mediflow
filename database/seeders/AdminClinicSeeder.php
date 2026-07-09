@@ -19,6 +19,9 @@ class AdminClinicSeeder extends Seeder
 
         $admin->forceFill([
             'clinic_id' => $clinic->id,
+            'current_clinic_id' => $clinic->id,
         ])->save();
+
+        $admin->clinics()->syncWithoutDetaching([$clinic->id]);
     }
 }

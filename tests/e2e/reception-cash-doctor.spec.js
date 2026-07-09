@@ -65,11 +65,9 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     const firstAvailableSlot = page.getByRole('button', { name: /^\d{2}:\d{2}$/ }).first();
     await expect(firstAvailableSlot).toBeVisible();
     const selectedSlot = (await firstAvailableSlot.textContent()).trim();
-    const selectedSlotButton = page.getByRole('button', { name: selectedSlot, exact: true });
     await page.fill('textarea[name="reason"]', appointmentData.reason);
     await page.fill('textarea[name="notes"]', appointmentData.notes);
-    await selectedSlotButton.scrollIntoViewIfNeeded();
-    await selectedSlotButton.click();
+    await page.getByRole('button', { name: selectedSlot, exact: true }).click();
     await expect(page.locator('#start_time')).toHaveValue(selectedSlot);
     await page.click('button[type="submit"]');
 

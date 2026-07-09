@@ -55,7 +55,7 @@ class AuditLogger
             }
 
             return AuditLog::create([
-                'clinic_id' => self::clinicId($auditable),
+                'clinic_id' => self::clinicId($auditable, $old, $new),
                 'user_id' => auth()->id(),
                 'action' => $action,
                 'auditable_type' => $auditable ? $auditable::class : null,
@@ -85,9 +85,15 @@ class AuditLogger
         return self::sanitize($attributes);
     }
 
-    private static function clinicId(?Model $auditable): ?int
+    private static function clinicId(?Model $auditable, array $old = [], array $new = []): ?int
     {
-        $clinicId = auth()->user()?->clinic_id;
+        $explicitClinicId = $new['clinic_id'] ?? $old['clinic_id'] ?? null;
+
+        if ($explicitClinicId) {
+            return (int) $explicitClinicId;
+        }
+
+        $clinicId = auth()->user()?->activeClinicId();
 
         if ($clinicId) {
             return (int) $clinicId;
@@ -103,6 +109,12 @@ class AuditLogger
 
         if ($auditable->relationLoaded('patient') && $auditable->patient?->clinic_id) {
             return (int) $auditable->patient->clinic_id;
+        }
+
+        $legacyClinicId = auth()->user()?->clinic_id;
+
+        if ($legacyClinicId && ! auth()->user()?->hasRole('super_admin')) {
+            return (int) $legacyClinicId;
         }
 
         return null;

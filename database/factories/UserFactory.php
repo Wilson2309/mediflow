@@ -17,6 +17,21 @@ class UserFactory extends Factory
      */
     protected static ?string $password;
 
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            if (! $user->clinic_id) {
+                return;
+            }
+
+            $user->clinics()->syncWithoutDetaching([$user->clinic_id]);
+
+            if (! $user->current_clinic_id) {
+                $user->forceFill(['current_clinic_id' => $user->clinic_id])->saveQuietly();
+            }
+        });
+    }
+
     /**
      * Define the model's default state.
      *

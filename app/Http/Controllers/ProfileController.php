@@ -63,8 +63,10 @@ class ProfileController extends Controller
             ], 'userDeletion');
         }
 
-        if ($user->clinic_id && $user->hasRole('administrador')) {
-            $administratorCount = User::where('clinic_id', $user->clinic_id)
+        $clinicId = $user->activeClinicId();
+
+        if ($clinicId && $user->hasRole('administrador')) {
+            $administratorCount = User::whereHas('clinics', fn ($query) => $query->where('clinics.id', $clinicId))
                 ->whereHas('roles', fn ($query) => $query->where('name', 'administrador'))
                 ->count();
 

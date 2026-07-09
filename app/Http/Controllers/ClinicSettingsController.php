@@ -29,33 +29,38 @@ class ClinicSettingsController extends Controller
     {
         $clinic = $this->clinic();
         $old = AuditLogger::modelSnapshot($clinic);
-        
         $data = $request->validated();
-        
+
         if ($request->hasFile('logo')) {
             if ($clinic->logo_path) {
                 Storage::disk('public')->delete($clinic->logo_path);
             }
+
             $data['logo_path'] = $request->file('logo')->store('logos', 'public');
         }
 
         $clinic->update($data);
-        AuditLogger::log('clinic.updated', 'settings', $clinic, $old, AuditLogger::modelSnapshot($clinic), 'Configuracion del consultorio actualizada.');
+
+        AuditLogger::log(
+            'clinic.updated',
+            'settings',
+            $clinic,
+            $old,
+            AuditLogger::modelSnapshot($clinic),
+            'Configuracion del consultorio actualizada.'
+        );
 
         return redirect()
             ->route('settings.clinic.edit')
-            ->with('success', 'Configuración del consultorio actualizada correctamente.');
+            ->with('success', 'Configuracion del consultorio actualizada correctamente.');
     }
 
     private function clinic(): Clinic
     {
-        $clinicId = auth()->user()?->activeClinicId();
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
+        $clinic = auth()->user()?->activeClinic();
 
-        return Clinic::findOrFail($clinicId);
+        abort_if(! $clinic, 403, 'El usuario autenticado no tiene una clinica activa asignada.');
+
+        return $clinic;
     }
 }
-
-
-
-

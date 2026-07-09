@@ -49,7 +49,7 @@ test.describe('Reports by role', () => {
       page.waitForEvent('download'),
       excelLink.click(),
     ]);
-    expect(excelDownload.suggestedFilename()).toMatch(/^reporte-financiero-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    expect(excelDownload.suggestedFilename()).toMatch(/^reporte-financiero-[a-z0-9-]+-\d{4}-\d{2}-\d{2}\.xlsx$/);
 
     await printLink.click();
     await expect(page.getByText('Reporte financiero').first()).toBeVisible();
@@ -79,13 +79,27 @@ test.describe('Reports by role', () => {
     await logout(page);
   });
 
-  test('Doctor cannot see or open financial report or financial audit', async ({ page }) => {
+  test('Doctor can export own appointment reports but cannot open financial reports or audit', async ({ page }) => {
     await login(page, 'medico@mediflow.com', 'Password123*');
 
     await page.goto('/reports');
     await expect(page).toHaveURL(/\/reports\/appointments/);
+    await expect(page.getByRole('heading', { name: /Reporte de citas/i })).toBeVisible();
     await expect(page.locator('nav[aria-label="Secciones de reportes"] a[href$="/reports/financial"]')).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Exportar Excel' })).toHaveCount(0);
+    await expect(page.locator('a[href*="/reports/financial/export"]')).toHaveCount(0);
+
+    const doctorFilterOptions = page.locator('#doctor_id option');
+    await expect(doctorFilterOptions).toHaveCount(2);
+
+    const appointmentExcelLink = page.getByRole('link', { name: 'Exportar Excel' });
+    await expect(appointmentExcelLink).toBeVisible();
+    await expect(appointmentExcelLink).toHaveAttribute('href', /\/reports\/appointments\/export\/xlsx/);
+
+    const [appointmentExcelDownload] = await Promise.all([
+      page.waitForEvent('download'),
+      appointmentExcelLink.click(),
+    ]);
+    expect(appointmentExcelDownload.suggestedFilename()).toMatch(/^reporte-citas-\d{4}-\d{2}-\d{2}\.xlsx$/);
 
     const financialResponse = await page.goto('/reports/financial');
     expect(financialResponse?.status()).toBe(403);

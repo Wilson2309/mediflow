@@ -286,6 +286,54 @@ class ReportModuleTest extends TestCase
         $this->actingAs($user)->get(route('reports.financial.export.pdf'))->assertForbidden();
     }
 
+    public function test_doctor_reports_are_scoped_to_their_own_data(): void
+    {
+        $clinic = Clinic::factory()->create();
+        $doctorUser = $this->userWithRole('medico', $clinic);
+        $ownDoctor = Doctor::factory()->for($clinic)->create(['user_id' => $doctorUser->id]);
+        $otherDoctor = $this->doctorForClinic($clinic, 'Doctor Ajeno Reporte');
+        $ownAppointment = $this->appointmentForClinic($clinic, doctor: $ownDoctor, patientName: 'Paciente Cita Propia');
+        $otherAppointment = $this->appointmentForClinic($clinic, doctor: $otherDoctor, patientName: 'Paciente Cita Ajena');
+        $ownPatient = $this->patientForClinic($clinic, 'Paciente Clinico Propio');
+        $otherPatient = $this->patientForClinic($clinic, 'Paciente Clinico Ajeno');
+        Consultation::factory()->create([
+            'patient_id' => $ownPatient->id,
+            'doctor_id' => $ownDoctor->id,
+            'consultation_date' => now(),
+            'diagnosis' => 'Diagnostico propio visible',
+        ]);
+        Consultation::factory()->create([
+            'patient_id' => $otherPatient->id,
+            'doctor_id' => $otherDoctor->id,
+            'consultation_date' => now(),
+            'diagnosis' => 'Diagnostico ajeno oculto',
+        ]);
+
+        $this->actingAs($doctorUser)
+            ->get(route('reports.appointments', [...$this->currentPeriod(), 'doctor_id' => $otherDoctor->id]))
+            ->assertOk()
+            ->assertSee($ownAppointment->patient->full_name)
+            ->assertDontSee($otherAppointment->patient->full_name);
+
+        $appointmentsXlsx = $this->actingAs($doctorUser)
+            ->get(route('reports.appointments.export.xlsx', [...$this->currentPeriod(), 'doctor_id' => $otherDoctor->id]))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertStringContainsString('Paciente Cita Propia', $appointmentsXlsx);
+        $this->assertStringNotContainsString('Paciente Cita Ajena', $appointmentsXlsx);
+
+        $clinicalXlsx = $this->actingAs($doctorUser)
+            ->get(route('reports.clinical.export.xlsx', [...$this->currentPeriod(), 'doctor_id' => $otherDoctor->id]))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertStringContainsString('Paciente Clinico Propio', $clinicalXlsx);
+        $this->assertStringContainsString('Diagnostico propio visible', $clinicalXlsx);
+        $this->assertStringNotContainsString('Paciente Clinico Ajeno', $clinicalXlsx);
+        $this->assertStringNotContainsString('Diagnostico ajeno oculto', $clinicalXlsx);
+    }
+
     public function test_receptionist_without_report_permission_cannot_access_financial_reports(): void
     {
         $user = $this->userWithRole('recepcionista');
@@ -328,7 +376,12 @@ class ReportModuleTest extends TestCase
 
     public function test_admin_and_cashier_can_export_financial_xlsx(): void
     {
-        $clinic = Clinic::factory()->create();
+        $clinic = Clinic::factory()->create([
+            'name' => 'Clinica Excel Principal',
+            'ruc' => '0999999999001',
+            'address' => 'Av. Principal 123',
+            'phone' => '0999999999',
+        ]);
         $service = Service::factory()->for($clinic)->create(['name' => 'Ecografía Excel']);
         $paidPatient = $this->patientForClinic($clinic, 'Paciente Pagado Excel');
         $pendingPatient = $this->patientForClinic($clinic, 'Paciente Pendiente Excel');
@@ -341,15 +394,24 @@ class ReportModuleTest extends TestCase
         $this->paymentForClinic($clinic, $refundedPatient, $service, 'refunded', 'card', 40);
 
         foreach (['administrador', 'caja_finanzas'] as $role) {
-            $response = $this->actingAs($this->userWithRole($role, $clinic))
+            $user = $this->userWithRole($role, $clinic);
+            $response = $this->actingAs($user)
                 ->get(route('reports.financial.export.xlsx', $this->currentPeriod()))
                 ->assertOk();
 
             $xlsx = $response->streamedContent();
             $this->assertStringStartsWith('PK', $xlsx);
+            $this->assertStringContainsString('reporte-financiero-clinica-excel-principal-', $response->headers->get('content-disposition'));
             $this->assertStringContainsString('.xlsx', $response->headers->get('content-disposition'));
             $this->assertStringContainsString('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $response->headers->get('content-type'));
             $this->assertStringContainsString('Reporte financiero', $xlsx);
+            $this->assertStringContainsString('Clínica: Clinica Excel Principal', $xlsx);
+            $this->assertStringContainsString('RUC: 0999999999001', $xlsx);
+            $this->assertStringContainsString('Dirección: Av. Principal 123', $xlsx);
+            $this->assertStringContainsString('Teléfono: 0999999999', $xlsx);
+            $this->assertStringContainsString('Rango: ', $xlsx);
+            $this->assertStringContainsString('Generado por: '.$user->name, $xlsx);
+            $this->assertStringContainsString('Generado el: ', $xlsx);
             $this->assertStringContainsString('Monto registrado', $xlsx);
             $this->assertStringContainsString('Cancelados/reembolsados', $xlsx);
             $this->assertStringContainsString('Número de pago', $xlsx);
@@ -368,9 +430,64 @@ class ReportModuleTest extends TestCase
             $this->assertStringContainsString('FFFEF3C7', $xlsx);
             $this->assertStringContainsString('FFFEE2E2', $xlsx);
             $this->assertStringContainsString('wrapText="1"', $xlsx);
-            $this->assertStringContainsString('pane ySplit="10"', $xlsx);
-            $this->assertStringContainsString('autoFilter ref="A10:I', $xlsx);
+            $this->assertStringContainsString('pane ySplit="', $xlsx);
+            $this->assertStringContainsString('autoFilter ref="A', $xlsx);
         }
+    }
+
+    public function test_financial_xlsx_uses_current_active_clinic_header_instead_of_legacy_user_clinic(): void
+    {
+        $legacyClinic = Clinic::factory()->create(['name' => 'Clinica Legacy']);
+        $secondaryClinic = Clinic::factory()->create(['name' => 'Sucursal Norte Activa']);
+        $legacyService = Service::factory()->for($legacyClinic)->create(['name' => 'Servicio Legacy']);
+        $secondaryService = Service::factory()->for($secondaryClinic)->create(['name' => 'Servicio Sucursal']);
+        $legacyPatient = $this->patientForClinic($legacyClinic, 'Paciente Legacy');
+        $secondaryPatient = $this->patientForClinic($secondaryClinic, 'Paciente Sucursal');
+        $this->paymentForClinic($legacyClinic, $legacyPatient, $legacyService, 'paid', 'cash', 30);
+        $this->paymentForClinic($secondaryClinic, $secondaryPatient, $secondaryService, 'paid', 'cash', 40);
+
+        $user = $this->userWithRole('caja_finanzas', $legacyClinic);
+        $user->clinics()->syncWithoutDetaching([$secondaryClinic->id]);
+        $user->forceFill(['current_clinic_id' => $secondaryClinic->id])->save();
+
+        $response = $this->actingAs($user)
+            ->get(route('reports.financial.export.xlsx', $this->currentPeriod()))
+            ->assertOk();
+
+        $xlsx = $response->streamedContent();
+
+        $this->assertStringContainsString('Clínica: Sucursal Norte Activa', $xlsx);
+        $this->assertStringContainsString('Paciente Sucursal', $xlsx);
+        $this->assertStringContainsString('Servicio Sucursal', $xlsx);
+        $this->assertStringNotContainsString('Clínica: Clinica Legacy', $xlsx);
+        $this->assertStringNotContainsString('Paciente Legacy', $xlsx);
+        $this->assertStringNotContainsString('Servicio Legacy', $xlsx);
+        $this->assertStringContainsString('reporte-financiero-sucursal-norte-activa-', $response->headers->get('content-disposition'));
+    }
+
+    public function test_financial_xlsx_changes_header_when_user_changes_active_clinic(): void
+    {
+        $firstClinic = Clinic::factory()->create(['name' => 'Clinica Centro']);
+        $secondClinic = Clinic::factory()->create(['name' => 'Clinica Sur']);
+        $user = $this->userWithRole('caja_finanzas', $firstClinic);
+        $user->clinics()->syncWithoutDetaching([$secondClinic->id]);
+
+        $firstResponse = $this->actingAs($user)
+            ->get(route('reports.financial.export.xlsx', $this->currentPeriod()))
+            ->assertOk()
+            ->streamedContent();
+
+        $user->forceFill(['current_clinic_id' => $secondClinic->id])->save();
+
+        $secondResponse = $this->actingAs($user->fresh())
+            ->get(route('reports.financial.export.xlsx', $this->currentPeriod()))
+            ->assertOk()
+            ->streamedContent();
+
+        $this->assertStringContainsString('Clínica: Clinica Centro', $firstResponse);
+        $this->assertStringNotContainsString('Clínica: Clinica Sur', $firstResponse);
+        $this->assertStringContainsString('Clínica: Clinica Sur', $secondResponse);
+        $this->assertStringNotContainsString('Clínica: Clinica Centro', $secondResponse);
     }
 
     public function test_doctor_and_receptionist_cannot_export_financial_xlsx(): void
