@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\Doctor;
@@ -19,6 +21,8 @@ use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
+    use ResolvesClinic;
+
     private const ROLES = [
         'administrador' => 'Administrador',
         'medico' => 'Médico',
@@ -65,6 +69,7 @@ class UserController extends Controller
         return view('users.create', [
             'roles' => $this->roleOptions(),
             'specialties' => $this->availableSpecialties(),
+            'availableClinics' => $this->adminClinics(),
         ]);
     }
 
@@ -79,6 +84,7 @@ class UserController extends Controller
         DB::transaction(function () use ($validated, $clinicId, &$createdUser) {
             $user = User::create([
                 'clinic_id' => $clinicId,
+                'current_clinic_id' => $clinicId,
                 'name' => $validated['name'],
                 'email' => $validated['email'],
                 'phone' => $validated['phone'] ?? null,
@@ -88,6 +94,13 @@ class UserController extends Controller
 
             $user->syncRoles([$validated['role']]);
             $createdUser = $user;
+
+            // Sync clinics: always include the current clinic + any extra selected
+            $clinicIds = array_unique(array_merge([$clinicId], $validated['clinic_ids'] ?? []));
+            // Security: only allow clinics the admin themselves has access to
+            $allowedClinicIds = auth()->user()->clinics()->pluck('clinics.id')->toArray();
+            $clinicIds = array_values(array_intersect($clinicIds, $allowedClinicIds));
+            $user->clinics()->sync($clinicIds);
 
             if ($validated['role'] === 'medico') {
                 $this->createDoctorProfile($user, $validated, $clinicId);
@@ -116,9 +129,10 @@ class UserController extends Controller
         $this->authorizeClinic($user);
 
         return view('users.edit', [
-            'managedUser' => $user->load(['roles', 'doctor.specialty']),
+            'managedUser' => $user->load(['roles', 'doctor.specialty', 'clinics']),
             'roles' => $this->roleOptions(),
             'specialties' => $this->availableSpecialties($user->doctor?->specialty_id),
+            'availableClinics' => $this->adminClinics(),
         ]);
     }
 
@@ -157,6 +171,17 @@ class UserController extends Controller
 
             $user->update($data);
             $user->syncRoles([$validated['role']]);
+
+            // Sync clinics
+            if (isset($validated['clinic_ids'])) {
+                $allowedClinicIds = auth()->user()->clinics()->pluck('clinics.id')->toArray();
+                $clinicIds = array_values(array_intersect($validated['clinic_ids'], $allowedClinicIds));
+                // Always keep at least the current clinic
+                if (!in_array((int) $user->clinic_id, $clinicIds)) {
+                    $clinicIds[] = (int) $user->clinic_id;
+                }
+                $user->clinics()->sync($clinicIds);
+            }
 
             if ($validated['role'] === 'medico') {
                 $this->updateOrCreateDoctorProfile($user, $validated);
@@ -198,13 +223,6 @@ class UserController extends Controller
         return redirect()->route('users.index')->with('success', 'Usuario eliminado correctamente.');
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
-
-        return (int) $clinicId;
-    }
 
     private function authorizeClinic(User $user): void
     {
@@ -311,6 +329,12 @@ class UserController extends Controller
     private function isPrimaryAdministrator(User $user): bool
     {
         return strtolower($user->email) === 'admin@mediflow.com';
+    }
+
+    /** Get the clinics that the current admin has access to (for assigning to staff) */
+    private function adminClinics(): \Illuminate\Support\Collection
+    {
+        return auth()->user()->clinics()->where('status', 'active')->orderBy('name')->get();
     }
 }
 

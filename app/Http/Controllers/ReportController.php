@@ -14,6 +14,8 @@ use App\Models\Service;
 use App\Models\Specialty;
 use App\Services\AuditLogger;
 use App\Services\FinancialXlsxExporter;
+use App\Services\AppointmentsXlsxExporter;
+use App\Services\ClinicalXlsxExporter;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -84,60 +86,23 @@ class ReportController extends Controller
     public function appointments(ReportFilterRequest $request): View
     {
         [$clinicId, $filters, $start, $end] = $this->context($request);
-        $query = $this->appointmentsQuery($clinicId, $start, $end)
-            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->where('doctor_id', $id))
-            ->when($filters['service_id'] ?? null, fn ($query, $id) => $query->where('service_id', $id))
-            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status));
-        $total = (clone $query)->count();
-        $statusCounts = (clone $query)->selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
+        $report = $this->appointmentsReportData($clinicId, $filters, $start, $end);
 
         return view('reports.appointments', [
             ...$this->shared($clinicId, $filters, $start, $end),
-            'appointments' => (clone $query)->with(['patient', 'doctor.user', 'service'])->orderByDesc('appointment_date')->orderBy('start_time')->paginate(15)->withQueryString(),
-            'metrics' => [
-                'total' => $total,
-                'scheduled' => (int) ($statusCounts['scheduled'] ?? 0),
-                'confirmed' => (int) ($statusCounts['confirmed'] ?? 0),
-                'completed' => (int) ($statusCounts['completed'] ?? 0),
-                'cancelled' => (int) ($statusCounts['cancelled'] ?? 0),
-                'noShow' => (int) ($statusCounts['no_show'] ?? 0),
-                'cancellationRate' => $total ? round(((int) ($statusCounts['cancelled'] ?? 0) / $total) * 100, 1) : 0,
-                'noShowRate' => $total ? round(((int) ($statusCounts['no_show'] ?? 0) / $total) * 100, 1) : 0,
-            ],
-            'statusCounts' => $statusCounts,
-            'appointmentsByDoctor' => (clone $query)->with('doctor.user:id,name')->selectRaw('doctor_id, COUNT(*) as total')->groupBy('doctor_id')->orderByDesc('total')->limit(10)->get(),
-            'appointmentsByService' => (clone $query)->whereNotNull('service_id')->with('service:id,name')->selectRaw('service_id, COUNT(*) as total')->groupBy('service_id')->orderByDesc('total')->limit(10)->get(),
-            'appointmentsByDay' => (clone $query)->selectRaw('appointment_date, COUNT(*) as total')->groupBy('appointment_date')->orderBy('appointment_date')->get(),
+            ...$report,
+            'appointments' => (clone $report['query'])->paginate(15)->withQueryString(),
         ]);
     }
 
     public function clinical(ReportFilterRequest $request): View
     {
         [$clinicId, $filters, $start, $end] = $this->context($request);
-        $consultations = $this->consultationsQuery($clinicId, $start, $end)
-            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->where('doctor_id', $id))
-            ->when($filters['patient_id'] ?? null, fn ($query, $id) => $query->where('patient_id', $id));
-        $prescriptions = $this->prescriptionsQuery($clinicId, $start, $end)
-            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->where('doctor_id', $id))
-            ->when($filters['patient_id'] ?? null, fn ($query, $id) => $query->where('patient_id', $id));
-        $patients = Patient::where('clinic_id', $clinicId);
+        $report = $this->clinicalReportData($clinicId, $filters, $start, $end);
 
         return view('reports.clinical', [
             ...$this->shared($clinicId, $filters, $start, $end),
-            'metrics' => [
-                'consultations' => (clone $consultations)->count(),
-                'prescriptions' => (clone $prescriptions)->count(),
-                'withMedicalRecord' => (clone $patients)->has('medicalRecord')->count(),
-                'withoutMedicalRecord' => (clone $patients)->doesntHave('medicalRecord')->count(),
-                'withAllergies' => (clone $patients)->whereNotNull('allergies')->where('allergies', '<>', '')->count(),
-                'withChronicDiseases' => (clone $patients)->whereHas('medicalRecord', fn ($query) => $query->whereNotNull('chronic_diseases')->where('chronic_diseases', '<>', ''))->count(),
-            ],
-            'latestConsultations' => (clone $consultations)->with(['patient', 'doctor.user'])->latest('consultation_date')->limit(10)->get(),
-            'recentPrescriptions' => (clone $prescriptions)->with(['patient', 'doctor.user'])->latest('prescription_date')->limit(10)->get(),
-            'consultationsByDoctor' => (clone $consultations)->with('doctor.user:id,name')->selectRaw('doctor_id, COUNT(*) as total')->groupBy('doctor_id')->orderByDesc('total')->limit(10)->get(),
-            'consultationsByPatient' => (clone $consultations)->with('patient:id,first_name,last_name')->selectRaw('patient_id, COUNT(*) as total')->groupBy('patient_id')->orderByDesc('total')->limit(10)->get(),
-            'topDiagnoses' => (clone $consultations)->whereNotNull('diagnosis')->where('diagnosis', '<>', '')->selectRaw('diagnosis, COUNT(*) as total')->groupBy('diagnosis')->orderByDesc('total')->limit(10)->get(),
-            'topTreatments' => (clone $consultations)->whereNotNull('treatment')->where('treatment', '<>', '')->selectRaw('treatment, COUNT(*) as total')->groupBy('treatment')->orderByDesc('total')->limit(10)->get(),
+            ...$report,
         ]);
     }
 
@@ -367,7 +332,7 @@ class ReportController extends Controller
     /** @return array{0: int, 1: array<string, mixed>, 2: Carbon, 3: Carbon} */
     private function context(ReportFilterRequest $request): array
     {
-        $clinicId = auth()->user()?->clinic_id;
+        $clinicId = auth()->user()?->activeClinicId();
         abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
         $filters = $request->validated();
         $timezone = config('app.timezone', 'America/Guayaquil');
@@ -436,6 +401,65 @@ class ReportController extends Controller
                 ->get(),
             'methodLabels' => $this->paymentMethodLabels(),
             'statusLabels' => $this->paymentStatusLabels(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function appointmentsReportData(int $clinicId, array $filters, Carbon $start, Carbon $end): array
+    {
+        $query = $this->appointmentsQuery($clinicId, $start, $end)
+            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->where('doctor_id', $id))
+            ->when($filters['service_id'] ?? null, fn ($query, $id) => $query->where('service_id', $id))
+            ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status));
+        $total = (clone $query)->count();
+        $statusCounts = (clone $query)->selectRaw('status, COUNT(*) as total')->groupBy('status')->pluck('total', 'status');
+
+        return [
+            'query' => (clone $query)->with(['patient', 'doctor.user', 'service'])->orderByDesc('appointment_date')->orderBy('start_time'),
+            'metrics' => [
+                'total' => $total,
+                'scheduled' => (int) ($statusCounts['scheduled'] ?? 0),
+                'confirmed' => (int) ($statusCounts['confirmed'] ?? 0),
+                'completed' => (int) ($statusCounts['completed'] ?? 0),
+                'cancelled' => (int) ($statusCounts['cancelled'] ?? 0),
+                'noShow' => (int) ($statusCounts['no_show'] ?? 0),
+                'cancellationRate' => $total ? round(((int) ($statusCounts['cancelled'] ?? 0) / $total) * 100, 1) : 0,
+                'noShowRate' => $total ? round(((int) ($statusCounts['no_show'] ?? 0) / $total) * 100, 1) : 0,
+            ],
+            'statusCounts' => $statusCounts,
+            'appointmentsByDoctor' => (clone $query)->with('doctor.user:id,name')->selectRaw('doctor_id, COUNT(*) as total')->groupBy('doctor_id')->orderByDesc('total')->limit(10)->get(),
+            'appointmentsByService' => (clone $query)->whereNotNull('service_id')->with('service:id,name')->selectRaw('service_id, COUNT(*) as total')->groupBy('service_id')->orderByDesc('total')->limit(10)->get(),
+            'appointmentsByDay' => (clone $query)->selectRaw('appointment_date, COUNT(*) as total')->groupBy('appointment_date')->orderBy('appointment_date')->get(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function clinicalReportData(int $clinicId, array $filters, Carbon $start, Carbon $end): array
+    {
+        $consultations = $this->consultationsQuery($clinicId, $start, $end)
+            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->where('doctor_id', $id))
+            ->when($filters['patient_id'] ?? null, fn ($query, $id) => $query->where('patient_id', $id));
+        $prescriptions = $this->prescriptionsQuery($clinicId, $start, $end)
+            ->when($filters['doctor_id'] ?? null, fn ($query, $id) => $query->where('doctor_id', $id))
+            ->when($filters['patient_id'] ?? null, fn ($query, $id) => $query->where('patient_id', $id));
+        $patients = Patient::where('clinic_id', $clinicId);
+
+        return [
+            'consultationsQuery' => (clone $consultations)->with(['patient', 'doctor.user'])->latest('consultation_date'),
+            'metrics' => [
+                'consultations' => (clone $consultations)->count(),
+                'prescriptions' => (clone $prescriptions)->count(),
+                'withMedicalRecord' => (clone $patients)->has('medicalRecord')->count(),
+                'withoutMedicalRecord' => (clone $patients)->doesntHave('medicalRecord')->count(),
+                'withAllergies' => (clone $patients)->whereNotNull('allergies')->where('allergies', '<>', '')->count(),
+                'withChronicDiseases' => (clone $patients)->whereHas('medicalRecord', fn ($query) => $query->whereNotNull('chronic_diseases')->where('chronic_diseases', '<>', ''))->count(),
+            ],
+            'latestConsultations' => (clone $consultations)->with(['patient', 'doctor.user'])->latest('consultation_date')->limit(10)->get(),
+            'recentPrescriptions' => (clone $prescriptions)->with(['patient', 'doctor.user'])->latest('prescription_date')->limit(10)->get(),
+            'consultationsByDoctor' => (clone $consultations)->with('doctor.user:id,name')->selectRaw('doctor_id, COUNT(*) as total')->groupBy('doctor_id')->orderByDesc('total')->limit(10)->get(),
+            'consultationsByPatient' => (clone $consultations)->with('patient:id,first_name,last_name')->selectRaw('patient_id, COUNT(*) as total')->groupBy('patient_id')->orderByDesc('total')->limit(10)->get(),
+            'topDiagnoses' => (clone $consultations)->whereNotNull('diagnosis')->where('diagnosis', '<>', '')->selectRaw('diagnosis, COUNT(*) as total')->groupBy('diagnosis')->orderByDesc('total')->limit(10)->get(),
+            'topTreatments' => (clone $consultations)->whereNotNull('treatment')->where('treatment', '<>', '')->selectRaw('treatment, COUNT(*) as total')->groupBy('treatment')->orderByDesc('total')->limit(10)->get(),
         ];
     }
 
@@ -547,5 +571,222 @@ class ReportController extends Controller
             'total_records' => $metrics['totalPayments'] ?? 0,
             'format' => $format,
         ], 'Reporte financiero exportado.');
+    }
+
+    public function appointmentsPdf(ReportFilterRequest $request): Response
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->appointmentsReportData($clinicId, $filters, $start, $end);
+        $appointments = (clone $report['query'])->get();
+
+        $this->auditAppointmentsExport('report.appointments_exported_pdf', 'pdf', $clinicId, $filters, $report['metrics']);
+
+        return Pdf::loadView('reports.appointments-print', [
+            ...$this->shared($clinicId, $filters, $start, $end),
+            ...$report,
+            'appointmentsList' => $appointments,
+            'clinic' => Clinic::find($clinicId),
+            'generatedAt' => $this->localNow(),
+            'generatedBy' => $request->user(),
+            'forPdf' => true,
+        ])->setPaper('a4', 'landscape')->download('reporte-citas-'.$this->localNow()->format('Y-m-d').'.pdf');
+    }
+
+    public function appointmentsCsv(ReportFilterRequest $request): StreamedResponse
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->appointmentsReportData($clinicId, $filters, $start, $end);
+        $appointments = (clone $report['query'])->get();
+        $timezone = config('app.timezone', 'America/Guayaquil');
+
+        $this->auditAppointmentsExport('report.appointments_exported_csv', 'csv', $clinicId, $filters, $report['metrics']);
+        $statusOptions = ['scheduled' => 'Programada', 'confirmed' => 'Confirmada', 'completed' => 'Completada', 'cancelled' => 'Cancelada', 'no_show' => 'No asistió'];
+
+        return response()->streamDownload(function () use ($appointments, $timezone, $statusOptions): void {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($handle, ['Nro. cita', 'Fecha', 'Hora', 'Paciente', 'Médico', 'Servicio', 'Estado', 'Motivo'], ';');
+
+            foreach ($appointments as $appointment) {
+                fputcsv($handle, [
+                    'CIT-'.str_pad((string) $appointment->id, 6, '0', STR_PAD_LEFT),
+                    $appointment->appointment_date?->format('d/m/Y') ?? 'Sin fecha',
+                    substr((string)$appointment->start_time, 0, 5) ?? 'Sin hora',
+                    $appointment->patient?->full_name ?? 'Sin paciente',
+                    $appointment->doctor?->user?->name ?? 'Sin médico',
+                    $appointment->service?->name ?? 'Sin servicio',
+                    $statusOptions[$appointment->status] ?? $appointment->status,
+                    $appointment->reason ?: 'Sin motivo',
+                ], ';');
+            }
+            fclose($handle);
+        }, 'reporte-citas-'.$this->localNow()->format('Y-m-d').'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    public function appointmentsXlsx(ReportFilterRequest $request, AppointmentsXlsxExporter $exporter): StreamedResponse
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->appointmentsReportData($clinicId, $filters, $start, $end);
+        $shared = $this->shared($clinicId, $filters, $start, $end);
+        $appointments = (clone $report['query'])->get();
+        $timezone = config('app.timezone', 'America/Guayaquil');
+        $generatedAt = $this->localNow();
+
+        $this->auditAppointmentsExport('report.appointments_exported_xlsx', 'xlsx', $clinicId, $filters, $report['metrics']);
+        $statusOptions = ['scheduled' => 'Programada', 'confirmed' => 'Confirmada', 'completed' => 'Completada', 'cancelled' => 'Cancelada', 'no_show' => 'No asistió'];
+
+        return response()->streamDownload(function () use ($exporter, $appointments, $report, $shared, $timezone, $generatedAt, $request, $statusOptions): void {
+            $exporter->stream(
+                appointments: $appointments,
+                metrics: $report['metrics'],
+                statusOptions: $statusOptions,
+                periodLabel: $shared['periodLabel'],
+                generatedAt: $generatedAt,
+                generatedBy: $request->user(),
+                timezone: $timezone,
+            );
+        }, 'reporte-citas-'.$generatedAt->format('Y-m-d').'.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    public function appointmentsPrint(ReportFilterRequest $request): View
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->appointmentsReportData($clinicId, $filters, $start, $end);
+
+        $this->auditAppointmentsExport('report.appointments_printed', 'print', $clinicId, $filters, $report['metrics']);
+
+        return view('reports.appointments-print', [
+            ...$this->shared($clinicId, $filters, $start, $end),
+            ...$report,
+            'appointmentsList' => (clone $report['query'])->get(),
+            'clinic' => Clinic::find($clinicId),
+            'generatedAt' => $this->localNow(),
+            'generatedBy' => $request->user(),
+            'forPdf' => false,
+        ]);
+    }
+
+    public function clinicalPdf(ReportFilterRequest $request): Response
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->clinicalReportData($clinicId, $filters, $start, $end);
+        $consultations = (clone $report['consultationsQuery'])->get();
+
+        $this->auditClinicalExport('report.clinical_exported_pdf', 'pdf', $clinicId, $filters, $report['metrics']);
+
+        return Pdf::loadView('reports.clinical-print', [
+            ...$this->shared($clinicId, $filters, $start, $end),
+            ...$report,
+            'consultationsList' => $consultations,
+            'clinic' => Clinic::find($clinicId),
+            'generatedAt' => $this->localNow(),
+            'generatedBy' => $request->user(),
+            'forPdf' => true,
+        ])->setPaper('a4', 'landscape')->download('reporte-clinico-'.$this->localNow()->format('Y-m-d').'.pdf');
+    }
+
+    public function clinicalCsv(ReportFilterRequest $request): StreamedResponse
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->clinicalReportData($clinicId, $filters, $start, $end);
+        $consultations = (clone $report['consultationsQuery'])->get();
+        $timezone = config('app.timezone', 'America/Guayaquil');
+
+        $this->auditClinicalExport('report.clinical_exported_csv', 'csv', $clinicId, $filters, $report['metrics']);
+
+        return response()->streamDownload(function () use ($consultations, $timezone): void {
+            $handle = fopen('php://output', 'w');
+            fwrite($handle, chr(0xEF).chr(0xBB).chr(0xBF));
+            fputcsv($handle, ['Nro. consulta', 'Fecha', 'Paciente', 'Médico', 'Diagnóstico', 'Tratamiento'], ';');
+
+            foreach ($consultations as $consultation) {
+                fputcsv($handle, [
+                    'CON-'.str_pad((string) $consultation->id, 6, '0', STR_PAD_LEFT),
+                    $consultation->consultation_date?->format('d/m/Y H:i') ?? 'Sin fecha',
+                    $consultation->patient?->full_name ?? 'Sin paciente',
+                    $consultation->doctor?->user?->name ?? 'Sin médico',
+                    $consultation->diagnosis ?: 'Sin diagnóstico',
+                    $consultation->treatment ?: 'Sin tratamiento',
+                ], ';');
+            }
+            fclose($handle);
+        }, 'reporte-clinico-'.$this->localNow()->format('Y-m-d').'.csv', [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    public function clinicalXlsx(ReportFilterRequest $request, ClinicalXlsxExporter $exporter): StreamedResponse
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->clinicalReportData($clinicId, $filters, $start, $end);
+        $shared = $this->shared($clinicId, $filters, $start, $end);
+        $consultations = (clone $report['consultationsQuery'])->get();
+        $timezone = config('app.timezone', 'America/Guayaquil');
+        $generatedAt = $this->localNow();
+
+        $this->auditClinicalExport('report.clinical_exported_xlsx', 'xlsx', $clinicId, $filters, $report['metrics']);
+
+        return response()->streamDownload(function () use ($exporter, $consultations, $report, $shared, $timezone, $generatedAt, $request): void {
+            $exporter->stream(
+                consultations: $consultations,
+                metrics: $report['metrics'],
+                periodLabel: $shared['periodLabel'],
+                generatedAt: $generatedAt,
+                generatedBy: $request->user(),
+                timezone: $timezone,
+            );
+        }, 'reporte-clinico-'.$generatedAt->format('Y-m-d').'.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    public function clinicalPrint(ReportFilterRequest $request): View
+    {
+        [$clinicId, $filters, $start, $end] = $this->context($request);
+        $report = $this->clinicalReportData($clinicId, $filters, $start, $end);
+
+        $this->auditClinicalExport('report.clinical_printed', 'print', $clinicId, $filters, $report['metrics']);
+
+        return view('reports.clinical-print', [
+            ...$this->shared($clinicId, $filters, $start, $end),
+            ...$report,
+            'consultationsList' => (clone $report['consultationsQuery'])->get(),
+            'clinic' => Clinic::find($clinicId),
+            'generatedAt' => $this->localNow(),
+            'generatedBy' => $request->user(),
+            'forPdf' => false,
+        ]);
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function auditAppointmentsExport(string $action, string $format, int $clinicId, array $filters, array $metrics): void
+    {
+        AuditLogger::log($action, 'reports', null, [], [
+            'date_from' => $filters['start_date'] ?? null,
+            'date_to' => $filters['end_date'] ?? null,
+            'filters' => $filters,
+            'user_id' => auth()->id(),
+            'clinic_id' => $clinicId,
+            'total_records' => $metrics['total'] ?? 0,
+            'format' => $format,
+        ], 'Reporte de citas exportado.');
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function auditClinicalExport(string $action, string $format, int $clinicId, array $filters, array $metrics): void
+    {
+        AuditLogger::log($action, 'reports', null, [], [
+            'date_from' => $filters['start_date'] ?? null,
+            'date_to' => $filters['end_date'] ?? null,
+            'filters' => $filters,
+            'user_id' => auth()->id(),
+            'clinic_id' => $clinicId,
+            'total_records' => $metrics['consultations'] ?? 0,
+            'format' => $format,
+        ], 'Reporte clínico exportado.');
     }
 }

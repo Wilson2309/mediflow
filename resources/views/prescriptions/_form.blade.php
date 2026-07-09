@@ -22,7 +22,7 @@
                 <select id="consultation_id" name="consultation_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                     <option value="">Sin consulta asociada</option>
                     @foreach ($consultations as $consultation)
-                        <option value="{{ $consultation->id }}" @selected((string) old('consultation_id', $prescription?->consultation_id) === (string) $consultation->id)>
+                        <option value="{{ $consultation->id }}" @selected((string) old('consultation_id', $prescription?->consultation_id ?? ($prefill['consultation_id'] ?? '')) === (string) $consultation->id)>
                             {{ $consultation->consultation_date?->format('d/m/Y H:i') }} · {{ $consultation->patient?->full_name }} · {{ $consultation->doctor?->user?->name }}
                         </option>
                     @endforeach
@@ -34,7 +34,7 @@
                 <select id="patient_id" name="patient_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                     <option value="">Seleccione un paciente</option>
                     @foreach ($patients as $patient)
-                        <option value="{{ $patient->id }}" @selected((string) old('patient_id', $prescription?->patient_id) === (string) $patient->id)>{{ $patient->full_name }} - {{ $patient->identification_number ?: 'Sin identificación' }}</option>
+                        <option value="{{ $patient->id }}" @selected((string) old('patient_id', $prescription?->patient_id ?? ($prefill['patient_id'] ?? '')) === (string) $patient->id)>{{ $patient->full_name }} - {{ $patient->identification_number ?: 'Sin identificación' }}</option>
                     @endforeach
                 </select>
                 @error('patient_id') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
@@ -44,7 +44,7 @@
                 <select id="doctor_id" name="doctor_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                     <option value="">Seleccione un médico</option>
                     @foreach ($doctors as $doctor)
-                        <option value="{{ $doctor->id }}" @selected((string) old('doctor_id', $prescription?->doctor_id) === (string) $doctor->id)>{{ $doctor->user?->name }}{{ $doctor->specialty ? ' - '.$doctor->specialty->name : '' }}</option>
+                        <option value="{{ $doctor->id }}" @selected((string) old('doctor_id', $prescription?->doctor_id ?? ($prefill['doctor_id'] ?? '')) === (string) $doctor->id)>{{ $doctor->user?->name }}{{ $doctor->specialty ? ' - '.$doctor->specialty->name : '' }}</option>
                     @endforeach
                 </select>
                 @error('doctor_id') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror

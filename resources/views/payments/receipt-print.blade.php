@@ -10,7 +10,12 @@
     $paymentDate = $payment->payment_date?->timezone($timezone);
     $generatedAt = $generatedAt->timezone($timezone);
     $forPdf = $forPdf ?? false;
-    $logoSrc = $forPdf ? public_path('brand/mediflow-logo-primary-pdf.png') : asset('brand/mediflow-logo-primary-pdf.png');
+    $clinic = $payment->clinic ?? \App\Models\Clinic::first(); // Asumiendo que el pago tiene una clínica asociada o usamos la primera disponible
+    if ($clinic && $clinic->logo_path) {
+        $logoSrc = $forPdf ? storage_path('app/public/' . $clinic->logo_path) : asset('storage/' . $clinic->logo_path);
+    } else {
+        $logoSrc = null;
+    }
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -61,7 +66,13 @@
     @endunless
 
     <div class="page">
-        <table class="header-table"><tr><td style="width: 42%;"><img class="logo" src="{{ $logoSrc }}" alt="MediFlow"></td><td class="clinic-info"><div class="clinic-name">{{ $clinic?->name ?? 'MediFlow' }}</div><div>RUC: {{ $clinic?->ruc ?: '-' }}</div><div>Telefono: {{ $clinic?->phone ?: '-' }}</div><div>Email: {{ $clinic?->email ?: '-' }}</div><div>Direccion: {{ $clinic?->address ?: '-' }}</div></td></tr></table>
+        <table class="header-table"><tr><td style="width: 42%;">
+            @if($logoSrc)
+                <img class="logo" src="{{ $logoSrc }}" alt="{{ $clinic?->name }}" style="max-height: 50px; width: auto;">
+            @else
+                <h1 style="margin:0; font-size: 21px; color: #0F172A;">{{ $clinic?->name ?? 'Consultorio' }}</h1>
+            @endif
+        </td><td class="clinic-info"><div class="clinic-name">{{ $clinic?->name ?? 'MediFlow' }}</div><div>RUC: {{ $clinic?->ruc ?: '-' }}</div><div>Telefono: {{ $clinic?->phone ?: '-' }}</div><div>Email: {{ $clinic?->email ?: '-' }}</div><div>Direccion: {{ $clinic?->address ?: '-' }}</div></td></tr></table>
         <div class="divider"></div>
         <div class="title">RECIBO DE PAGO</div>
         <div class="receipt-summary"><table class="header-table"><tr><td><div class="summary-number">No. de recibo</div><div style="font-size: 14px; font-weight: 800; margin-top: 3px;">{{ $receiptNumber }}</div></td><td class="right"><span class="status {{ $payment->payment_status === 'paid' ? 'status-paid' : ($payment->payment_status === 'pending' ? 'status-pending' : 'status-other') }}">{{ $statusLabels[$payment->payment_status] ?? $payment->payment_status }}</span><div class="summary-amount">${{ number_format((float) $payment->amount, 2) }}</div></td></tr></table></div>
@@ -83,8 +94,9 @@
             <div class="note">{{ $payment->notes }}</div>
         @endif
 
-        <div class="internal-note">Documento generado por MediFlow para control interno del consultorio.</div>
-        <table class="footer-table"><tr><td>MediFlow - Control interno de caja</td><td class="right">{{ $generatedAt->format('d/m/Y H:i') }}</td></tr></table>
+        <div style="margin-top: 20px; text-align: center; font-size: 10px; color: #94A3B8;">
+            Generado de forma segura por <strong>MediFlow</strong>
+        </div>
     </div>
 </body>
 </html>

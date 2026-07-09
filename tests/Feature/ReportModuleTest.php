@@ -753,7 +753,7 @@ class ReportModuleTest extends TestCase
     /** @return array<int, string> */
     private function reportRoutes(): array
     {
-        return ['reports.index', 'reports.appointments', 'reports.clinical', 'reports.financial', 'reports.financial.export.pdf', 'reports.financial.export.csv', 'reports.financial.export.xlsx', 'reports.financial.print', 'financial-audit.index', 'reports.patients', 'reports.doctors', 'reports.services'];
+        return ['reports.index', 'reports.appointments', 'reports.appointments.export.pdf', 'reports.appointments.export.csv', 'reports.appointments.export.xlsx', 'reports.appointments.print', 'reports.clinical', 'reports.clinical.export.pdf', 'reports.clinical.export.csv', 'reports.clinical.export.xlsx', 'reports.clinical.print', 'reports.financial', 'reports.financial.export.pdf', 'reports.financial.export.csv', 'reports.financial.export.xlsx', 'reports.financial.print', 'financial-audit.index', 'reports.patients', 'reports.doctors', 'reports.services'];
     }
 
     private function userForClinic(Clinic $clinic): User

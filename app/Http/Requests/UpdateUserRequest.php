@@ -11,7 +11,7 @@ class UpdateUserRequest extends FormRequest
     public function authorize(): bool
     {
         $target = $this->route('user');
-        $clinicId = auth()->user()?->clinic_id;
+        $clinicId = auth()->user()?->activeClinicId();
 
         return $target instanceof User
             && $clinicId
@@ -36,6 +36,8 @@ class UpdateUserRequest extends FormRequest
             'doctor_phone' => ['nullable', 'string', 'max:30'],
             'consultation_fee' => ['required_if:role,medico', 'nullable', 'numeric', 'min:0', 'max:999999.99'],
             'doctor_status' => ['required_if:role,medico', 'nullable', Rule::in(['active', 'inactive'])],
+            'clinic_ids' => ['nullable', 'array'],
+            'clinic_ids.*' => ['integer', Rule::exists('clinics', 'id')],
         ];
     }
 }

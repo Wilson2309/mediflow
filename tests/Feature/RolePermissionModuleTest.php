@@ -23,7 +23,7 @@ class RolePermissionModuleTest extends TestCase
         $this->seed(PermissionSeeder::class);
 
         $this->assertSame(count(RolePermissions::all()), Permission::count());
-        $this->assertCount(count(RolePermissions::all()), Role::findByName('administrador')->permissions);
+        $this->assertCount(count(RolePermissions::all()) - 1, Role::findByName('administrador')->permissions);
     }
 
     public function test_permission_seeder_assigns_the_exact_permissions_for_each_role(): void
@@ -45,7 +45,7 @@ class RolePermissionModuleTest extends TestCase
 
         $this->assertTrue($admin->fresh()->hasRole('administrador'));
         $this->assertFalse($admin->fresh()->hasRole('recepcionista'));
-        $this->assertCount(count(RolePermissions::all()), $admin->fresh()->getAllPermissions());
+        $this->assertCount(count(RolePermissions::all()) - 1, $admin->fresh()->getAllPermissions());
     }
 
     public function test_administrator_can_access_dashboard_and_all_main_modules(): void

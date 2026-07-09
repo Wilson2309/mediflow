@@ -31,14 +31,20 @@ final class RolePermissions
             ...self::resource('users'),
             'settings.clinic.view',
             'settings.clinic.update',
+            'super_admin.access',
         ];
     }
 
     /** @return array<string, array<int, string>> */
     public static function byRole(): array
     {
+        $allExceptSuperAdmin = array_values(array_filter(self::all(), fn($p) => $p !== 'super_admin.access'));
+
         return [
-            'administrador' => self::all(),
+            'super_admin' => [
+                'super_admin.access',
+            ],
+            'administrador' => $allExceptSuperAdmin,
             'medico' => [
                 'dashboard.view',
                 'patients.view',
@@ -64,6 +70,9 @@ final class RolePermissions
                 'appointments.view',
                 'appointments.create',
                 'appointments.update',
+                'medical_records.view',
+                'medical_records.create',
+                'medical_records.update',
                 'services.view',
                 'doctors.view',
                 'demo_requests.view',

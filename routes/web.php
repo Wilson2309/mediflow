@@ -16,6 +16,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PublicDemoRequestController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ServiceController;
+use App\Http\Controllers\SwitchClinicController;
 use App\Http\Controllers\UserController;
 use App\Models\Appointment;
 use App\Models\Consultation;
@@ -41,7 +42,7 @@ Route::get('/verificar-receta/{code}', [PrescriptionController::class, 'verify']
 
 Route::get('/dashboard', function () {
     $user = auth()->user();
-    $clinicId = $user?->clinic_id;
+    $clinicId = $user?->activeClinicId();
     $isDoctorDashboard = (bool) $user?->hasRole('medico');
     $doctor = $isDoctorDashboard && $clinicId
         ? Doctor::where('clinic_id', $clinicId)->where('user_id', $user->id)->first()
@@ -177,7 +178,15 @@ Route::middleware('auth')->group(function () {
 
     Route::get('reports', [ReportController::class, 'index'])->middleware('permission:reports.view')->name('reports.index');
     Route::get('reports/appointments', [ReportController::class, 'appointments'])->middleware('permission:reports.appointments')->name('reports.appointments');
+    Route::get('reports/appointments/export/pdf', [ReportController::class, 'appointmentsPdf'])->middleware('permission:reports.appointments')->name('reports.appointments.export.pdf');
+    Route::get('reports/appointments/export/csv', [ReportController::class, 'appointmentsCsv'])->middleware('permission:reports.appointments')->name('reports.appointments.export.csv');
+    Route::get('reports/appointments/export/xlsx', [ReportController::class, 'appointmentsXlsx'])->middleware('permission:reports.appointments')->name('reports.appointments.export.xlsx');
+    Route::get('reports/appointments/print', [ReportController::class, 'appointmentsPrint'])->middleware('permission:reports.appointments')->name('reports.appointments.print');
     Route::get('reports/clinical', [ReportController::class, 'clinical'])->middleware('permission:reports.clinical')->name('reports.clinical');
+    Route::get('reports/clinical/export/pdf', [ReportController::class, 'clinicalPdf'])->middleware('permission:reports.clinical')->name('reports.clinical.export.pdf');
+    Route::get('reports/clinical/export/csv', [ReportController::class, 'clinicalCsv'])->middleware('permission:reports.clinical')->name('reports.clinical.export.csv');
+    Route::get('reports/clinical/export/xlsx', [ReportController::class, 'clinicalXlsx'])->middleware('permission:reports.clinical')->name('reports.clinical.export.xlsx');
+    Route::get('reports/clinical/print', [ReportController::class, 'clinicalPrint'])->middleware('permission:reports.clinical')->name('reports.clinical.print');
     Route::get('reports/financial', [ReportController::class, 'financial'])->middleware('permission:reports.financial')->name('reports.financial');
     Route::get('reports/financial/export/pdf', [ReportController::class, 'financialPdf'])->middleware('permission:reports.financial')->name('reports.financial.export.pdf');
     Route::get('reports/financial/export/csv', [ReportController::class, 'financialCsv'])->middleware('permission:reports.financial')->name('reports.financial.export.csv');
@@ -194,6 +203,18 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // Switch Clinic (Tenant Switcher)
+    Route::post('/switch-clinic/{clinic}', SwitchClinicController::class)->name('switch-clinic');
+
+    // Super Admin Routes
+    Route::middleware('permission:super_admin.access')->prefix('super-admin')->name('super-admin.')->group(function () {
+        Route::get('clinics', [\App\Http\Controllers\SuperAdmin\ClinicController::class, 'index'])->name('clinics.index');
+        Route::get('clinics/create', [\App\Http\Controllers\SuperAdmin\ClinicController::class, 'create'])->name('clinics.create');
+        Route::post('clinics', [\App\Http\Controllers\SuperAdmin\ClinicController::class, 'store'])->name('clinics.store');
+        Route::get('clinics/{clinic}/edit', [\App\Http\Controllers\SuperAdmin\ClinicController::class, 'edit'])->name('clinics.edit');
+        Route::match(['put', 'patch'], 'clinics/{clinic}', [\App\Http\Controllers\SuperAdmin\ClinicController::class, 'update'])->name('clinics.update');
+    });
 });
 
 require __DIR__.'/auth.php';

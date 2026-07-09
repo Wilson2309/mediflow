@@ -19,7 +19,7 @@
 
         <div class="hidden items-center gap-3 lg:flex">
             @auth
-                <a href="{{ route('dashboard') }}" class="public-action rounded-xl bg-[#2563EB] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700">Ir al dashboard</a>
+                <a href="{{ auth()->user()?->hasRole('super_admin') ? route('super-admin.clinics.index') : route('dashboard') }}" class="public-action rounded-xl bg-[#2563EB] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700">{{ auth()->user()?->hasRole('super_admin') ? 'Ir al Panel' : 'Ir al dashboard' }}</a>
             @else
                 <a href="{{ route('login') }}" class="public-action rounded-xl border border-[#E2E8F0] bg-white px-5 py-2.5 text-sm font-bold text-[#0F172A] hover:border-[#2563EB] hover:text-[#2563EB]">Iniciar sesión</a>
                 <a href="#contacto" class="public-action rounded-xl bg-[#2563EB] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700">Solicitar demo</a>
@@ -47,7 +47,7 @@
             @endforeach
             <div class="mt-3 grid gap-2 border-t border-[#E2E8F0] pt-4 sm:grid-cols-2">
                 @auth
-                    <a href="{{ route('dashboard') }}" class="rounded-xl bg-[#2563EB] px-5 py-3 text-center text-sm font-bold text-white">Ir al dashboard</a>
+                    <a href="{{ auth()->user()?->hasRole('super_admin') ? route('super-admin.clinics.index') : route('dashboard') }}" class="rounded-xl bg-[#2563EB] px-5 py-3 text-center text-sm font-bold text-white">{{ auth()->user()?->hasRole('super_admin') ? 'Ir al Panel' : 'Ir al dashboard' }}</a>
                 @else
                     <a href="{{ route('login') }}" class="rounded-xl border border-[#E2E8F0] px-5 py-3 text-center text-sm font-bold text-[#0F172A]">Iniciar sesión</a>
                     <a href="#contacto" @click="mobileOpen = false" class="rounded-xl bg-[#2563EB] px-5 py-3 text-center text-sm font-bold text-white">Solicitar demo</a>

@@ -9,7 +9,7 @@ class StoreUserRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return auth()->check() && (bool) auth()->user()?->clinic_id;
+        return auth()->check() && (bool) auth()->user()?->activeClinicId();
     }
 
     /** @return array<string, mixed> */
@@ -27,6 +27,8 @@ class StoreUserRequest extends FormRequest
             'doctor_phone' => ['nullable', 'string', 'max:30'],
             'consultation_fee' => ['required_if:role,medico', 'nullable', 'numeric', 'min:0', 'max:999999.99'],
             'doctor_status' => ['required_if:role,medico', 'nullable', Rule::in(['active', 'inactive'])],
+            'clinic_ids' => ['nullable', 'array'],
+            'clinic_ids.*' => ['integer', Rule::exists('clinics', 'id')],
         ];
     }
 }

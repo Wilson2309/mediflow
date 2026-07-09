@@ -98,7 +98,7 @@
                             <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m9 18 6-6-6-6" /></svg>
                         </a>
                         @auth
-                            <a href="{{ route('dashboard') }}" class="public-action inline-flex items-center justify-center rounded-xl border border-[#E2E8F0] bg-white px-6 py-3.5 text-sm font-bold text-[#0F172A] shadow-sm hover:border-[#2563EB] hover:text-[#2563EB]">Ir al dashboard</a>
+                            <a href="{{ auth()->user()?->hasRole('super_admin') ? route('super-admin.clinics.index') : route('dashboard') }}" class="public-action inline-flex items-center justify-center rounded-xl border border-[#E2E8F0] bg-white px-6 py-3.5 text-sm font-bold text-[#0F172A] shadow-sm hover:border-[#2563EB] hover:text-[#2563EB]">{{ auth()->user()?->hasRole('super_admin') ? 'Ir al Panel' : 'Ir al dashboard' }}</a>
                         @else
                             <a href="{{ route('login') }}" class="public-action inline-flex items-center justify-center rounded-xl border border-[#E2E8F0] bg-white px-6 py-3.5 text-sm font-bold text-[#0F172A] shadow-sm hover:border-[#2563EB] hover:text-[#2563EB]">Iniciar sesión</a>
                         @endauth

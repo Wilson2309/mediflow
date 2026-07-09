@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -9,6 +11,8 @@ use Illuminate\View\View;
 
 class AuditLogController extends Controller
 {
+    use ResolvesClinic;
+
     public function index(Request $request): View
     {
         $clinicId = $this->clinicId();
@@ -59,11 +63,4 @@ class AuditLogController extends Controller
         ]);
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
-
-        return (int) $clinicId;
-    }
 }

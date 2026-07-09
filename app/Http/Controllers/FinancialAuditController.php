@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class FinancialAuditController extends Controller
 {
+    use ResolvesClinic;
+
     public const FINANCIAL_ACTIONS = [
         'payment.paid',
         'payment.cancelled',
@@ -61,11 +65,4 @@ class FinancialAuditController extends Controller
         ]);
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
-
-        return (int) $clinicId;
-    }
 }

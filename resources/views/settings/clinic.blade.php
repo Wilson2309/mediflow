@@ -15,7 +15,7 @@
 
         <section class="grid gap-6 xl:grid-cols-3">
             <div class="space-y-6 xl:col-span-2">
-                <form method="POST" action="{{ route('settings.clinic.update') }}" class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
+                <form method="POST" action="{{ route('settings.clinic.update') }}" enctype="multipart/form-data" class="rounded-lg border border-[#E2E8F0] bg-white shadow-sm">
                     @csrf
                     @method('PUT')
                     <div class="border-b border-[#E2E8F0] px-5 py-4">
@@ -24,9 +24,14 @@
                     </div>
                     <div class="grid gap-5 p-5 md:grid-cols-2">
                         <div class="md:col-span-2">
-                            <label for="name" class="mb-2 block text-sm font-semibold text-[#0F172A]">Nombre del consultorio *</label>
+                            <label for="name" class="mb-2 block text-sm font-semibold text-[#0F172A]">Nombre Comercial *</label>
                             <input id="name" name="name" type="text" maxlength="255" required value="{{ old('name', $clinic->name) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                             @error('name')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
+                        </div>
+                        <div class="md:col-span-2">
+                            <label for="legal_name" class="mb-2 block text-sm font-semibold text-[#0F172A]">Razón Social</label>
+                            <input id="legal_name" name="legal_name" type="text" maxlength="255" value="{{ old('legal_name', $clinic->legal_name) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                            @error('legal_name')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label for="ruc" class="mb-2 block text-sm font-semibold text-[#0F172A]">RUC</label>
@@ -34,14 +39,24 @@
                             @error('ruc')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
                         </div>
                         <div>
-                            <label for="phone" class="mb-2 block text-sm font-semibold text-[#0F172A]">Teléfono</label>
+                            <label for="phone" class="mb-2 block text-sm font-semibold text-[#0F172A]">Teléfono Principal</label>
                             <input id="phone" name="phone" type="text" maxlength="30" value="{{ old('phone', $clinic->phone) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                             @error('phone')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
                         </div>
                         <div>
-                            <label for="email" class="mb-2 block text-sm font-semibold text-[#0F172A]">Correo</label>
+                            <label for="secondary_phone" class="mb-2 block text-sm font-semibold text-[#0F172A]">Teléfono Secundario / WhatsApp</label>
+                            <input id="secondary_phone" name="secondary_phone" type="text" maxlength="30" value="{{ old('secondary_phone', $clinic->secondary_phone) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                            @error('secondary_phone')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="email" class="mb-2 block text-sm font-semibold text-[#0F172A]">Correo de contacto</label>
                             <input id="email" name="email" type="email" maxlength="255" value="{{ old('email', $clinic->email) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                             @error('email')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="website" class="mb-2 block text-sm font-semibold text-[#0F172A]">Sitio Web</label>
+                            <input id="website" name="website" type="text" maxlength="255" value="{{ old('website', $clinic->website) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                            @error('website')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
                         </div>
                         <div>
                             <label for="status" class="mb-2 block text-sm font-semibold text-[#0F172A]">Estado *</label>
@@ -51,10 +66,39 @@
                             </select>
                             @error('status')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
                         </div>
+                        <div>
+                            <label for="country" class="mb-2 block text-sm font-semibold text-[#0F172A]">País</label>
+                            <input id="country" name="country" type="text" maxlength="255" value="{{ old('country', $clinic->country) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                            @error('country')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="state" class="mb-2 block text-sm font-semibold text-[#0F172A]">Provincia / Estado</label>
+                            <input id="state" name="state" type="text" maxlength="255" value="{{ old('state', $clinic->state) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                            @error('state')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="city" class="mb-2 block text-sm font-semibold text-[#0F172A]">Ciudad</label>
+                            <input id="city" name="city" type="text" maxlength="255" value="{{ old('city', $clinic->city) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
+                            @error('city')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
+                        </div>
                         <div class="md:col-span-2">
-                            <label for="address" class="mb-2 block text-sm font-semibold text-[#0F172A]">Dirección</label>
+                            <label for="address" class="mb-2 block text-sm font-semibold text-[#0F172A]">Dirección Exacta</label>
                             <input id="address" name="address" type="text" maxlength="255" value="{{ old('address', $clinic->address) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
                             @error('address')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
+                        </div>
+                        
+                        <div class="md:col-span-2 mt-2 border-t border-[#E2E8F0] pt-6">
+                            <h3 class="text-sm font-bold text-[#0F172A] mb-4">Personalización Visual</h3>
+                            <label for="logo" class="mb-2 block text-sm font-semibold text-[#0F172A]">Logotipo del Consultorio</label>
+                            @if($clinic->logo_path)
+                                <div class="mb-3 flex items-center gap-4">
+                                    <img src="{{ asset('storage/' . $clinic->logo_path) }}" alt="Logo de {{ $clinic->name }}" class="h-14 w-auto object-contain rounded border border-[#E2E8F0]">
+                                    <span class="text-xs text-[#475569]">Logotipo actual. Se usa en reportes y recetas impresas.</span>
+                                </div>
+                            @endif
+                            <input type="file" name="logo" id="logo" accept="image/*" class="block w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#0F172A] focus:border-[#2563EB] focus:ring-[#2563EB]">
+                            <p class="mt-1 text-xs text-[#475569]">Formatos permitidos: JPG, PNG o SVG. Tamaño máximo: 2MB.</p>
+                            @error('logo') <p class="mt-1 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
                         </div>
                     </div>
                     @can('settings.clinic.update')
@@ -64,11 +108,7 @@
                     @endcan
                 </form>
 
-                <article class="rounded-lg border border-dashed border-[#38BDF8]/50 bg-[#38BDF8]/5 p-5">
-                    <h2 class="text-base font-bold text-[#0F172A]">Configuración avanzada</h2>
-                    <p class="mt-2 text-sm leading-6 text-[#475569]">Esta sección queda preparada para incorporar logo, firma médica, encabezados de recetas, datos legales, correo, moneda, horarios, impuestos y preferencias del sistema.</p>
-                    <span class="mt-4 inline-flex rounded-full bg-white px-3 py-1 text-xs font-bold text-[#2563EB]">Próxima fase</span>
-                </article>
+
             </div>
 
             <aside class="space-y-6">

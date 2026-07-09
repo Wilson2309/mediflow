@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Http\Requests\StorePrescriptionRequest;
 use App\Http\Requests\UpdatePrescriptionRequest;
 use App\Mail\PrescriptionMail;
@@ -26,6 +28,8 @@ use Throwable;
 
 class PrescriptionController extends Controller
 {
+    use ResolvesClinic;
+
     public function index(Request $request): View
     {
         $clinicId = $this->clinicId();
@@ -66,9 +70,15 @@ class PrescriptionController extends Controller
         ]);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('prescriptions.create', $this->formData($this->clinicId()));
+        $clinicId = $this->clinicId();
+        $consultationId = $request->query('consultation_id');
+        $consultation = $consultationId 
+            ? Consultation::whereHas('patient', fn ($query) => $query->where('clinic_id', $clinicId))->find($consultationId)
+            : null;
+
+        return view('prescriptions.create', $this->formData($clinicId, $consultation));
     }
 
     public function store(StorePrescriptionRequest $request): RedirectResponse
@@ -326,13 +336,6 @@ class PrescriptionController extends Controller
         ];
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
-
-        return (int) $clinicId;
-    }
 
     private function authorizeClinic(Prescription $prescription): void
     {
@@ -422,7 +425,7 @@ class PrescriptionController extends Controller
         return str_repeat('*', max(strlen($identification) - 3, 0)).$visible;
     }
 
-    private function formData(int $clinicId): array
+    private function formData(int $clinicId, ?Consultation $consultation = null): array
     {
         return [
             'consultations' => Consultation::with(['patient', 'doctor.user'])
@@ -431,6 +434,11 @@ class PrescriptionController extends Controller
                 ->get(),
             'patients' => Patient::where('clinic_id', $clinicId)->where('status', 'active')->orderBy('last_name')->orderBy('first_name')->get(),
             'doctors' => $this->doctors($clinicId),
+            'prefill' => $consultation ? [
+                'consultation_id' => $consultation->id,
+                'patient_id' => $consultation->patient_id,
+                'doctor_id' => $consultation->doctor_id,
+            ] : null,
         ];
     }
 

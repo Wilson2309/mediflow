@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Http\Requests\StoreMedicalRecordRequest;
 use App\Http\Requests\UpdateMedicalRecordRequest;
 use App\Models\MedicalRecord;
@@ -13,6 +15,8 @@ use Illuminate\View\View;
 
 class MedicalRecordController extends Controller
 {
+    use ResolvesClinic;
+
     public function index(Request $request): View
     {
         $clinicId = $this->clinicId();
@@ -145,19 +149,14 @@ class MedicalRecordController extends Controller
             'personal_history' => $validated['personal_history'] ?? null,
             'family_history' => $validated['family_history'] ?? null,
             'surgical_history' => $validated['surgical_history'] ?? null,
+            'allergies' => $validated['allergies'] ?? null,
+            'habits' => $validated['habits'] ?? null,
             'current_medications' => $validated['current_medications'] ?? null,
             'chronic_diseases' => $validated['chronic_diseases'] ?? null,
             'observations' => $validated['observations'] ?? null,
         ];
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
-
-        return (int) $clinicId;
-    }
 
     private function authorizeClinic(MedicalRecord $medicalRecord): void
     {

@@ -25,6 +25,8 @@ class UpdateMedicalRecordRequest extends FormRequest
             'personal_history' => 'nullable|string',
             'family_history' => 'nullable|string',
             'surgical_history' => 'nullable|string',
+            'allergies' => 'nullable|string',
+            'habits' => 'nullable|string',
             'current_medications' => 'nullable|string',
             'chronic_diseases' => 'nullable|string',
             'observations' => 'nullable|string',

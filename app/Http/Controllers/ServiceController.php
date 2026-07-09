@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Http\Requests\StoreServiceRequest;
 use App\Http\Requests\UpdateServiceRequest;
 use App\Models\Doctor;
@@ -13,6 +15,8 @@ use Illuminate\View\View;
 
 class ServiceController extends Controller
 {
+    use ResolvesClinic;
+
     public function index(Request $request): View
     {
         $clinicId = $this->clinicId();
@@ -116,14 +120,6 @@ class ServiceController extends Controller
             ->with('success', 'Servicio médico eliminado correctamente.');
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
-
-        return (int) $clinicId;
-    }
 
     private function authorizeClinic(Service $service): void
     {

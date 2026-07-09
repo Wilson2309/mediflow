@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Http\Requests\StorePaymentRequest;
 use App\Http\Requests\UpdatePaymentRequest;
 use App\Models\Appointment;
@@ -19,6 +21,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 class PaymentController extends Controller
 {
+    use ResolvesClinic;
+
     public function index(Request $request): View
     {
         $clinicId = $this->clinicId();
@@ -260,13 +264,6 @@ class PaymentController extends Controller
         return now(config('app.timezone', 'America/Guayaquil'));
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
-
-        return (int) $clinicId;
-    }
 
     private function authorizeClinic(Payment $payment): void
     {

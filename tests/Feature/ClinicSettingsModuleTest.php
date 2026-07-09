@@ -88,12 +88,7 @@ class ClinicSettingsModuleTest extends TestCase
         $this->assertSame('Av. Principal 123, Guayaquil', $clinic->refresh()->address);
     }
 
-    public function test_status_can_be_updated(): void
-    {
-        $clinic = Clinic::factory()->create(['status' => 'active']);
-        $this->updateClinic($clinic, ['status' => 'inactive']);
-        $this->assertSame('inactive', $clinic->refresh()->status);
-    }
+
 
     public function test_name_is_required(): void
     {
@@ -115,14 +110,7 @@ class ClinicSettingsModuleTest extends TestCase
             ->assertSessionHasErrors('email');
     }
 
-    public function test_status_must_be_valid(): void
-    {
-        $clinic = Clinic::factory()->create();
 
-        $this->actingAs($this->userForClinic($clinic))
-            ->put(route('settings.clinic.update'), $this->validPayload($clinic, ['status' => 'archived']))
-            ->assertSessionHasErrors('status');
-    }
 
     public function test_submitted_clinic_id_cannot_change_target_clinic(): void
     {

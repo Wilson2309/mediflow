@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Http\Requests\StoreAppointmentRequest;
 use App\Http\Requests\UpdateAppointmentRequest;
 use App\Models\Appointment;
@@ -19,6 +21,8 @@ use Illuminate\View\View;
 
 class AppointmentController extends Controller
 {
+    use ResolvesClinic;
+
     private const ACTIVE_BLOCKING_STATUSES = ['scheduled', 'confirmed'];
     private const DEFAULT_APPOINTMENT_DURATION = 30;
     private const SLOT_START = '08:00';
@@ -403,13 +407,6 @@ class AppointmentController extends Controller
         return Carbon::createFromFormat('Y-m-d H:i', $date.' '.substr($time, 0, 5));
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
-
-        return (int) $clinicId;
-    }
 
     private function authorizeAppointmentAccess(Appointment $appointment): void
     {

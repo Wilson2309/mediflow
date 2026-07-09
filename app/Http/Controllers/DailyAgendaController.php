@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Models\Appointment;
 use App\Models\AuditLog;
 use App\Models\Doctor;
@@ -12,6 +14,8 @@ use Illuminate\View\View;
 
 class DailyAgendaController extends Controller
 {
+    use ResolvesClinic;
+
     public function index(Request $request): View
     {
         $clinicId = $this->clinicId();
@@ -172,13 +176,6 @@ class DailyAgendaController extends Controller
         ]);
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clinica asignada.');
-
-        return (int) $clinicId;
-    }
 
     private function doctors(int $clinicId)
     {

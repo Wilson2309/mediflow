@@ -6,6 +6,7 @@ use App\Http\Requests\UpdateClinicSettingsRequest;
 use App\Models\Clinic;
 use App\Services\AuditLogger;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class ClinicSettingsController extends Controller
@@ -28,7 +29,17 @@ class ClinicSettingsController extends Controller
     {
         $clinic = $this->clinic();
         $old = AuditLogger::modelSnapshot($clinic);
-        $clinic->update($request->validated());
+        
+        $data = $request->validated();
+        
+        if ($request->hasFile('logo')) {
+            if ($clinic->logo_path) {
+                Storage::disk('public')->delete($clinic->logo_path);
+            }
+            $data['logo_path'] = $request->file('logo')->store('logos', 'public');
+        }
+
+        $clinic->update($data);
         AuditLogger::log('clinic.updated', 'settings', $clinic, $old, AuditLogger::modelSnapshot($clinic), 'Configuracion del consultorio actualizada.');
 
         return redirect()
@@ -38,7 +49,7 @@ class ClinicSettingsController extends Controller
 
     private function clinic(): Clinic
     {
-        $clinicId = auth()->user()?->clinic_id;
+        $clinicId = auth()->user()?->activeClinicId();
         abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
 
         return Clinic::findOrFail($clinicId);

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesClinic;
+
 use App\Http\Requests\StoreConsultationRequest;
 use App\Http\Requests\UpdateConsultationRequest;
 use App\Models\Appointment;
@@ -16,6 +18,8 @@ use Illuminate\View\View;
 
 class ConsultationController extends Controller
 {
+    use ResolvesClinic;
+
     public function index(Request $request): View
     {
         $clinicId = $this->clinicId();
@@ -86,7 +90,8 @@ class ConsultationController extends Controller
         $this->authorizeClinic($consultation);
 
         return view('consultations.show', [
-            'consultation' => $consultation->load(['appointment.service', 'patient', 'doctor.user', 'doctor.specialty']),
+            'consultation' => $consultation->load(['appointment.service', 'patient.medicalRecord', 'doctor.user', 'doctor.specialty']),
+            'medicalRecord' => $consultation->patient?->medicalRecord,
         ]);
     }
 
@@ -95,7 +100,8 @@ class ConsultationController extends Controller
         $this->authorizeClinic($consultation);
 
         return view('consultations.edit', [
-            'consultation' => $consultation->load(['appointment', 'patient', 'doctor.user']),
+            'consultation' => $consultation->load(['appointment', 'patient.medicalRecord', 'doctor.user']),
+            'medicalRecord' => $consultation->patient?->medicalRecord,
             ...$this->formData($this->clinicId(), $consultation),
         ]);
     }
@@ -196,13 +202,6 @@ class ConsultationController extends Controller
         }
     }
 
-    private function clinicId(): int
-    {
-        $clinicId = auth()->user()?->clinic_id;
-        abort_if(! $clinicId, 403, 'El usuario autenticado no tiene una clínica asignada.');
-
-        return (int) $clinicId;
-    }
 
     private function authorizeClinic(Consultation $consultation): void
     {

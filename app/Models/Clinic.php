@@ -12,11 +12,27 @@ class Clinic extends Model
 
     protected $fillable = [
         'name',
+        'legal_name',
         'ruc',
+        'legal_representative',
         'phone',
+        'secondary_phone',
         'email',
+        'website',
         'address',
+        'country',
+        'state',
+        'city',
+        'clinic_type',
+        'logo_path',
+        'subscription_plan',
+        'subscription_end_date',
+        'internal_notes',
         'status',
+    ];
+
+    protected $casts = [
+        'subscription_end_date' => 'date',
     ];
 
     public function users(): HasMany

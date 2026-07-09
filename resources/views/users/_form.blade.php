@@ -47,11 +47,38 @@
         @error('status')<p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p>@enderror
     </div>
     <div>
-        <p class="mb-2 text-sm font-semibold text-[#0F172A]">Clínica</p>
-        <div class="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2.5 text-sm text-[#475569]">{{ auth()->user()->clinic?->name ?? 'Clínica asignada' }}</div>
-        <p class="mt-2 text-xs text-[#475569]">Se asigna automáticamente desde tu usuario.</p>
+        <p class="mb-2 text-sm font-semibold text-[#0F172A]">Clínica principal</p>
+        <div class="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2.5 text-sm text-[#475569]">{{ auth()->user()->currentClinic?->name ?? auth()->user()->clinic?->name ?? 'Clínica asignada' }}</div>
+        <p class="mt-2 text-xs text-[#475569]">Se asigna automáticamente desde tu sucursal activa.</p>
     </div>
 </div>
+
+@if(isset($availableClinics) && $availableClinics->count() > 1)
+    <div class="border-t border-[#E2E8F0] bg-[#F8FAFC]/70 p-5">
+        <div class="mb-4">
+            <p class="text-sm font-semibold uppercase tracking-wide text-[#2563EB]">Acceso a sucursales</p>
+            <h2 class="mt-1 text-lg font-bold text-[#0F172A]">Asignar a sucursales</h2>
+            <p class="mt-1 text-sm text-[#475569]">Selecciona las sucursales a las que este usuario tendrá acceso. Podrá cambiar entre ellas desde el menú lateral.</p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            @php
+                $assignedClinicIds = old('clinic_ids', $managedUser?->clinics?->pluck('id')->toArray() ?? []);
+            @endphp
+            @foreach($availableClinics as $availableClinic)
+                <label class="flex items-center gap-3 rounded-lg border border-[#E2E8F0] bg-white p-3 cursor-pointer transition hover:border-[#38BDF8]">
+                    <input type="checkbox" name="clinic_ids[]" value="{{ $availableClinic->id }}"
+                        {{ in_array($availableClinic->id, $assignedClinicIds) ? 'checked' : '' }}
+                        class="h-4 w-4 rounded border-[#CBD5E1] text-[#2563EB] focus:ring-[#2563EB]">
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-[#0F172A]">{{ $availableClinic->name }}</p>
+                        <p class="text-xs text-[#475569]">{{ $availableClinic->city ?? $availableClinic->address ?? 'Sin dirección' }}</p>
+                    </div>
+                </label>
+            @endforeach
+        </div>
+        @error('clinic_ids') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
+    </div>
+@endif
 
 <section x-cloak x-show="selectedRole === 'medico'" x-transition class="border-t border-[#E2E8F0] bg-[#F8FAFC]/70 p-5">
     <div class="mb-5">

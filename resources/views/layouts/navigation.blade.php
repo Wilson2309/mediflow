@@ -8,8 +8,12 @@
         ->map(fn ($part) => strtoupper(substr($part, 0, 1)))
         ->take(2)
         ->implode('') ?: 'U';
-    $pendingPaymentsBadge = $user?->clinic_id && $user?->can('payments.view')
-        ? \App\Models\Payment::where('clinic_id', $user->clinic_id)->where('payment_status', 'pending')->count()
+    $activeClinicId = $user?->activeClinicId();
+    $currentClinic = $activeClinicId ? \App\Models\Clinic::find($activeClinicId) : $user?->clinic;
+    $userClinics = $user ? $user->clinics()->where('status', 'active')->orderBy('name')->get() : collect();
+    $hasMultipleClinics = $userClinics->count() > 1;
+    $pendingPaymentsBadge = $activeClinicId && $user?->can('payments.view')
+        ? \App\Models\Payment::where('clinic_id', $activeClinicId)->where('payment_status', 'pending')->count()
         : 0;
 
     $icons = [
@@ -28,6 +32,7 @@
         'demoRequests' => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 5.25h15A1.5 1.5 0 0 1 21 6.75v10.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.25V6.75a1.5 1.5 0 0 1 1.5-1.5ZM3.75 7.5 12 13.25 20.25 7.5" /></svg>',
         'users' => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3.75 19.5 6v5.25c0 4.55-3.1 8.8-7.5 9.95-4.4-1.15-7.5-5.4-7.5-9.95V6L12 3.75ZM9 12l2 2 4-4" /></svg>',
         'settings' => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.35 4.65 11 2.75h2l.65 1.9c.45.14.88.32 1.28.54l1.8-.88 1.42 1.42-.88 1.8c.22.4.4.83.54 1.28l1.9.65v2l-1.9.65c-.14.45-.32.88-.54 1.28l.88 1.8-1.42 1.42-1.8-.88c-.4.22-.83.4-1.28.54L13 21.25h-2l-.65-1.9a7.4 7.4 0 0 1-1.28-.54l-1.8.88-1.42-1.42.88-1.8a7.4 7.4 0 0 1-.54-1.28l-1.9-.65v-2l1.9-.65c.14-.45.32-.88.54-1.28l-.88-1.8 1.42-1.42 1.8.88c.4-.22.83-.4 1.28-.54ZM12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" /></svg>',
+        'superAdmin' => '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>',
     ];
 
     $moduleLinks = [
@@ -44,9 +49,10 @@
         ['label' => 'Reportes', 'href' => route('reports.index'), 'active' => request()->routeIs('reports.*'), 'icon' => 'reports', 'permission' => 'reports.view'],
         ['label' => 'Registro de caja', 'href' => route('financial-audit.index'), 'active' => request()->routeIs('financial-audit.*'), 'icon' => 'audit', 'permission' => 'reports.financial'],
         ['label' => 'Auditoría', 'href' => route('audit-logs.index'), 'active' => request()->routeIs('audit-logs.*'), 'icon' => 'audit', 'permission' => 'audit_logs.view'],
-        ['label' => 'Solicitudes de demo', 'href' => route('demo-requests.index'), 'active' => request()->routeIs('demo-requests.*'), 'icon' => 'demoRequests', 'permission' => 'demo_requests.view'],
+        ['label' => 'Solicitudes de demo', 'href' => route('demo-requests.index'), 'active' => request()->requestUri === '/demo-requests', 'icon' => 'demoRequests', 'permission' => 'demo_requests.view'],
         ['label' => 'Usuarios y Roles', 'href' => route('users.index'), 'active' => request()->routeIs('users.*'), 'icon' => 'users', 'permission' => 'users.view'],
         ['label' => 'Configuración', 'href' => route('settings.clinic.edit'), 'active' => request()->routeIs('settings.*'), 'icon' => 'settings', 'permission' => 'settings.clinic.view'],
+        ['label' => 'Súper Admin', 'href' => route('super-admin.clinics.index'), 'active' => request()->routeIs('super-admin.*'), 'icon' => 'superAdmin', 'permission' => 'super_admin.access'],
     ];
 
     $moduleLinks = collect($moduleLinks)
@@ -101,6 +107,52 @@
                     </a>
                 @endforeach
             </nav>
+
+            {{-- Tenant Switcher (Mobile) --}}
+            @if($hasMultipleClinics)
+                <div class="border-t border-[#E2E8F0] p-3">
+                    <div x-data="{ switcherOpen: false }" class="relative">
+                        <button @click="switcherOpen = !switcherOpen" type="button" class="flex w-full items-center gap-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3 text-left transition hover:border-[#38BDF8]">
+                            <span class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#38BDF8]/15 text-[#2563EB]">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 21V6.75A2.25 2.25 0 0 1 7.5 4.5h9a2.25 2.25 0 0 1 2.25 2.25V21M9 9.75h6M9 13.5h6M10.5 21v-3h3v3" /></svg>
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-sm font-semibold text-[#0F172A]">{{ $currentClinic?->name ?? 'Sin clínica' }}</span>
+                                <span class="block text-xs text-[#10B981]">Sucursal activa</span>
+                            </span>
+                            <svg class="h-4 w-4 shrink-0 text-slate-400 transition" :class="switcherOpen && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" /></svg>
+                        </button>
+                        <div x-show="switcherOpen" x-transition @click.outside="switcherOpen = false" class="absolute bottom-full left-0 mb-2 w-full rounded-lg border border-[#E2E8F0] bg-white p-1 shadow-lg">
+                            <p class="px-3 py-2 text-xs font-bold uppercase tracking-wide text-[#475569]">Cambiar sucursal</p>
+                            @foreach($userClinics as $c)
+                                @if($c->id !== $activeClinicId)
+                                    <form method="POST" action="{{ route('switch-clinic', $c) }}">
+                                        @csrf
+                                        <button type="submit" class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-600 transition hover:bg-[#F1F5F9] hover:text-[#0F172A]">
+                                            <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 21V6.75A2.25 2.25 0 0 1 7.5 4.5h9a2.25 2.25 0 0 1 2.25 2.25V21M9 9.75h6M9 13.5h6M10.5 21v-3h3v3" /></svg>
+                                            {{ $c->name }}
+                                        </button>
+                                    </form>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            @else
+                <div class="border-t border-[#E2E8F0] p-3">
+                    <div class="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+                        <div class="flex items-center gap-3">
+                            <span class="grid h-9 w-9 place-items-center rounded-lg bg-[#38BDF8]/15 text-[#2563EB]">
+                                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 21V6.75A2.25 2.25 0 0 1 7.5 4.5h9a2.25 2.25 0 0 1 2.25 2.25V21M9 9.75h6M9 13.5h6M10.5 21v-3h3v3" /></svg>
+                            </span>
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold text-[#0F172A]">{{ $currentClinic?->name ?? 'Sin clínica asignada' }}</p>
+                                <p class="text-xs font-medium text-[#10B981]">Activo</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 </div>
@@ -134,19 +186,52 @@
     </nav>
 
     <div class="border-t border-[#E2E8F0] p-4">
-        <div class="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4">
-            <div class="flex items-center gap-3">
-                <span class="grid h-10 w-10 place-items-center rounded-lg bg-[#38BDF8]/15 text-[#2563EB]">
-                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 21V6.75A2.25 2.25 0 0 1 7.5 4.5h9a2.25 2.25 0 0 1 2.25 2.25V21M9 9.75h6M9 13.5h6M10.5 21v-3h3v3" />
+        @if($hasMultipleClinics)
+            <div x-data="{ switcherOpen: false }" class="relative">
+                <button @click="switcherOpen = !switcherOpen" type="button" class="flex w-full items-center gap-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4 text-left transition hover:border-[#38BDF8]">
+                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-[#38BDF8]/15 text-[#2563EB]">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 21V6.75A2.25 2.25 0 0 1 7.5 4.5h9a2.25 2.25 0 0 1 2.25 2.25V21M9 9.75h6M9 13.5h6M10.5 21v-3h3v3" />
+                        </svg>
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-semibold text-[#0F172A]">{{ $currentClinic?->name ?? 'Sin clínica' }}</p>
+                        <p class="text-xs font-medium text-[#10B981]">📍 Sucursal activa</p>
+                    </div>
+                    <svg class="h-4 w-4 shrink-0 text-slate-400 transition" :class="switcherOpen && 'rotate-180'" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.17l3.71-3.94a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z" clip-rule="evenodd" />
                     </svg>
-                </span>
-                <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold text-[#0F172A]">{{ $user?->clinic?->name ?? 'Sin clínica asignada' }}</p>
-                    <p class="text-xs font-medium {{ $user?->clinic?->status === 'inactive' ? 'text-[#EF4444]' : 'text-[#10B981]' }}">{{ $user?->clinic?->status === 'inactive' ? 'Inactivo' : 'Activo' }}</p>
+                </button>
+                <div x-show="switcherOpen" x-transition @click.outside="switcherOpen = false" class="absolute bottom-full left-0 mb-2 w-full rounded-lg border border-[#E2E8F0] bg-white p-1 shadow-lg">
+                    <p class="px-3 py-2 text-xs font-bold uppercase tracking-wide text-[#475569]">Cambiar sucursal</p>
+                    @foreach($userClinics as $c)
+                        @if($c->id !== $activeClinicId)
+                            <form method="POST" action="{{ route('switch-clinic', $c) }}">
+                                @csrf
+                                <button type="submit" class="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-sm text-slate-600 transition hover:bg-[#F1F5F9] hover:text-[#0F172A]">
+                                    <svg class="h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 21V6.75A2.25 2.25 0 0 1 7.5 4.5h9a2.25 2.25 0 0 1 2.25 2.25V21M9 9.75h6M9 13.5h6M10.5 21v-3h3v3" /></svg>
+                                    {{ $c->name }}
+                                </button>
+                            </form>
+                        @endif
+                    @endforeach
                 </div>
             </div>
-        </div>
+        @else
+            <div class="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-4">
+                <div class="flex items-center gap-3">
+                    <span class="grid h-10 w-10 place-items-center rounded-lg bg-[#38BDF8]/15 text-[#2563EB]">
+                        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M5.25 21V6.75A2.25 2.25 0 0 1 7.5 4.5h9a2.25 2.25 0 0 1 2.25 2.25V21M9 9.75h6M9 13.5h6M10.5 21v-3h3v3" />
+                        </svg>
+                    </span>
+                    <div class="min-w-0">
+                        <p class="truncate text-sm font-semibold text-[#0F172A]">{{ $currentClinic?->name ?? 'Sin clínica asignada' }}</p>
+                        <p class="text-xs font-medium {{ $currentClinic?->status === 'inactive' ? 'text-[#EF4444]' : 'text-[#10B981]' }}">{{ $currentClinic?->status === 'inactive' ? 'Inactivo' : 'Activo' }}</p>
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
 </aside>
 

@@ -15,6 +15,8 @@ class MedicalRecord extends Model
         'personal_history',
         'family_history',
         'surgical_history',
+        'allergies',
+        'habits',
         'current_medications',
         'chronic_diseases',
         'observations',

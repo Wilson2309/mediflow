@@ -14,6 +14,7 @@ class RoleSeeder extends Seeder
             'medico',
             'recepcionista',
             'caja_finanzas',
+            'super_admin',
         ];
 
         foreach ($roles as $role) {

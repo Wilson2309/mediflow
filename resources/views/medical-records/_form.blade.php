@@ -47,6 +47,16 @@
                 @error('surgical_history') <p class="mt-2 text-sm font-semibold text-[#EF4444]">{{ $message }}</p> @enderror
             </div>
             <div>
+                <label for="allergies" class="mb-2 block text-sm font-semibold text-[#0F172A]">Alergias</label>
+                <textarea id="allergies" name="allergies" rows="5" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">{{ old('allergies', $medicalRecord?->allergies) }}</textarea>
+                @error('allergies') <p class="mt-2 text-sm font-semibold text-[#EF4444]">{{ $message }}</p> @enderror
+            </div>
+            <div>
+                <label for="habits" class="mb-2 block text-sm font-semibold text-[#0F172A]">Hábitos (Tabaco, Alcohol, etc.)</label>
+                <textarea id="habits" name="habits" rows="5" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">{{ old('habits', $medicalRecord?->habits) }}</textarea>
+                @error('habits') <p class="mt-2 text-sm font-semibold text-[#EF4444]">{{ $message }}</p> @enderror
+            </div>
+            <div>
                 <label for="current_medications" class="mb-2 block text-sm font-semibold text-[#0F172A]">Medicamentos actuales</label>
                 <textarea id="current_medications" name="current_medications" rows="5" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">{{ old('current_medications', $medicalRecord?->current_medications) }}</textarea>
                 @error('current_medications') <p class="mt-2 text-sm font-semibold text-[#EF4444]">{{ $message }}</p> @enderror

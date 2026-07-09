@@ -58,7 +58,11 @@
     <main class="sheet">
         <section class="header">
             <div class="brand">
-                <p class="label">MediFlow</p>
+                @if(isset($clinic) && $clinic->logo_path)
+                    <img src="{{ $forPdf ?? false ? storage_path('app/public/' . $clinic->logo_path) : asset('storage/' . $clinic->logo_path) }}" alt="{{ $clinic->name }}" style="max-height: 50px; width: auto; margin-bottom: 8px;">
+                @else
+                    <p class="label">{{ $clinic?->name ?? 'Consultorio' }}</p>
+                @endif
                 <h1>Reporte financiero</h1>
                 <p class="muted">{{ $clinic?->name ?? 'Consultorio' }}</p>
             </div>
@@ -115,6 +119,9 @@
         </section>
 
         <p class="note">Reporte de control interno. La informacion financiera respeta el consultorio autenticado, los filtros aplicados y la zona horaria America/Guayaquil.</p>
+        <div style="margin-top: 20px; text-align: center; font-size: 10px; color: #94A3B8;">
+            Generado de forma segura por <strong>MediFlow</strong>
+        </div>
     </main>
 </div>
 </body>

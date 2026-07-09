@@ -5,7 +5,12 @@
     $recordCode = 'REC-'.str_pad((string) $prescription->id, 6, '0', STR_PAD_LEFT);
     $forPdf = $forPdf ?? false;
     $signatureQrCode = $signatureQrCode ?? null;
-    $logoSrc = $forPdf ? public_path('brand/mediflow-logo-primary-pdf.png') : asset('brand/mediflow-logo-primary-pdf.png');
+    $clinic = $prescription->patient?->clinic;
+    if ($clinic && $clinic->logo_path) {
+        $logoSrc = $forPdf ? storage_path('app/public/' . $clinic->logo_path) : asset('storage/' . $clinic->logo_path);
+    } else {
+        $logoSrc = null;
+    }
     $patientAge = $patient?->birth_date ? $patient->birth_date->age.' años' : '-';
     $patientGender = $patient?->gender ? str($patient->gender)->replace('_', ' ')->title() : '-';
     $doctorName = $doctor?->user?->name ?: '-';
@@ -68,7 +73,11 @@
         <table class="header-table">
             <tr>
                 <td style="width: 42%;">
-                    <img class="logo" src="{{ $logoSrc }}" alt="MediFlow">
+                    @if($logoSrc)
+                        <img class="logo" src="{{ $logoSrc }}" alt="{{ $clinic?->name ?? 'Consultorio' }}" style="max-height: 50px; width: auto;">
+                    @else
+                        <h1 style="margin:0; font-size: 21px; color: #0F172A;">{{ $clinic?->name ?? 'Consultorio' }}</h1>
+                    @endif
                 </td>
                 <td class="clinic-info">
                     <div class="clinic-name">{{ $clinic?->name ?? 'Consultorio' }}</div>
@@ -200,7 +209,7 @@
 
         <table class="footer-table">
             <tr>
-                <td>Documento generado por MediFlow</td>
+                <td>Generado de forma segura por <strong>MediFlow</strong></td>
                 <td class="right">{{ $generatedAt->format('d/m/Y H:i') }}</td>
             </tr>
         </table>
