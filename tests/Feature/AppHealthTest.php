@@ -8,7 +8,7 @@ class AppHealthTest extends TestCase
 {
     public function test_app_health_returns_minimal_ok_json(): void
     {
-        $this->getJson('/app-health')
+        $response = $this->getJson('/app-health')
             ->assertOk()
             ->assertJson([
                 'ok' => true,
@@ -19,6 +19,8 @@ class AppHealthTest extends TestCase
                 'timestamp',
                 'app',
             ]);
+
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
     }
 
     public function test_app_health_does_not_expose_sensitive_data(): void

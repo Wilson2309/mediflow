@@ -275,6 +275,15 @@
     color: #b45309;
 }
 
+.mediflow-assistant__connection[data-status="internet-unavailable"] {
+    color: #b45309;
+}
+
+.mediflow-assistant__connection[data-status="internet-unavailable"] i {
+    background: #f59e0b;
+    box-shadow: 0 0 0 3px rgb(245 158 11 / 14%);
+}
+
 .mediflow-assistant__connection[data-status="server-down"] i {
     background: #f59e0b;
     box-shadow: 0 0 0 3px rgb(245 158 11 / 15%);

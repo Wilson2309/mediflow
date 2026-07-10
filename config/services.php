@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'internet_health' => [
+        'urls' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('INTERNET_HEALTH_URLS', 'https://www.gstatic.com/generate_204'))
+        ))),
+        'timeout' => (float) env('INTERNET_HEALTH_TIMEOUT', 2.5),
+    ],
+
 ];

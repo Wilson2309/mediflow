@@ -8,6 +8,7 @@ use App\Http\Controllers\DailyAgendaController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\DemoRequestController;
 use App\Http\Controllers\FinancialAuditController;
+use App\Http\Controllers\HealthCheckController;
 use App\Http\Controllers\MedicalRecordController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\PaymentController;
@@ -33,11 +34,8 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::get('/app-health', fn () => response()->json([
-    'ok' => true,
-    'timestamp' => now(config('app.timezone', 'America/Guayaquil'))->toIso8601String(),
-    'app' => 'MediFlow',
-]))->name('app-health');
+Route::get('/app-health', [HealthCheckController::class, 'app'])->name('app-health');
+Route::get('/internet-health', [HealthCheckController::class, 'internet'])->name('internet-health');
 
 Route::post('/demo-requests', [PublicDemoRequestController::class, 'store'])
     ->middleware('throttle:5,1')

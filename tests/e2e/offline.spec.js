@@ -1,14 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { login, logout } from './helpers/auth.js';
 import { createUniquePatientData } from './helpers/data.js';
+import { mockConnectionHealth, setMockConnectionHealth } from './helpers/connection.js';
 
 async function goOffline(page) {
+  await setMockConnectionHealth(page, { serverReachable: false, internetReachable: false });
   await page.context().setOffline(true);
   await page.evaluate(() => window.dispatchEvent(new Event('offline')));
   await expect(page.locator('#connection-status')).toContainText('Sin conexión');
 }
 
 async function goOnline(page) {
+  await setMockConnectionHealth(page, { serverReachable: true, internetReachable: true });
   await page.context().setOffline(false);
   await page.evaluate(async () => {
     window.dispatchEvent(new Event('online'));
@@ -18,9 +21,62 @@ async function goOnline(page) {
   await expect(page.locator('#connection-status')).toContainText('Conectado');
 }
 
+async function goWithoutInternet(page) {
+  await setMockConnectionHealth(page, { serverReachable: true, internetReachable: false });
+  await page.evaluate(() => window.MediFlowConnection?.check?.(true));
+  await expect(page.locator('#connection-status')).toContainText('Sin Internet');
+}
+
 test.describe('Offline protection', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockConnectionHealth(page);
+  });
+
   test.afterEach(async ({ context }) => {
     await context.setOffline(false);
+  });
+
+  test('app-health and internet-health available show detailed online state', async ({ page }) => {
+    await login(page, 'admin@mediflow.com', 'Admin123*');
+    await page.goto('/dashboard');
+    await page.evaluate(() => window.MediFlowConnection?.check?.(false));
+
+    await expect(page.locator('#connection-status')).toContainText('Conectado');
+    const connection = await page.evaluate(() => ({
+      state: window.MediFlowConnection.state,
+      serverReachable: window.MediFlowConnection.serverReachable,
+      internetReachable: window.MediFlowConnection.internetReachable,
+      browserOnline: window.MediFlowConnection.browserOnline,
+      lastCheckedAt: window.MediFlowConnection.lastCheckedAt,
+    }));
+    expect(connection).toEqual(expect.objectContaining({
+      state: 'ONLINE',
+      serverReachable: true,
+      internetReachable: true,
+      browserOnline: true,
+      lastCheckedAt: expect.any(String),
+    }));
+  });
+
+  test('app available without internet shows Sin Internet only once per state', async ({ page }) => {
+    await login(page, 'admin@mediflow.com', 'Admin123*');
+    await page.goto('/dashboard');
+
+    await goWithoutInternet(page);
+    await expect(page.getByText(/MediFlow local continúa disponible/i)).toBeVisible();
+    await page.evaluate(() => window.MediFlowConnection?.check?.(true));
+    await expect(page.getByText(/MediFlow local continúa disponible/i)).toHaveCount(1);
+  });
+
+  test('app-health failure while browser is online shows server unavailable', async ({ page }) => {
+    await login(page, 'admin@mediflow.com', 'Admin123*');
+    await page.goto('/dashboard');
+
+    await setMockConnectionHealth(page, { serverReachable: false, internetReachable: false });
+    await page.evaluate(() => window.MediFlowConnection?.check?.(true));
+
+    await expect(page.locator('#connection-status')).toContainText('Servidor no disponible');
+    expect(await page.evaluate(() => window.MediFlowConnection.state)).toBe('SERVER_UNAVAILABLE');
   });
 
   test('shows offline and restored connection status', async ({ page }) => {
@@ -39,12 +95,11 @@ test.describe('Offline protection', () => {
     await login(page, 'caja@mediflow.com', 'Password123*');
     await page.goto('/payments');
 
-    await goOffline(page);
+    await goWithoutInternet(page);
     await expect(page.locator('a[href$="/payments/create"]')).toHaveAttribute('aria-disabled', 'true');
 
-    await page.context().setOffline(false);
     await page.goto('/payments/create');
-    await goOffline(page);
+    await goWithoutInternet(page);
 
     const paymentForm = page.locator('form[action$="/payments"]').first();
     await expect(paymentForm.locator('button[type="submit"]')).toBeDisabled();
@@ -61,7 +116,7 @@ test.describe('Offline protection', () => {
 
     await login(page, 'recepcionista@mediflow.com', 'Password123*');
     await page.goto('/patients/create');
-    await goOffline(page);
+    await goWithoutInternet(page);
 
     await page.fill('#first_name', patientData.first_name);
     await page.fill('#last_name', patientData.last_name);
@@ -84,7 +139,7 @@ test.describe('Offline protection', () => {
   test('doctor saves clinical drafts and cannot run official prescription actions offline', async ({ page }) => {
     await login(page, 'medico@mediflow.com', 'Password123*');
     await page.goto('/consultations/create');
-    await goOffline(page);
+    await goWithoutInternet(page);
 
     await page.fill('#diagnosis', 'Borrador clínico E2E sin conexión');
     await page.locator('form[action$="/consultations"]').evaluate((form) => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));

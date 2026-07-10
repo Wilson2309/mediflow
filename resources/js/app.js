@@ -8,6 +8,7 @@ const FINANCE_BLOCK_MESSAGE = 'No se puede registrar ni modificar pagos sin cone
 const ADMIN_BLOCK_MESSAGE = 'No se pueden realizar cambios administrativos sin conexión.';
 const SERVER_DOWN_MESSAGE = 'Servidor no disponible. Espere a que se restablezca la conexión.';
 const OFFLINE_MESSAGE = 'Sin conexión. Algunas acciones fueron bloqueadas para evitar pérdida o duplicación de datos.';
+const INTERNET_UNAVAILABLE_MESSAGE = 'Sin conexión a Internet. MediFlow local continúa disponible, pero algunas acciones están bloqueadas.';
 const RESTORED_MESSAGE = 'Conexión restablecida.';
 const DRAFT_DEFAULT_MESSAGE = 'No hay conexión. El formulario fue guardado como borrador local. Revísalo y envíalo cuando vuelva la conexión.';
 const CLINICAL_DRAFT_MESSAGE = 'No hay conexión. El contenido fue guardado como borrador local. Revísalo y envíalo cuando vuelva la conexión.';
@@ -20,10 +21,24 @@ const SENSITIVE_ACTION_PATTERNS = [
     { pattern: /\/prescriptions\/\d+\/(sign|send-email)(\/|$)/, message: 'No se puede firmar ni enviar recetas sin conexión.' },
 ];
 
-let connectionStatus = 'connected';
+const CONNECTION_STATES = Object.freeze({
+    ONLINE: 'ONLINE',
+    INTERNET_UNAVAILABLE: 'INTERNET_UNAVAILABLE',
+    SERVER_UNAVAILABLE: 'SERVER_UNAVAILABLE',
+    OFFLINE: 'OFFLINE',
+});
+let connection = {
+    state: navigator.onLine ? CONNECTION_STATES.ONLINE : CONNECTION_STATES.OFFLINE,
+    serverReachable: null,
+    internetReachable: null,
+    browserOnline: navigator.onLine,
+    lastCheckedAt: null,
+};
 let healthTimer = null;
 let toastTimer = null;
 let hadConnectivityIssue = false;
+let healthCheckId = 0;
+let healthController = null;
 
 function appContext() {
     return {
@@ -42,7 +57,7 @@ function draftKey(form) {
 }
 
 function isOnlineReady() {
-    return connectionStatus === 'connected';
+    return connection.state === CONNECTION_STATES.ONLINE;
 }
 
 function toast(message, tone = 'warning') {
@@ -78,25 +93,30 @@ function updateIndicator() {
     const label = indicator.querySelector('[data-connection-label]');
     const dot = indicator.querySelector('[data-connection-dot]');
     const states = {
-        connected: {
+        ONLINE: {
             text: 'Conectado',
             className: 'hidden items-center gap-2 rounded-full border border-[#10B981]/20 bg-[#10B981]/10 px-3 py-2 text-xs font-bold text-[#047857] sm:inline-flex',
             dotClass: 'h-2 w-2 rounded-full bg-[#10B981]',
         },
-        offline: {
+        INTERNET_UNAVAILABLE: {
+            text: 'Sin Internet',
+            className: 'hidden items-center gap-2 rounded-full border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-3 py-2 text-xs font-bold text-[#B45309] sm:inline-flex',
+            dotClass: 'h-2 w-2 rounded-full bg-[#F59E0B]',
+        },
+        OFFLINE: {
             text: 'Sin conexión',
             className: 'hidden items-center gap-2 rounded-full border border-[#EF4444]/20 bg-[#EF4444]/10 px-3 py-2 text-xs font-bold text-[#B91C1C] sm:inline-flex',
             dotClass: 'h-2 w-2 rounded-full bg-[#EF4444]',
         },
-        server_down: {
+        SERVER_UNAVAILABLE: {
             text: 'Servidor no disponible',
             className: 'hidden items-center gap-2 rounded-full border border-[#F59E0B]/30 bg-[#F59E0B]/10 px-3 py-2 text-xs font-bold text-[#B45309] sm:inline-flex',
             dotClass: 'h-2 w-2 rounded-full bg-[#F59E0B]',
         },
     };
-    const state = states[connectionStatus] || states.connected;
+    const state = states[connection.state] || states.ONLINE;
 
-    indicator.dataset.status = connectionStatus;
+    indicator.dataset.status = connection.state.toLowerCase();
     indicator.className = state.className;
     if (label) {
         label.textContent = state.text;
@@ -106,68 +126,117 @@ function updateIndicator() {
     }
 }
 
-function setConnectionStatus(nextStatus, notify = true) {
-    if (connectionStatus === nextStatus) {
-        updateOnlineOnlyElements();
-        window.dispatchEvent(new CustomEvent('mediflow:connection-change', {
-            detail: { status: connectionStatus },
-        }));
-        if (nextStatus === 'connected' && hadConnectivityIssue && notify) {
-            hadConnectivityIssue = false;
-            toast(RESTORED_MESSAGE, 'success');
-        }
-        return;
+function legacyConnectionStatus(state) {
+    if (state === CONNECTION_STATES.ONLINE) {
+        return 'connected';
     }
+    if (state === CONNECTION_STATES.SERVER_UNAVAILABLE) {
+        return 'server_down';
+    }
+    return 'offline';
+}
 
-    const previous = connectionStatus;
-    connectionStatus = nextStatus;
+function publishConnection() {
+    window.dispatchEvent(new CustomEvent('mediflow:connection-change', {
+        detail: {
+            ...connection,
+            status: legacyConnectionStatus(connection.state),
+        },
+    }));
+}
+
+function setConnection(nextConnection, notify = true) {
+    const previousState = connection.state;
+    const stateChanged = previousState !== nextConnection.state;
+    connection = { ...nextConnection };
     updateIndicator();
     updateOnlineOnlyElements();
-    window.dispatchEvent(new CustomEvent('mediflow:connection-change', {
-        detail: { status: connectionStatus },
-    }));
+    publishConnection();
 
-    if (nextStatus !== 'connected') {
+    if (connection.state !== CONNECTION_STATES.ONLINE) {
         hadConnectivityIssue = true;
     }
 
-    if (! notify) {
+    if (! notify || ! stateChanged) {
         return;
     }
 
-    if (nextStatus === 'offline') {
+    if (connection.state === CONNECTION_STATES.INTERNET_UNAVAILABLE) {
+        toast(INTERNET_UNAVAILABLE_MESSAGE);
+    } else if (connection.state === CONNECTION_STATES.OFFLINE) {
         toast(OFFLINE_MESSAGE);
-    } else if (nextStatus === 'server_down') {
+    } else if (connection.state === CONNECTION_STATES.SERVER_UNAVAILABLE) {
         toast(SERVER_DOWN_MESSAGE);
-    } else if (previous !== 'connected' || hadConnectivityIssue) {
+    } else if (previousState !== CONNECTION_STATES.ONLINE || hadConnectivityIssue) {
         hadConnectivityIssue = false;
         toast(RESTORED_MESSAGE, 'success');
     }
 }
 
-async function checkServerHealth(notify = true) {
-    if (! navigator.onLine) {
-        setConnectionStatus('offline', notify);
-        return;
+function deriveConnectionState(browserOnline, serverReachable, internetReachable) {
+    if (serverReachable && internetReachable) {
+        return CONNECTION_STATES.ONLINE;
     }
+    if (serverReachable) {
+        return CONNECTION_STATES.INTERNET_UNAVAILABLE;
+    }
+    if (! browserOnline) {
+        return CONNECTION_STATES.OFFLINE;
+    }
+    return CONNECTION_STATES.SERVER_UNAVAILABLE;
+}
 
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 5000);
-
+async function readHealth(url, signal) {
     try {
-        const response = await fetch('/app-health', {
+        const response = await fetch(url, {
             method: 'GET',
             headers: { Accept: 'application/json' },
             cache: 'no-store',
-            signal: controller.signal,
+            signal,
         });
-        const payload = response.ok ? await response.json() : null;
-        setConnectionStatus(payload?.ok === true ? 'connected' : 'server_down', notify);
+        return response.ok ? await response.json() : null;
     } catch (_error) {
-        setConnectionStatus('server_down', notify);
+        return null;
+    }
+}
+
+async function checkConnection(notify = true) {
+    const checkId = ++healthCheckId;
+    healthController?.abort();
+    healthController = new AbortController();
+    const controller = healthController;
+    const timeout = window.setTimeout(() => controller.abort(), 6500);
+    const browserOnline = navigator.onLine;
+
+    try {
+        const [appHealth, internetHealth] = await Promise.all([
+            readHealth('/app-health', controller.signal),
+            readHealth('/internet-health', controller.signal),
+        ]);
+
+        if (checkId !== healthCheckId) {
+            return connection;
+        }
+
+        const serverReachable = appHealth?.ok === true;
+        const internetReachable = serverReachable
+            && internetHealth?.ok === true
+            && internetHealth?.internet === true;
+        setConnection({
+            state: deriveConnectionState(browserOnline, serverReachable, internetReachable),
+            serverReachable,
+            internetReachable,
+            browserOnline,
+            lastCheckedAt: new Date().toISOString(),
+        }, notify);
     } finally {
         window.clearTimeout(timeout);
+        if (checkId === healthCheckId) {
+            healthController = null;
+        }
     }
+
+    return connection;
 }
 
 function markSensitiveElements() {
@@ -383,11 +452,16 @@ function initOfflineProtection() {
     document.addEventListener('click', preventOnlineOnlyAction, true);
     document.addEventListener('submit', preventOnlineOnlyAction, true);
 
-    window.addEventListener('offline', () => setConnectionStatus('offline'));
-    window.addEventListener('online', () => checkServerHealth(true));
+    window.addEventListener('offline', () => checkConnection(true));
+    window.addEventListener('online', () => checkConnection(true));
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            checkConnection(true);
+        }
+    });
 
-    checkServerHealth(false);
-    healthTimer = window.setInterval(() => checkServerHealth(true), 15000);
+    checkConnection(false);
+    healthTimer = window.setInterval(() => checkConnection(true), 15000);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -396,9 +470,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 window.addEventListener('beforeunload', () => window.clearInterval(healthTimer));
 window.MediFlowConnection = {
-    check: checkServerHealth,
+    check: checkConnection,
+    states: CONNECTION_STATES,
+    get state() {
+        return connection.state;
+    },
     get status() {
-        return connectionStatus;
+        return legacyConnectionStatus(connection.state);
+    },
+    get serverReachable() {
+        return connection.serverReachable;
+    },
+    get internetReachable() {
+        return connection.internetReachable;
+    },
+    get browserOnline() {
+        return connection.browserOnline;
+    },
+    get lastCheckedAt() {
+        return connection.lastCheckedAt;
     },
     saveDraft,
     draftKey,

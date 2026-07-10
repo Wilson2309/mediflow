@@ -7,7 +7,52 @@ import {
 
 const HISTORY_LIMIT = 50;
 const POSITION_MARGIN = 8;
-const MIN_SEARCH_SCORE = 40;
+const MIN_SEARCH_SCORE = 62;
+const MIN_AMBIGUITY_SCORE = 30;
+const AMBIGUITY_DELTA = 10;
+const STOP_WORDS = new Set([
+    'como', 'puedo', 'podria', 'quiero', 'necesito', 'una', 'un', 'el', 'la',
+    'los', 'las', 'para', 'por', 'favor', 'me', 'se',
+]);
+const PHRASE_EQUIVALENCES = new Map([
+    ['receta medica', 'receta'],
+    ['usuario clinico', 'paciente'],
+    ['registrar pago', 'crear pago'],
+    ['confirmar pago', 'crear pago'],
+    ['sin conexion', 'conexion'],
+]);
+const WORD_EQUIVALENCES = new Map([
+    ['creo', 'crear'], ['hacer', 'crear'], ['hago', 'crear'], ['generar', 'crear'],
+    ['genero', 'crear'], ['elaborar', 'crear'], ['emitir', 'crear'], ['registro', 'crear'],
+    ['registrar', 'crear'], ['agendar', 'crear'], ['agendo', 'crear'],
+    ['prescripcion', 'receta'], ['recetario', 'receta'],
+    ['turno', 'cita'], ['agendamiento', 'cita'],
+    ['cobrar', 'crear pago'], ['cobro', 'crear pago'],
+    ['descargar', 'exportar'], ['bajar', 'exportar'],
+    ['informe', 'reporte'],
+    ['internet', 'conexion'], ['red', 'conexion'], ['offline', 'conexion'],
+]);
+const SAFE_SINGULARS = new Map([
+    ['recetas', 'receta'], ['prescripciones', 'receta'], ['citas', 'cita'],
+    ['turnos', 'cita'], ['pagos', 'pago'], ['pacientes', 'paciente'],
+    ['recibos', 'recibo'], ['reportes', 'reporte'], ['informes', 'reporte'],
+    ['consultas', 'consulta'], ['usuarios', 'usuario'], ['borradores', 'borrador'],
+    ['historias', 'historia'], ['clinicas', 'clinica'], ['acciones', 'accion'],
+]);
+const MODULE_TOKENS = Object.freeze({
+    patients: ['paciente'],
+    appointments: ['cita'],
+    payments: ['pago', 'recibo'],
+    prescriptions: ['receta'],
+    reports: ['reporte'],
+    consultations: ['consulta'],
+    'medical-records': ['historia', 'historial'],
+    users: ['usuario'],
+    settings: ['configuracion', 'clinica'],
+    audit: ['auditoria'],
+    'super-admin': ['clinica', 'suscripcion'],
+    connection: ['conexion'],
+});
 const SENSITIVE_INPUT = [
     /\b(?:password|contrase(?:n|ñ)a|token|cvv|cvc|api[ _-]?key|clave secreta)\b/i,
     /\b(?:tarjeta|card)\b[^\n]{0,20}\d/i,
@@ -17,13 +62,25 @@ const SENSITIVE_INPUT = [
 ];
 
 export function normalizeAssistantText(value = '') {
-    return String(value)
+    let normalized = String(value)
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase()
         .replace(/[^a-z0-9\s]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+
+    PHRASE_EQUIVALENCES.forEach((replacement, phrase) => {
+        normalized = normalized.replace(new RegExp(`\\b${phrase}\\b`, 'g'), replacement);
+    });
+
+    const tokens = normalized
+        .split(' ')
+        .flatMap((token) => String(WORD_EQUIVALENCES.get(token) || token).split(' '))
+        .map((token) => SAFE_SINGULARS.get(token) || token)
+        .filter((token) => token && ! STOP_WORDS.has(token));
+
+    return tokens.filter((token, index) => token !== tokens[index - 1]).join(' ');
 }
 
 function safeKeyPart(value, fallback) {
@@ -44,85 +101,149 @@ function wildcardRouteMatches(pattern, route) {
 }
 
 function isOfflineEntry(entry) {
-    return entry.id.startsWith('offline-');
+    return entry.id.startsWith('offline-') || entry.id.includes('-offline-');
 }
 
-function tokenSimilarity(question, keyword) {
-    const questionTokens = new Set(question.split(' ').filter((token) => token.length > 2));
-    const keywordTokens = keyword.split(' ').filter((token) => token.length > 2);
-
-    if (! keywordTokens.length) {
-        return 0;
-    }
-
-    const matched = keywordTokens.filter((token) => questionTokens.has(token)).length;
-    return matched / keywordTokens.length;
+function normalizeConnectionState(value) {
+    const states = {
+        connected: 'ONLINE',
+        online: 'ONLINE',
+        offline: 'OFFLINE',
+        server_down: 'SERVER_UNAVAILABLE',
+        server_unavailable: 'SERVER_UNAVAILABLE',
+        internet_unavailable: 'INTERNET_UNAVAILABLE',
+    };
+    const normalized = String(value || '').toLowerCase();
+    return states[normalized] || (String(value || '').toUpperCase() || 'ONLINE');
 }
 
-export function findKnowledgeAnswer(question, context, connectionStatus = 'connected') {
-    const normalizedQuestion = normalizeAssistantText(question);
-    if (! normalizedQuestion) {
-        return null;
-    }
+function tokensFor(value) {
+    return new Set(normalizeAssistantText(value).split(' ').filter((token) => token.length > 1));
+}
 
-    const disconnected = connectionStatus !== 'connected';
-    let bestMatch = null;
+function inferredIntent(tokens) {
+    const intentTokens = [
+        ['create', ['crear', 'nuevo', 'nueva']],
+        ['sign', ['firmar', 'firma']],
+        ['send', ['enviar', 'correo', 'compartir']],
+        ['export', ['exportar', 'imprimir']],
+        ['update', ['editar', 'actualizar', 'corregir', 'cambiar']],
+        ['cancel', ['cancelar', 'anular']],
+        ['restore', ['restaurar', 'recuperar']],
+        ['view', ['ver', 'revisar', 'consultar', 'buscar']],
+        ['troubleshoot', ['no', 'bloqueado', 'bloqueada', 'conexion']],
+    ];
+    return intentTokens.find(([, candidates]) => candidates.some((token) => tokens.has(token)))?.[0] || null;
+}
 
-    MEDIFLOW_KNOWLEDGE_BASE
-        .filter((entry) => entry.roles.includes(context.role))
-        .filter((entry) => disconnected || ! isOfflineEntry(entry))
-        .forEach((entry) => {
-            let score = 0;
-            let textScore = 0;
-            const normalizedKnownQuestion = normalizeAssistantText(entry.question);
+function entryModule(entry) {
+    return entry.module || entry.modules[0] || 'general';
+}
 
-            if (normalizedQuestion === normalizedKnownQuestion) {
-                textScore = 120;
-            } else if (normalizedKnownQuestion.includes(normalizedQuestion) && normalizedQuestion.length >= 8) {
-                textScore = Math.max(textScore, 52);
-            }
+function queryModules(tokens) {
+    return Object.entries(MODULE_TOKENS)
+        .filter(([, candidates]) => candidates.some((token) => tokens.has(token)))
+        .map(([module]) => module);
+}
 
-            entry.keywords.forEach((keyword) => {
-                const normalizedKeyword = normalizeAssistantText(keyword);
-                if (normalizedQuestion === normalizedKeyword) {
-                    textScore = Math.max(textScore, 100);
-                } else if (normalizedQuestion.includes(normalizedKeyword)) {
-                    textScore = Math.max(textScore, 70);
-                } else {
-                    const similarity = tokenSimilarity(normalizedQuestion, normalizedKeyword);
-                    if (similarity === 1 && normalizedKeyword.length >= 6) {
-                        textScore = Math.max(textScore, 54);
-                    } else if (similarity >= 0.66) {
-                        textScore = Math.max(textScore, 35);
-                    }
-                }
-            });
+function candidateScore(entry, normalizedQuestion, questionTokens, context, disconnected) {
+    const knownQuestions = [entry.question, ...(entry.aliases || [])].map(normalizeAssistantText);
+    const keywords = (entry.keywords || []).map(normalizeAssistantText);
+    const searchable = [...knownQuestions, ...keywords].filter(Boolean);
+    const module = entryModule(entry);
+    const identifiedModules = queryModules(questionTokens);
+    const moduleMatched = identifiedModules.some((identified) => identified === module || entry.modules.includes(identified));
+    const questionIntent = inferredIntent(questionTokens);
+    const entryAction = normalizeAssistantText(entry.action || '').split(' ')[0];
+    const actionMatched = entryAction && questionTokens.has(entryAction);
+    let score = 0;
 
-            if (textScore === 0) {
-                return;
-            }
+    if (knownQuestions.includes(normalizedQuestion)) {
+        score = 140;
+    } else if (keywords.includes(normalizedQuestion)) {
+        score = 108;
+    } else {
+        if (entry.intent && questionIntent === entry.intent && moduleMatched) {
+            score = Math.max(score, 84);
+        } else if (actionMatched && moduleMatched) {
+            score = Math.max(score, 74);
+        }
 
-            score += textScore;
-            if (entry.modules.includes(context.module)) {
-                score += 24;
-            }
-            if (entry.routes.some((pattern) => wildcardRouteMatches(pattern, context.route))) {
-                score += 16;
-            }
-            if (disconnected && isOfflineEntry(entry)) {
-                score += 32;
-            }
+        searchable.forEach((knownText) => {
+            const knownTokens = tokensFor(knownText);
+            const overlap = [...knownTokens].filter((token) => questionTokens.has(token)).length;
+            const coverage = knownTokens.size ? overlap / knownTokens.size : 0;
 
-            if (! bestMatch || score > bestMatch.score) {
-                bestMatch = { entry, score };
+            if ((knownText.includes(normalizedQuestion) || normalizedQuestion.includes(knownText))
+                && knownTokens.size >= 2
+                && questionTokens.size >= 2) {
+                score = Math.max(score, 76);
+            } else if (overlap >= 2 && coverage >= 0.66) {
+                score = Math.max(score, 58);
+            } else if (moduleMatched && overlap >= 1) {
+                score = Math.max(score, 46);
             }
         });
 
-    return bestMatch && bestMatch.score >= MIN_SEARCH_SCORE ? bestMatch.entry : null;
+        if (moduleMatched) {
+            score = Math.max(score, 30);
+        }
+    }
+
+    if (score > 0 && entry.modules.includes(context.module)) {
+        score += 10;
+    }
+    if (score > 0 && entry.routes.some((pattern) => wildcardRouteMatches(pattern, context.route))) {
+        score += 5;
+    }
+    if (score > 0 && disconnected && isOfflineEntry(entry)) {
+        score += 12;
+    }
+
+    return score;
 }
 
-export function quickQuestionsFor(context, connectionStatus = 'connected') {
-    const disconnected = connectionStatus !== 'connected';
+export function searchKnowledge(question, context, connectionStatus = 'ONLINE') {
+    const normalizedQuestion = normalizeAssistantText(question);
+    if (! normalizedQuestion) {
+        return { entry: null, alternatives: [] };
+    }
+
+    const connectionState = normalizeConnectionState(connectionStatus);
+    const disconnected = connectionState !== 'ONLINE';
+    const questionTokens = tokensFor(normalizedQuestion);
+    const candidates = MEDIFLOW_KNOWLEDGE_BASE
+        .filter((entry) => entry.roles.includes(context.role))
+        .filter((entry) => disconnected || ! isOfflineEntry(entry))
+        .map((entry) => ({ entry, score: candidateScore(entry, normalizedQuestion, questionTokens, context, disconnected) }))
+        .filter((candidate) => candidate.score > 0)
+        .sort((left, right) => right.score - left.score);
+
+    const best = candidates[0];
+    if (! best) {
+        return { entry: null, alternatives: [] };
+    }
+
+    const closeCandidates = candidates.filter((candidate) =>
+        candidate.score >= MIN_AMBIGUITY_SCORE
+        && best.score - candidate.score <= AMBIGUITY_DELTA);
+    const ambiguous = closeCandidates.length > 1 && best.score < 130;
+
+    if (ambiguous || (best.score < MIN_SEARCH_SCORE && closeCandidates.length > 1)) {
+        return { entry: null, alternatives: closeCandidates.slice(0, 3).map((candidate) => candidate.entry) };
+    }
+
+    return best.score >= MIN_SEARCH_SCORE
+        ? { entry: best.entry, alternatives: [] }
+        : { entry: null, alternatives: [] };
+}
+
+export function findKnowledgeAnswer(question, context, connectionStatus = 'ONLINE') {
+    return searchKnowledge(question, context, connectionStatus).entry;
+}
+
+export function quickQuestionsFor(context, connectionStatus = 'ONLINE') {
+    const disconnected = normalizeConnectionState(connectionStatus) !== 'ONLINE';
     const allowed = MEDIFLOW_KNOWLEDGE_BASE.filter((entry) => entry.roles.includes(context.role));
     const selected = [];
     const seen = new Set();
@@ -163,10 +284,13 @@ function readableTime(value) {
 }
 
 function connectionSnapshot() {
-    if (window.MediFlowConnection?.status) {
-        return window.MediFlowConnection.status;
+    if (window.MediFlowConnection?.state) {
+        return window.MediFlowConnection.state;
     }
-    return navigator.onLine ? 'connected' : 'offline';
+    if (window.MediFlowConnection?.status) {
+        return normalizeConnectionState(window.MediFlowConnection.status);
+    }
+    return navigator.onLine ? 'ONLINE' : 'OFFLINE';
 }
 
 function storageRead(key, fallback) {
@@ -187,12 +311,39 @@ function storageWrite(key, value) {
 }
 
 function buildAnswerContent(entry, connectionStatus) {
-    const lines = [entry.answer];
-    entry.steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`));
-    if (entry.requiresConnection && connectionStatus !== 'connected') {
-        lines.push('Esta guía describe una acción que requiere conexión. Puedes revisarla ahora y continuar cuando MediFlow vuelva a estar conectado.');
+    const state = normalizeConnectionState(connectionStatus);
+    const roleConnectionAnswers = {
+        'offline-reception': 'Actualmente no hay conexión a Internet. MediFlow local continúa disponible y puedes conservar borradores de pacientes y citas. Restáuralos, revísalos y envíalos manualmente cuando vuelva la conexión.',
+        'offline-cash': 'Actualmente no hay conexión a Internet. MediFlow bloquea los pagos y movimientos financieros para evitar duplicaciones o inconsistencias.',
+        'offline-doctor': 'Actualmente no hay conexión a Internet. Puedes conservar borradores clínicos, pero MediFlow bloquea la firma y el envío de recetas hasta recuperar la conexión.',
+        'offline-admin': 'Actualmente no hay conexión a Internet. MediFlow local continúa disponible, pero las acciones administrativas y financieras críticas permanecen bloqueadas.',
+        'offline-super-admin': 'Actualmente no hay conexión a Internet. Las acciones globales críticas permanecen bloqueadas hasta recuperar la conexión.',
+        'prescriptions-offline-sign': 'Actualmente no hay conexión a Internet. MediFlow bloquea la firma y el envío de recetas porque son acciones oficiales. Puedes conservar un borrador local y completarlas cuando vuelva la conexión.',
+    };
+    let answer = entry.answer;
+
+    if (state === 'INTERNET_UNAVAILABLE' && roleConnectionAnswers[entry.id]) {
+        answer = roleConnectionAnswers[entry.id];
+    } else if (state === 'SERVER_UNAVAILABLE' && (isOfflineEntry(entry) || entry.id === 'prescriptions-offline-sign')) {
+        answer = 'No se puede establecer comunicación con el servidor MediFlow.';
+    }
+
+    const lines = [answer];
+    (entry.steps || []).forEach((step, index) => lines.push(`${index + 1}. ${step}`));
+    if (entry.requiresConnection && state !== 'ONLINE') {
+        const connectionNotes = {
+            INTERNET_UNAVAILABLE: 'Esta acción requiere Internet. Puedes revisar la guía ahora y continuar cuando la conexión se restablezca.',
+            SERVER_UNAVAILABLE: 'Esta acción requiere comunicación con el servidor MediFlow. Inténtala nuevamente cuando el servidor responda.',
+            OFFLINE: 'Esta acción requiere conexión. Puedes revisar la guía ahora y continuar cuando MediFlow vuelva a estar conectado.',
+        };
+        lines.push(connectionNotes[state] || connectionNotes.OFFLINE);
     }
     return lines.join('\n');
+}
+
+function ambiguityContent(entries) {
+    const options = entries.map((entry) => `- ${entry.ambiguityLabel || entry.question.replace(/[¿?]/g, '')}`);
+    return ['¿Te refieres a alguna de estas opciones?', '', ...options].join('\n');
 }
 
 function createElement(tag, className, text) {
@@ -317,7 +468,7 @@ class MediFlowAssistant {
         this.bindDrag(this.root.querySelector('[data-assistant-drag-handle]'), false);
 
         window.addEventListener('mediflow:connection-change', (event) => {
-            this.updateConnection(event.detail?.status || connectionSnapshot());
+            this.updateConnection(event.detail?.state || event.detail?.status || connectionSnapshot());
         });
         window.addEventListener('offline', () => queueMicrotask(() => this.updateConnection(connectionSnapshot())));
         window.addEventListener('online', () => window.setTimeout(() => this.updateConnection(connectionSnapshot()), 0));
@@ -436,8 +587,15 @@ class MediFlowAssistant {
         }
 
         this.addMessage('user', question);
-        const entry = directEntry || findKnowledgeAnswer(question, this.context, this.connectionStatus);
+        const result = directEntry
+            ? { entry: directEntry, alternatives: [] }
+            : searchKnowledge(question, this.context, this.connectionStatus);
+        const entry = result.entry;
         if (! entry) {
+            if (result.alternatives.length) {
+                this.addMessage('assistant', ambiguityContent(result.alternatives));
+                return;
+            }
             this.addMessage('assistant', UNKNOWN_ANSWER);
             this.elements.escalation.hidden = false;
             return;
@@ -458,14 +616,15 @@ class MediFlowAssistant {
     }
 
     updateConnection(status) {
-        const normalizedStatus = ['connected', 'offline', 'server_down'].includes(status) ? status : 'connected';
+        const normalizedStatus = normalizeConnectionState(status);
         this.connectionStatus = normalizedStatus;
         const states = {
-            connected: { label: 'Conectado', tone: 'connected' },
-            offline: { label: 'Sin conexión', tone: 'offline' },
-            server_down: { label: 'Servidor no disponible', tone: 'server-down' },
+            ONLINE: { label: 'Conectado', tone: 'connected' },
+            INTERNET_UNAVAILABLE: { label: 'Sin Internet', tone: 'internet-unavailable' },
+            SERVER_UNAVAILABLE: { label: 'Servidor no disponible', tone: 'server-down' },
+            OFFLINE: { label: 'Sin conexión', tone: 'offline' },
         };
-        const state = states[normalizedStatus];
+        const state = states[normalizedStatus] || states.ONLINE;
         this.elements.connection.dataset.status = state.tone;
         this.elements.connectionLabel.textContent = state.label;
         this.renderQuickQuestions();
@@ -550,9 +709,10 @@ class MediFlowAssistant {
 
     async copySupportDetails() {
         const statusLabels = {
-            connected: 'Conectado',
-            offline: 'Sin conexión',
-            server_down: 'Servidor no disponible',
+            ONLINE: 'Conectado',
+            INTERNET_UNAVAILABLE: 'Sin Internet',
+            SERVER_UNAVAILABLE: 'Servidor no disponible',
+            OFFLINE: 'Sin conexión',
         };
         const details = [
             `Rol: ${this.context.role}`,
