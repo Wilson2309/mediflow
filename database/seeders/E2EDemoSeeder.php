@@ -18,6 +18,11 @@ class E2EDemoSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call([
+            RoleSeeder::class,
+            PermissionSeeder::class,
+        ]);
+
         // 1. Create or get the main clinic
         $clinic = Clinic::firstOrCreate(
             ['ruc' => '0999999999001'],
@@ -26,6 +31,16 @@ class E2EDemoSeeder extends Seeder
                 'address' => 'Av. Principal E2E',
                 'phone' => '0999999999',
                 'email' => 'contacto@mediflow-e2e.com',
+                'status' => 'active',
+            ]
+        );
+        $secondaryClinic = Clinic::firstOrCreate(
+            ['ruc' => '0999999999002'],
+            [
+                'name' => 'MediFlow Clinica E2E Secundaria',
+                'address' => 'Av. Secundaria E2E',
+                'phone' => '0988888877',
+                'email' => 'secundaria@mediflow-e2e.com',
                 'status' => 'active',
             ]
         );
@@ -73,6 +88,30 @@ class E2EDemoSeeder extends Seeder
             ]
         );
         $doctorUser->syncRoles(['medico']);
+
+        $admin->forceFill([
+            'clinic_id' => $clinic->id,
+            'current_clinic_id' => $clinic->id,
+        ])->save();
+        $admin->clinics()->syncWithoutDetaching([$clinic->id, $secondaryClinic->id]);
+
+        foreach ([$receptionist, $cashier, $doctorUser] as $clinicUser) {
+            $clinicUser->forceFill([
+                'clinic_id' => $clinic->id,
+                'current_clinic_id' => $clinic->id,
+            ])->save();
+            $clinicUser->clinics()->syncWithoutDetaching([$clinic->id]);
+        }
+
+        $superAdmin = User::firstOrCreate(
+            ['email' => 'superadmin@mediflow.com'],
+            [
+                'name' => 'Super Admin E2E',
+                'password' => Hash::make('Password123*'),
+                'status' => 'active',
+            ]
+        );
+        $superAdmin->syncRoles(['super_admin']);
 
         // Associate a Specialty and Doctor record
         $specialty = Specialty::firstOrCreate(

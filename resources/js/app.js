@@ -1,4 +1,5 @@
 import Alpine from 'alpinejs';
+import { initMediFlowAssistant } from './assistant/mediflow-assistant.js';
 
 window.Alpine = Alpine;
 
@@ -108,6 +109,9 @@ function updateIndicator() {
 function setConnectionStatus(nextStatus, notify = true) {
     if (connectionStatus === nextStatus) {
         updateOnlineOnlyElements();
+        window.dispatchEvent(new CustomEvent('mediflow:connection-change', {
+            detail: { status: connectionStatus },
+        }));
         if (nextStatus === 'connected' && hadConnectivityIssue && notify) {
             hadConnectivityIssue = false;
             toast(RESTORED_MESSAGE, 'success');
@@ -119,6 +123,9 @@ function setConnectionStatus(nextStatus, notify = true) {
     connectionStatus = nextStatus;
     updateIndicator();
     updateOnlineOnlyElements();
+    window.dispatchEvent(new CustomEvent('mediflow:connection-change', {
+        detail: { status: connectionStatus },
+    }));
 
     if (nextStatus !== 'connected') {
         hadConnectivityIssue = true;
@@ -383,7 +390,10 @@ function initOfflineProtection() {
     healthTimer = window.setInterval(() => checkServerHealth(true), 15000);
 }
 
-document.addEventListener('DOMContentLoaded', initOfflineProtection);
+document.addEventListener('DOMContentLoaded', () => {
+    initOfflineProtection();
+    initMediFlowAssistant();
+});
 window.addEventListener('beforeunload', () => window.clearInterval(healthTimer));
 window.MediFlowConnection = {
     check: checkServerHealth,

@@ -44,6 +44,10 @@
                     </div>
                 </main>
             </div>
+
+            @auth
+                <x-mediflow-assistant />
+            @endauth
         </div>
     </body>
 </html>
