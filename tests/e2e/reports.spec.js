@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from './helpers/auth.js';
+import { loginAs, logout } from './helpers/auth.js';
 
 const currentDate = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Guayaquil' }).format(new Date());
 
 test.describe('Reports by role', () => {
   test('Cashier only sees financial reports, exports CSV and Excel, and can open financial audit', async ({ page }) => {
-    await login(page, 'caja@mediflow.com', 'Password123*');
+    await loginAs(page, 'cash');
 
     await page.goto('/dashboard');
     await expect(page.getByText(/siguiente fase|proxima fase/i)).toHaveCount(0);
@@ -64,7 +64,7 @@ test.describe('Reports by role', () => {
   });
 
   test('Admin sees every report section and global audit remains separate', async ({ page }) => {
-    await login(page, 'admin@mediflow.com', 'Admin123*');
+    await loginAs(page, 'admin');
     await page.goto('/reports');
 
     await expect(page.getByRole('heading', { name: /Resumen ejecutivo/i })).toBeVisible();
@@ -80,7 +80,7 @@ test.describe('Reports by role', () => {
   });
 
   test('Doctor can export own appointment reports but cannot open financial reports or audit', async ({ page }) => {
-    await login(page, 'medico@mediflow.com', 'Password123*');
+    await loginAs(page, 'doctor');
 
     await page.goto('/reports');
     await expect(page).toHaveURL(/\/reports\/appointments/);

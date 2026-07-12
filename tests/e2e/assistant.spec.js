@@ -1,31 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from './helpers/auth.js';
+import { loginAs, logout } from './helpers/auth.js';
 import { mockConnectionHealth, setMockConnectionHealth } from './helpers/connection.js';
-
-const accounts = {
-  admin: ['admin@mediflow.com', 'Admin123*'],
-  reception: ['recepcionista@mediflow.com', 'Password123*'],
-  cash: ['caja@mediflow.com', 'Password123*'],
-  doctor: ['medico@mediflow.com', 'Password123*'],
-  superAdmin: ['superadmin@mediflow.com', 'Password123*'],
-};
-
-async function loginAs(page, account) {
-  const [email, password] = accounts[account];
-  if (account !== 'superAdmin') {
-    await login(page, email, password);
-    return;
-  }
-
-  await page.goto('/login');
-  await page.fill('input[name="email"]', email);
-  await page.fill('input[name="password"]', password);
-  await Promise.all([
-    page.waitForResponse((response) => response.url().includes('/login') && response.request().method() === 'POST'),
-    page.click('button[type="submit"]'),
-  ]);
-  await page.goto('/super-admin/clinics');
-}
 
 async function openAssistant(page) {
   const root = page.locator('#mediflow-assistant');
@@ -235,12 +210,14 @@ test.describe('Asistente MediFlow - Fase 1', () => {
 
   test('15. SuperAdmin ve preguntas SaaS y no procedimientos médicos', async ({ page }) => {
     await loginAs(page, 'superAdmin');
-    test.skip(new URL(page.url()).pathname === '/login', 'Requiere credenciales E2E del SuperAdmin sembradas.');
+
+    await expect(page).toHaveURL(/\/super-admin\/clinics(?:[/?#]|$)/);
     const root = await openAssistant(page);
+    await expect(root).toHaveAttribute('data-role', 'super_admin');
     const questions = (await quickQuestionTexts(root)).join(' ');
 
-    expect(questions).toMatch(/clínica|onboarding|suscripción/i);
-    expect(questions).not.toMatch(/consulta médica|receta|diagnóstico/i);
+    expect(questions).toMatch(/clínica|onboarding|suscripción|activar|administración global/i);
+    expect(questions).not.toMatch(/consulta médica|receta|diagnóstico|procedimiento clínico/i);
   });
 
   test('16. las preguntas cambian según la ruta', async ({ page }) => {

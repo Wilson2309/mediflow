@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from './helpers/auth.js';
+import { loginAs, logout } from './helpers/auth.js';
 import { createUniquePatientData } from './helpers/data.js';
 import { mockConnectionHealth, setMockConnectionHealth } from './helpers/connection.js';
 
@@ -37,7 +37,7 @@ test.describe('Offline protection', () => {
   });
 
   test('app-health and internet-health available show detailed online state', async ({ page }) => {
-    await login(page, 'admin@mediflow.com', 'Admin123*');
+    await loginAs(page, 'admin');
     await page.goto('/dashboard');
     await page.evaluate(() => window.MediFlowConnection?.check?.(false));
 
@@ -59,7 +59,7 @@ test.describe('Offline protection', () => {
   });
 
   test('app available without internet shows Sin Internet only once per state', async ({ page }) => {
-    await login(page, 'admin@mediflow.com', 'Admin123*');
+    await loginAs(page, 'admin');
     await page.goto('/dashboard');
 
     await goWithoutInternet(page);
@@ -69,7 +69,7 @@ test.describe('Offline protection', () => {
   });
 
   test('app-health failure while browser is online shows server unavailable', async ({ page }) => {
-    await login(page, 'admin@mediflow.com', 'Admin123*');
+    await loginAs(page, 'admin');
     await page.goto('/dashboard');
 
     await setMockConnectionHealth(page, { serverReachable: false, internetReachable: false });
@@ -80,7 +80,7 @@ test.describe('Offline protection', () => {
   });
 
   test('shows offline and restored connection status', async ({ page }) => {
-    await login(page, 'admin@mediflow.com', 'Admin123*');
+    await loginAs(page, 'admin');
     await page.goto('/dashboard');
     await expect(page.locator('#connection-status')).toContainText('Conectado');
 
@@ -92,7 +92,7 @@ test.describe('Offline protection', () => {
   });
 
   test('cashier cannot create or submit payments offline', async ({ page }) => {
-    await login(page, 'caja@mediflow.com', 'Password123*');
+    await loginAs(page, 'cash');
     await page.goto('/payments');
 
     await goWithoutInternet(page);
@@ -114,7 +114,7 @@ test.describe('Offline protection', () => {
   test('reception saves and restores patient draft offline', async ({ page }) => {
     const patientData = createUniquePatientData();
 
-    await login(page, 'recepcionista@mediflow.com', 'Password123*');
+    await loginAs(page, 'reception');
     await page.goto('/patients/create');
     await goWithoutInternet(page);
 
@@ -137,7 +137,7 @@ test.describe('Offline protection', () => {
   });
 
   test('doctor saves clinical drafts and cannot run official prescription actions offline', async ({ page }) => {
-    await login(page, 'medico@mediflow.com', 'Password123*');
+    await loginAs(page, 'doctor');
     await page.goto('/consultations/create');
     await goWithoutInternet(page);
 

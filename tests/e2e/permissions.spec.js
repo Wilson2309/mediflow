@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from './helpers/auth.js';
+import { loginAs, logout } from './helpers/auth.js';
 
 test.describe('Role Based Permissions', () => {
 
   test('Doctor cannot access new patient and payment routes', async ({ page }) => {
-    await login(page, 'medico@mediflow.com', 'Password123*');
+    await loginAs(page, 'doctor');
     
     // Attempt to access patients creation
     const response = await page.goto('/patients/create');
@@ -18,7 +18,7 @@ test.describe('Role Based Permissions', () => {
   });
 
   test('Cashier cannot access consultations', async ({ page }) => {
-    await login(page, 'caja@mediflow.com', 'Password123*');
+    await loginAs(page, 'cash');
     
     const response = await page.goto('/consultations');
     expect(response?.status()).toBe(403);
@@ -27,7 +27,7 @@ test.describe('Role Based Permissions', () => {
   });
 
   test('Receptionist cannot access prescriptions', async ({ page }) => {
-    await login(page, 'recepcionista@mediflow.com', 'Password123*');
+    await loginAs(page, 'reception');
     
     const response = await page.goto('/prescriptions');
     expect(response?.status()).toBe(403);

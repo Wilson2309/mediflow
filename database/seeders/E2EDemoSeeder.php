@@ -103,14 +103,17 @@ class E2EDemoSeeder extends Seeder
             $clinicUser->clinics()->syncWithoutDetaching([$clinic->id]);
         }
 
-        $superAdmin = User::firstOrCreate(
-            ['email' => 'superadmin@mediflow.com'],
+        $superAdmin = User::updateOrCreate(
+            ['email' => 'superadmin.e2e@mediflow.test'],
             [
                 'name' => 'Super Admin E2E',
                 'password' => Hash::make('Password123*'),
+                'clinic_id' => null,
+                'current_clinic_id' => null,
                 'status' => 'active',
             ]
         );
+        $superAdmin->forceFill(['email_verified_at' => now()])->save();
         $superAdmin->syncRoles(['super_admin']);
 
         // Associate a Specialty and Doctor record

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from './helpers/auth.js';
+import { loginAs, logout } from './helpers/auth.js';
 import { createUniquePatientData, createUniqueAppointmentData } from './helpers/data.js';
 
 test.describe('Reception -> Cashier -> Doctor Flow', () => {
@@ -11,7 +11,7 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     const futureDate = new Date(Date.now() + (90 + Math.floor(Math.random() * 90)) * 24 * 60 * 60 * 1000);
     const appointmentDate = futureDate.toISOString().slice(0, 10);
 
-    await login(page, 'recepcionista@mediflow.com', 'Password123*');
+    await loginAs(page, 'reception');
     await page.goto('/patients');
     await page.click('text=Nuevo Paciente');
 
@@ -85,7 +85,7 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     await expect(page.getByRole('button', { name: selectedSlot })).toHaveCount(0);
     await logout(page);
 
-    await login(page, 'caja@mediflow.com', 'Password123*');
+    await loginAs(page, 'cash');
     await page.goto('/daily-agenda?date=' + appointmentDate + '&search=' + encodeURIComponent(patientData.first_name));
     await expect(page.getByRole('heading', { name: /Agenda del d.a/i })).toBeVisible();
     await expect(page.getByText(patientData.first_name).first()).toBeVisible();
@@ -119,7 +119,7 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     await expect(page.getByText(expectedAmount).first()).toBeVisible();
     await logout(page);
 
-    await login(page, 'medico@mediflow.com', 'Password123*');
+    await loginAs(page, 'doctor');
     const doctorReceiptResponse = await page.goto(`/payments/${paymentId}/receipt/print`);
     expect(doctorReceiptResponse.status()).toBe(403);
     await page.goto('/daily-agenda?date=' + appointmentDate + '&search=' + encodeURIComponent(patientData.first_name));
@@ -128,7 +128,7 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
     await expect(page.locator('td', { hasText: 'Pagado' }).getByText('Pagado')).toHaveCount(1);
     await logout(page);
 
-    await login(page, 'admin@mediflow.com', 'Admin123*');
+    await loginAs(page, 'admin');
     await page.goto('/dashboard');
     await expect(page.getByRole('heading', { name: /Dashboard/i })).toBeVisible();
     await logout(page);
