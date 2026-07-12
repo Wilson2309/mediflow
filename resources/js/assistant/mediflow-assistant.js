@@ -10,6 +10,9 @@ import {
 } from './knowledge-base.js';
 
 const HISTORY_LIMIT = 50;
+const REMOTE_ENDPOINT = '/assistant/message';
+const REMOTE_TIMEOUT_MS = 17000;
+const SENSITIVE_ANSWER = 'No puedo procesar esa pregunta porque parece contener información sensible. Reformúlala sin nombres de pacientes, identificaciones ni datos clínicos.';
 const POSITION_MARGIN = 8;
 const MIN_SEARCH_SCORE = 62;
 const MIN_AMBIGUITY_SCORE = 30;
@@ -61,7 +64,10 @@ const SENSITIVE_INPUT = [
     /\b(?:password|contrase(?:n|ñ)a|token|cvv|cvc|api[ _-]?key|clave secreta)\b/i,
     /\b(?:tarjeta|card)\b[^\n]{0,20}\d/i,
     /\b\d{7,}\b/,
+    /(?:\+?\d[\d\s().-]{8,}\d)/,
     /\b(?:paciente|diagn[oó]stico|pago|monto|c[eé]dula|identificaci[oó]n)\s*[:=]/i,
+    /\b(?:diagn[oó]stico|historia cl[ií]nica|receta)\s+de\s+[^?.,]{2,}/i,
+    /\b(?:paciente|c[eé]dula)\s+(?!m[eé]dico|nuevo|nueva|sin\b|con\b|debo\b|puedo\b|se\b|est[aá]\b)[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ'-]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ'-]+)+/,
     /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
 ];
 
@@ -363,6 +369,31 @@ function createElement(tag, className, text) {
     return element;
 }
 
+function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+}
+
+function remoteAnswerContent(payload) {
+    if (! payload || typeof payload.answer !== 'string' || ! payload.answer.trim()) {
+        return null;
+    }
+
+    const answer = payload.answer.trim().slice(0, 2000);
+    const steps = Array.isArray(payload.steps)
+        ? payload.steps.filter((step) => typeof step === 'string' && step.trim()).slice(0, 10)
+        : [];
+    const suggestions = Array.isArray(payload.suggestions)
+        ? payload.suggestions.filter((suggestion) => typeof suggestion === 'string' && suggestion.trim()).slice(0, 5)
+        : [];
+    const lines = [answer];
+    steps.forEach((step, index) => lines.push(`${index + 1}. ${step.trim().slice(0, 300)}`));
+
+    return {
+        content: lines.join('\n'),
+        suggestions: suggestions.map((suggestion) => suggestion.trim().slice(0, 150)),
+    };
+}
+
 class MediFlowAssistant {
     constructor(root) {
         this.root = root;
@@ -396,6 +427,7 @@ class MediFlowAssistant {
             escalationMessage: root.querySelector('[data-assistant-escalation-message]'),
             form: root.querySelector('[data-assistant-form]'),
             input: root.querySelector('[data-assistant-input]'),
+            send: root.querySelector('[data-assistant-send]'),
             minimize: root.querySelector('[data-assistant-minimize]'),
             maximize: root.querySelector('[data-assistant-maximize]'),
         };
@@ -408,6 +440,10 @@ class MediFlowAssistant {
         this.suppressLauncherClick = false;
         this.resizeTimer = null;
         this.suggestionTimer = null;
+        this.requestSequence = 0;
+        this.remoteController = null;
+        this.remoteTimeoutId = null;
+        this.pendingMessage = null;
     }
 
     init() {
@@ -500,6 +536,7 @@ class MediFlowAssistant {
                 timestamp: message.timestamp || new Date().toISOString(),
                 route: String(message.route || this.context.route).slice(0, 250),
                 module: String(message.module || this.context.module).slice(0, 80),
+                source: message.source === 'remote' ? 'remote' : null,
             }))
             .slice(-HISTORY_LIMIT);
     }
@@ -516,6 +553,7 @@ class MediFlowAssistant {
             timestamp: new Date().toISOString(),
             route: this.context.route,
             module: this.context.module,
+            source: options.source === 'remote' ? 'remote' : null,
         };
         this.history.push(message);
         this.saveHistory();
@@ -529,7 +567,7 @@ class MediFlowAssistant {
             this.renderWelcome();
             return;
         }
-        this.history.forEach((message) => this.renderMessage(message));
+        this.history.forEach((message) => this.renderMessage(message, { source: message.source }));
         this.scrollMessages();
     }
 
@@ -551,8 +589,25 @@ class MediFlowAssistant {
         }
 
         const bubble = createElement('div', 'mediflow-assistant__bubble');
+        if ((options.source || message.source) === 'remote') {
+            const source = createElement('span', 'mediflow-assistant__source', 'Respuesta del asistente');
+            source.dataset.assistantResponseSource = 'remote';
+            bubble.appendChild(source);
+        }
         const content = createElement('p', '', message.content);
         bubble.appendChild(content);
+
+        if (options.suggestions?.length) {
+            const suggestions = createElement('div', 'mediflow-assistant__remote-suggestions');
+            options.suggestions.forEach((suggestion) => {
+                const button = createElement('button', 'mediflow-assistant__quick-button', suggestion);
+                button.type = 'button';
+                button.dataset.assistantRemoteSuggestion = 'true';
+                button.addEventListener('click', () => this.submitQuestion(suggestion));
+                suggestions.appendChild(button);
+            });
+            bubble.appendChild(suggestions);
+        }
 
         if (options.entry?.suggestedRoute && String(options.entry.suggestedRoute).startsWith('/')) {
             const link = createElement('a', 'mediflow-assistant__module-link', 'Ir al módulo');
@@ -577,11 +632,12 @@ class MediFlowAssistant {
         });
     }
 
-    submitQuestion(rawQuestion, directEntry = null) {
+    async submitQuestion(rawQuestion, directEntry = null) {
         const question = String(rawQuestion || '').trim().slice(0, 500);
         if (! question) {
             return;
         }
+        const requestSequence = this.startSubmission();
 
         this.elements.escalation.hidden = true;
         if (this.elements.escalationMessage) {
@@ -593,7 +649,7 @@ class MediFlowAssistant {
 
         if (containsSensitiveInput(question)) {
             this.addMessage('user', '[Contenido omitido por seguridad]');
-            this.addMessage('assistant', 'Por seguridad, formula la pregunta sin nombres, identificaciones, diagnósticos, montos, datos de pago, credenciales ni otra información sensible.');
+            this.addMessage('assistant', SENSITIVE_ANSWER);
             return;
         }
 
@@ -607,8 +663,12 @@ class MediFlowAssistant {
                 this.addMessage('assistant', ambiguityContent(result.alternatives));
                 return;
             }
-            this.addMessage('assistant', UNKNOWN_ANSWER);
-            this.elements.escalation.hidden = false;
+            if (! this.remoteEnabled() || normalizeConnectionState(this.connectionStatus) !== 'ONLINE') {
+                this.showFallback();
+                return;
+            }
+
+            await this.requestRemoteAnswer(question, requestSequence);
             return;
         }
 
@@ -618,6 +678,124 @@ class MediFlowAssistant {
                 this.elements.escalationMessage.textContent = entry.escalation.message;
             }
             this.elements.escalation.hidden = false;
+        }
+    }
+
+    startSubmission() {
+        this.requestSequence += 1;
+        this.remoteController?.abort();
+        window.clearTimeout(this.remoteTimeoutId);
+        this.pendingMessage?.remove();
+        this.remoteController = null;
+        this.remoteTimeoutId = null;
+        this.pendingMessage = null;
+        this.setRemoteBusy(false);
+
+        return this.requestSequence;
+    }
+
+    remoteEnabled() {
+        return this.root.dataset.remoteEnabled === 'true';
+    }
+
+    setRemoteBusy(busy) {
+        this.elements.send.disabled = busy;
+        this.elements.form.setAttribute('aria-busy', String(busy));
+    }
+
+    showFallback() {
+        this.addMessage('assistant', UNKNOWN_ANSWER);
+        this.elements.escalation.hidden = false;
+    }
+
+    renderPendingMessage() {
+        const item = createElement('article', 'mediflow-assistant__message mediflow-assistant__message--assistant');
+        item.dataset.assistantPending = 'true';
+        const bubble = createElement('div', 'mediflow-assistant__bubble', 'Buscando respuesta…');
+        item.appendChild(bubble);
+        this.elements.messages.appendChild(item);
+        this.scrollMessages();
+
+        return item;
+    }
+
+    async requestRemoteAnswer(question, requestSequence) {
+        const controller = new AbortController();
+        const pending = this.renderPendingMessage();
+        this.remoteController = controller;
+        this.pendingMessage = pending;
+        this.setRemoteBusy(true);
+        const timeoutId = window.setTimeout(() => controller.abort(), REMOTE_TIMEOUT_MS);
+        this.remoteTimeoutId = timeoutId;
+
+        try {
+            const response = await fetch(REMOTE_ENDPOINT, {
+                method: 'POST',
+                credentials: 'same-origin',
+                signal: controller.signal,
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken(),
+                },
+                body: JSON.stringify({
+                    question,
+                    current_route: this.context.routeName || null,
+                    current_module: Object.prototype.hasOwnProperty.call(MODULE_LABELS, this.context.module)
+                        ? this.context.module
+                        : null,
+                    connection_state: normalizeConnectionState(this.connectionStatus),
+                    knowledge_version: KNOWLEDGE_BASE_META.schemaVersion,
+                }),
+            });
+            let payload = null;
+            try {
+                payload = await response.json();
+            } catch (_error) {
+                payload = null;
+            }
+
+            if (requestSequence !== this.requestSequence) {
+                return;
+            }
+
+            const remoteAnswer = remoteAnswerContent(payload);
+            if (! response.ok) {
+                if (remoteAnswer && ['SENSITIVE_CONTENT', 'RATE_LIMITED'].includes(payload?.code)) {
+                    this.addMessage('assistant', remoteAnswer.content);
+                } else {
+                    this.showFallback();
+                }
+                return;
+            }
+
+            if (! remoteAnswer) {
+                this.showFallback();
+                return;
+            }
+
+            const isRemote = payload.source === 'remote' && payload.fallback_used !== true;
+            this.addMessage('assistant', remoteAnswer.content, {
+                source: isRemote ? 'remote' : null,
+                suggestions: isRemote ? remoteAnswer.suggestions : [],
+            });
+            if (payload.can_escalate) {
+                this.elements.escalationMessage.textContent = 'Puedes contactar al administrador si necesitas más ayuda.';
+                this.elements.escalation.hidden = false;
+            }
+        } catch (_error) {
+            if (requestSequence === this.requestSequence) {
+                this.showFallback();
+            }
+        } finally {
+            window.clearTimeout(timeoutId);
+            pending.remove();
+            if (requestSequence === this.requestSequence) {
+                this.remoteController = null;
+                this.remoteTimeoutId = null;
+                this.pendingMessage = null;
+                this.setRemoteBusy(false);
+            }
         }
     }
 

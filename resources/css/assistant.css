@@ -392,6 +392,33 @@
     overflow-wrap: anywhere;
 }
 
+.mediflow-assistant__source {
+    display: block;
+    margin-bottom: 5px;
+    color: #2563eb;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.mediflow-assistant__remote-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 9px;
+}
+
+.mediflow-assistant__composer button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+[data-assistant-pending] .mediflow-assistant__bubble {
+    color: #475569;
+    font-style: italic;
+}
+
 .mediflow-assistant__message--user .mediflow-assistant__bubble {
     border-color: #2563eb;
     border-radius: 15px 5px 15px 15px;

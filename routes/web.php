@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AppointmentController;
+use App\Http\Controllers\AssistantMessageController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\ClinicSettingsController;
 use App\Http\Controllers\ConsultationController;
@@ -147,6 +148,10 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified', 'active_clinic', 'permission:dashboard.view'])->name('dashboard');
 
 Route::middleware('auth')->group(function () {
+    Route::post('assistant/message', AssistantMessageController::class)
+        ->middleware(['active_clinic', 'throttle:assistant'])
+        ->name('assistant.message');
+
     $protectedResource = static function (string $uri, string $controller, string $permission): void {
         Route::resource($uri, $controller)->only(['create', 'store'])->middleware(['active_clinic', "permission:{$permission}.create"]);
         Route::resource($uri, $controller)->only(['index', 'show'])->middleware(['active_clinic', "permission:{$permission}.view"]);

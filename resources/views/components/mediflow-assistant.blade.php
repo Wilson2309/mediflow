@@ -39,6 +39,7 @@
     data-current-route="{{ $assistantRoute }}"
     data-current-route-name="{{ $assistantRouteName }}"
     data-current-module="{{ $assistantModule }}"
+    data-remote-enabled="{{ config('assistant.remote_enabled', false) ? 'true' : 'false' }}"
     data-state="closed"
     aria-live="polite"
 >
