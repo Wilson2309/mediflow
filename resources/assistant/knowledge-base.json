@@ -1,0 +1,468 @@
+{
+  "schema_version": 2,
+  "source": "resources/assistant/knowledge-base.json",
+  "description": "Fuente única de ayuda local y controlada del Asistente MediFlow.",
+  "defaults": {
+    "version": 1,
+    "status": "active",
+    "locale": "es-EC",
+    "aliases": [],
+    "steps": [],
+    "related_route": null,
+    "related_path": null,
+    "requires_online": false,
+    "online_restrictions": [],
+    "sensitive": false,
+    "tags": [],
+    "category": "guide",
+    "escalation": { "allowed": false, "message": "" }
+  },
+  "catalogs": {
+    "roles": {
+      "administrador": "Administración",
+      "recepcionista": "Recepción",
+      "caja_finanzas": "Caja y finanzas",
+      "medico": "Médico",
+      "super_admin": "Súper Admin"
+    },
+    "modules": {
+      "dashboard": { "label": "Dashboard", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico"] },
+      "patients": { "label": "Pacientes", "roles": ["administrador", "recepcionista"] },
+      "doctors": { "label": "Médicos", "roles": ["administrador", "recepcionista"] },
+      "services": { "label": "Servicios", "roles": ["administrador", "recepcionista", "caja_finanzas"] },
+      "appointments": { "label": "Citas", "roles": ["administrador", "recepcionista", "medico", "caja_finanzas"] },
+      "daily_agenda": { "label": "Agenda del día", "roles": ["administrador", "recepcionista", "medico", "caja_finanzas"] },
+      "payments": { "label": "Pagos", "roles": ["administrador", "caja_finanzas", "recepcionista", "medico"] },
+      "receipts": { "label": "Recibos", "roles": ["administrador", "caja_finanzas"] },
+      "consultations": { "label": "Consultas", "roles": ["administrador", "medico"] },
+      "medical_records": { "label": "Historias clínicas", "roles": ["administrador", "medico"] },
+      "prescriptions": { "label": "Recetas", "roles": ["administrador", "medico"] },
+      "reports": { "label": "Reportes", "roles": ["administrador", "caja_finanzas", "medico"] },
+      "audit": { "label": "Auditoría", "roles": ["administrador"] },
+      "financial_audit": { "label": "Registro financiero", "roles": ["administrador", "caja_finanzas"] },
+      "users": { "label": "Usuarios y roles", "roles": ["administrador"] },
+      "clinic_settings": { "label": "Configuración de clínica", "roles": ["administrador"] },
+      "clinic_switch": { "label": "Cambio de clínica", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico"] },
+      "offline": { "label": "Conexión y borradores", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico", "super_admin"] },
+      "permissions": { "label": "Permisos", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico", "super_admin"] },
+      "support": { "label": "Soporte", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico", "super_admin"] },
+      "super_admin_clinics": { "label": "Clínicas globales", "roles": ["super_admin"] },
+      "subscriptions": { "label": "Suscripciones", "roles": ["super_admin"] },
+      "onboarding": { "label": "Onboarding SaaS", "roles": ["super_admin"] }
+    },
+    "statuses": ["active", "draft", "deprecated"],
+    "locales": ["es-EC"],
+    "routes": [
+      "dashboard", "patients.index", "patients.create", "patients.store", "patients.show", "patients.edit", "patients.update", "patients.destroy",
+      "doctors.index", "doctors.create", "doctors.store", "doctors.show", "doctors.edit", "doctors.update", "doctors.destroy",
+      "services.index", "services.create", "services.store", "services.show", "services.edit", "services.update", "services.destroy",
+      "appointments.index", "appointments.create", "appointments.store", "appointments.show", "appointments.edit", "appointments.update", "appointments.destroy", "appointments.patients.search", "appointments.doctors.search", "appointments.availability",
+      "daily-agenda.index", "daily-agenda.appointments.cancel", "daily-agenda.appointments.no-show",
+      "payments.index", "payments.create", "payments.store", "payments.show", "payments.edit", "payments.update", "payments.destroy", "payments.receipt", "payments.receipt.print",
+      "consultations.index", "consultations.create", "consultations.store", "consultations.show", "consultations.edit", "consultations.update", "consultations.destroy",
+      "medical-records.index", "medical-records.create", "medical-records.store", "medical-records.show", "medical-records.edit", "medical-records.update", "medical-records.destroy",
+      "prescriptions.index", "prescriptions.create", "prescriptions.store", "prescriptions.show", "prescriptions.edit", "prescriptions.update", "prescriptions.destroy", "prescriptions.print", "prescriptions.pdf", "prescriptions.send-email", "prescriptions.sign", "prescriptions.verify",
+      "reports.index", "reports.appointments", "reports.appointments.export.pdf", "reports.appointments.export.csv", "reports.appointments.export.xlsx", "reports.appointments.print", "reports.clinical", "reports.clinical.export.pdf", "reports.clinical.export.csv", "reports.clinical.export.xlsx", "reports.clinical.print", "reports.financial", "reports.financial.export.pdf", "reports.financial.export.csv", "reports.financial.export.xlsx", "reports.financial.print", "reports.patients", "reports.doctors", "reports.services",
+      "financial-audit.index", "audit-logs.index", "users.index", "users.create", "users.store", "users.show", "users.edit", "users.update", "users.destroy", "settings.clinic.edit", "settings.clinic.update", "switch-clinic",
+      "super-admin.clinics.index", "super-admin.clinics.create", "super-admin.clinics.store", "super-admin.clinics.edit", "super-admin.clinics.update"
+    ],
+    "permissions": [
+      "dashboard.view", "patients.view", "patients.create", "patients.update", "patients.delete", "doctors.view", "doctors.create", "doctors.update", "doctors.delete", "services.view", "services.create", "services.update", "services.delete", "appointments.view", "appointments.create", "appointments.update", "appointments.delete", "consultations.view", "consultations.create", "consultations.update", "consultations.delete", "medical_records.view", "medical_records.create", "medical_records.update", "medical_records.delete", "prescriptions.view", "prescriptions.create", "prescriptions.update", "prescriptions.delete", "payments.view", "payments.create", "payments.update", "payments.delete", "reports.view", "reports.appointments", "reports.clinical", "reports.financial", "reports.patients", "reports.doctors", "reports.services", "audit_logs.view", "users.view", "users.create", "users.update", "users.delete", "settings.clinic.view", "settings.clinic.update", "super_admin.access"
+    ],
+    "forbidden_phrases": ["facturación electrónica", "laboratorio", "farmacia", "inventario", "telemedicina", "whatsapp", "aseguradoras", "firma digital certificada", "pagos online", "sincronización offline automática"]
+  },
+  "entries": [
+    {
+      "id": "connection-states", "title": "Estados de conexión", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico", "super_admin"], "modules": ["offline"], "routes": [], "permissions": [],
+      "intent": "view", "action": "entender", "entity": "conexión", "question": "¿Qué significan los estados de conexión?", "aliases": ["que significa conectado", "diferencia sin internet y servidor no disponible"], "keywords": ["conectado sin internet servidor no disponible sin conexión"],
+      "answer": "Conectado indica que MediFlow y el acceso a Internet responden. Sin Internet indica que el servidor local responde, pero no hay salida a Internet. Servidor no disponible indica que MediFlow no responde. Sin conexión indica que el navegador tampoco tiene red.",
+      "steps": ["Revisa el indicador del encabezado.", "Conserva la pantalla abierta si necesitas consultar información ya cargada.", "Espera a que el estado vuelva a Conectado antes de ejecutar acciones bloqueadas."], "tags": ["conexión", "estado"], "category": "offline", "evidence": ["resources/js/app.js", "app/Http/Controllers/HealthCheckController.php"]
+    },
+    {
+      "id": "connection-restored", "title": "Conexión restablecida", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico", "super_admin"], "modules": ["offline"], "routes": [], "permissions": [],
+      "intent": "troubleshoot", "action": "continuar", "entity": "conexión", "question": "¿Qué hago cuando vuelve la conexión?", "keywords": ["conexión restablecida volver internet continuar"],
+      "answer": "Cuando el indicador vuelva a Conectado, revisa la información antes de enviarla. Los borradores no se sincronizan solos y las acciones críticas deben repetirse manualmente.",
+      "steps": ["Confirma que el indicador muestre Conectado.", "Restaura el borrador si existe.", "Revisa datos y disponibilidad actuales.", "Envía o confirma la acción manualmente."], "tags": ["conexión", "borrador"], "category": "offline", "evidence": ["resources/js/app.js"]
+    },
+    {
+      "id": "drafts-local", "title": "Borradores locales", "roles": ["administrador", "recepcionista", "medico"], "modules": ["offline"], "routes": [], "permissions": [],
+      "intent": "view", "action": "entender", "entity": "borrador", "question": "¿Qué es un borrador local y dónde se guarda?", "aliases": ["donde se guardan los borradores"], "keywords": ["borrador local navegador almacenamiento"],
+      "answer": "Un borrador local es una copia temporal del formulario guardada en el almacenamiento local del navegador. Se separa por clínica, usuario, rol, formulario y registro; no se envía al servidor.",
+      "steps": [], "tags": ["borrador", "privacidad"], "category": "offline", "sensitive": true, "evidence": ["resources/js/app.js:draftKey", "resources/js/app.js:saveDraft"]
+    },
+    {
+      "id": "drafts-restore-discard", "title": "Restaurar o descartar borrador", "roles": ["administrador", "recepcionista", "medico"], "modules": ["offline"], "routes": [], "permissions": [],
+      "intent": "restore", "action": "restaurar", "entity": "borrador", "question": "¿Cómo restauro o descarto un borrador?", "aliases": ["hay un borrador guardado", "quiero borrar un borrador"], "keywords": ["restaurar descartar borrador"],
+      "answer": "Al abrir el mismo formulario, MediFlow muestra un aviso si existe un borrador. Restaurar repone los campos guardados; Descartar elimina esa copia local.",
+      "steps": ["Abre el mismo formulario y registro.", "Pulsa Restaurar borrador para recuperar los campos o Descartar borrador para eliminarlo.", "Si restauras, revisa todo antes de enviarlo."], "tags": ["borrador"], "category": "offline", "evidence": ["resources/js/app.js:showDraftBanner", "resources/js/app.js:restoreDraft", "resources/js/app.js:discardDraft"]
+    },
+    {
+      "id": "drafts-lifecycle", "title": "Ciclo de vida del borrador", "roles": ["administrador", "recepcionista", "medico"], "modules": ["offline"], "routes": [], "permissions": [],
+      "intent": "view", "action": "entender", "entity": "borrador", "question": "¿Cuándo se elimina o sincroniza un borrador?", "aliases": ["el borrador se sincroniza solo"], "keywords": ["eliminar sincronizar borrador manual"],
+      "answer": "El borrador se elimina al descartarlo o al enviar el formulario mientras MediFlow está conectado. No se sincroniza automáticamente.",
+      "steps": ["Restaura el borrador.", "Revisa la información.", "Envíalo manualmente con conexión."], "tags": ["borrador"], "category": "offline", "evidence": ["resources/js/app.js:initDraftForm"]
+    },
+    {
+      "id": "drafts-isolation", "title": "Aislamiento de borradores", "roles": ["administrador", "recepcionista", "medico"], "modules": ["offline", "clinic_switch"], "routes": [], "permissions": [],
+      "intent": "view", "action": "proteger", "entity": "borrador", "question": "¿Se mezclan borradores entre usuarios o clínicas?", "keywords": ["borradores usuario clínica separados"],
+      "answer": "No. La clave local incluye clínica, usuario, rol, formulario y registro. Un borrador no debe aparecer en otro contexto.", "tags": ["borrador", "multi-clínica"], "category": "offline", "sensitive": true, "evidence": ["resources/js/app.js:draftKey", "tests/e2e/offline.spec.js"]
+    },
+    {
+      "id": "permissions-button", "title": "Botón no visible", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico", "super_admin"], "modules": ["permissions"], "routes": [], "permissions": [],
+      "intent": "troubleshoot", "action": "acceder", "entity": "permiso", "question": "¿Por qué no aparece un botón o módulo?", "aliases": ["no aparece el botón", "no veo el módulo"], "keywords": ["botón módulo permiso no aparece"],
+      "answer": "Las opciones se muestran según el rol, el permiso efectivo, el estado del registro y la clínica activa. El asistente no puede ampliar permisos.",
+      "steps": ["Confirma que estás en la clínica correcta.", "Revisa si el registro cumple el estado requerido.", "Contacta al administrador si la función corresponde a tu trabajo."], "category": "error", "escalation": { "allowed": true, "message": "Contacta al administrador e indica el módulo y la acción que necesitas, sin compartir datos sensibles." }, "evidence": ["resources/views/layouts/navigation.blade.php", "app/Support/RolePermissions.php"]
+    },
+    {
+      "id": "permissions-403", "title": "Acceso 403", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico", "super_admin"], "modules": ["permissions"], "routes": [], "permissions": [],
+      "intent": "troubleshoot", "action": "acceder", "entity": "ruta", "question": "¿Por qué una ruta muestra 403?", "aliases": ["acceso denegado", "no puedo entrar a un módulo"], "keywords": ["403 permiso ruta clínica"],
+      "answer": "Un 403 indica que el backend rechazó el acceso por permiso, clínica activa, alcance del registro o estado de la clínica. No intentes acceder mediante otra URL.",
+      "steps": ["Vuelve al menú autorizado.", "Confirma la clínica activa.", "Contacta al administrador si consideras que necesitas ese permiso."], "category": "error", "escalation": { "allowed": true, "message": "Comparte con el administrador el módulo y la ruta, nunca información clínica o financiera." }, "evidence": ["routes/web.php", "app/Http/Middleware/EnsureActiveClinic.php"]
+    },
+    {
+      "id": "clinic-switch", "title": "Cambiar de clínica", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico"], "modules": ["clinic_switch"], "routes": ["switch-clinic"], "permissions": [],
+      "intent": "update", "action": "cambiar", "entity": "clínica", "question": "¿Cómo cambio de clínica?", "aliases": ["cambiar sucursal", "seleccionar otra clínica"], "keywords": ["cambiar clínica sucursal activa"],
+      "answer": "Usa el selector Sucursal activa de la navegación. Solo aparecen clínicas activas asociadas a tu usuario.",
+      "steps": ["Abre el selector Sucursal activa.", "Selecciona otra clínica disponible.", "Espera la recarga y confirma el nombre mostrado."], "related_route": "dashboard", "related_path": "/dashboard", "requires_online": true, "online_restrictions": ["El cambio requiere comunicación con el servidor."], "tags": ["multi-clínica"], "evidence": ["resources/views/layouts/navigation.blade.php", "app/Http/Controllers/SwitchClinicController.php"]
+    },
+    {
+      "id": "clinic-switch-missing", "title": "Clínica ausente del selector", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico"], "modules": ["clinic_switch"], "routes": ["switch-clinic"], "permissions": [],
+      "intent": "troubleshoot", "action": "cambiar", "entity": "clínica", "question": "¿Por qué no aparece otra clínica en el selector?", "keywords": ["clínica no aparece selector sucursal"],
+      "answer": "El selector solo lista clínicas activas asociadas al usuario. Si falta una clínica, puede estar inactiva o no estar asignada a tu cuenta.",
+      "steps": ["Confirma que usas la cuenta correcta.", "Contacta al administrador para revisar la asignación y el estado de la clínica."], "category": "error", "escalation": { "allowed": true, "message": "Solicita al administrador que revise la asociación de tu usuario; no compartas credenciales." }, "evidence": ["resources/views/layouts/navigation.blade.php", "app/Models/User.php"]
+    },
+    {
+      "id": "clinic-inactive", "title": "Clínica inactiva", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico", "super_admin"], "modules": ["clinic_switch", "super_admin_clinics"], "routes": ["switch-clinic", "super-admin.clinics.update"], "permissions": [],
+      "intent": "troubleshoot", "action": "acceder", "entity": "clínica", "question": "¿Qué pasa si una clínica está inactiva?", "keywords": ["clínica inactiva acceso bloqueado"],
+      "answer": "Una clínica inactiva no puede seleccionarse como clínica activa y las rutas protegidas por clínica rechazan el acceso. Solo SuperAdmin puede cambiar su estado global.",
+      "steps": ["No intentes continuar con otra URL.", "El personal debe contactar a su administrador.", "SuperAdmin puede revisar el estado desde el panel global."], "category": "error", "evidence": ["app/Http/Middleware/EnsureActiveClinic.php", "app/Http/Controllers/SwitchClinicController.php", "app/Http/Controllers/SuperAdmin/ClinicController.php"]
+    },
+    {
+      "id": "clinic-data-isolation", "title": "Datos separados por clínica", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico"], "modules": ["clinic_switch"], "routes": [], "permissions": [],
+      "intent": "view", "action": "proteger", "entity": "clínica", "question": "¿Los datos se separan por clínica?", "keywords": ["aislamiento multi clínica datos separados"],
+      "answer": "Sí. Las consultas y autorizaciones usan la clínica activa. El cambio de clínica modifica el contexto, no combina información entre clínicas.", "sensitive": true, "tags": ["multi-clínica", "privacidad"], "evidence": ["app/Http/Controllers/Concerns/ResolvesClinic.php", "routes/web.php"]
+    },
+    {
+      "id": "support-safe", "title": "Soporte seguro", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico", "super_admin"], "modules": ["support"], "routes": [], "permissions": [],
+      "intent": "troubleshoot", "action": "contactar", "entity": "soporte", "question": "¿Qué hago si el asistente no encuentra una respuesta?", "aliases": ["pregunta desconocida", "copiar detalles para soporte"], "keywords": ["soporte respuesta desconocida copiar detalles"],
+      "answer": "Usa Copiar detalles para soporte o Contactar administrador. Los detalles incluyen rol, módulo, ruta, conexión y una pregunta segura; revísalos antes de compartirlos.",
+      "steps": ["Elimina nombres, identificaciones, diagnósticos, montos y credenciales.", "Copia los detalles seguros.", "Compártelos con el administrador."], "category": "error", "escalation": { "allowed": true, "message": "No incluyas datos sensibles al solicitar soporte." }, "evidence": ["resources/js/assistant/mediflow-assistant.js:copySupportDetails"]
+    },
+
+    {
+      "id": "patients-create", "title": "Registrar paciente", "roles": ["administrador", "recepcionista"], "modules": ["patients"], "routes": ["patients.create", "patients.store"], "permissions": ["patients.create"],
+      "intent": "create", "action": "crear", "entity": "paciente", "question": "¿Cómo registro un paciente?", "aliases": ["como creo un paciente", "quiero registrar un paciente", "donde creo un paciente"], "keywords": ["registrar paciente crear paciente nuevo paciente"],
+      "answer": "Para registrar un paciente sigue estos pasos:", "steps": ["Abre Pacientes.", "Pulsa Nuevo paciente.", "Completa los datos solicitados.", "Revisa y guarda el registro."], "related_route": "patients.create", "related_path": "/patients/create", "requires_online": true, "online_restrictions": ["Sin conexión el formulario se conserva como borrador local y no se registra en el servidor."], "evidence": ["routes/web.php:patients.create", "resources/views/patients/create.blade.php", "app/Http/Controllers/PatientController.php"]
+    },
+    {
+      "id": "patients-edit-search", "title": "Buscar y editar paciente", "roles": ["administrador", "recepcionista"], "modules": ["patients"], "routes": ["patients.index", "patients.edit", "patients.update"], "permissions": ["patients.view", "patients.update"],
+      "intent": "update", "action": "editar", "entity": "paciente", "question": "¿Cómo busco o edito un paciente?", "aliases": ["buscar paciente", "corregir datos de paciente"], "keywords": ["buscar editar actualizar paciente"],
+      "answer": "En Pacientes puedes buscar por nombre, identificación, teléfono o correo. Abre la ficha y usa Editar si tienes permiso.", "steps": ["Abre Pacientes.", "Usa el buscador.", "Abre el registro correcto.", "Pulsa Editar, revisa y guarda."], "related_route": "patients.index", "related_path": "/patients", "requires_online": true, "online_restrictions": ["La actualización requiere conexión."], "evidence": ["app/Http/Controllers/PatientController.php:index", "resources/views/patients/index.blade.php", "resources/views/patients/show.blade.php"]
+    },
+    {
+      "id": "patients-required-fields", "title": "Datos obligatorios del paciente", "roles": ["administrador", "recepcionista"], "modules": ["patients"], "routes": ["patients.create", "patients.edit"], "permissions": ["patients.create"],
+      "intent": "view", "action": "completar", "entity": "paciente", "question": "¿Qué datos del paciente son obligatorios?", "aliases": ["campos obligatorios del paciente"], "keywords": ["datos campos obligatorios paciente nombre apellido estado"],
+      "answer": "Nombres, apellidos y estado son obligatorios. La identificación, fecha de nacimiento, género, contacto, dirección, tipo de sangre, alergias y contacto de emergencia son opcionales, pero se validan si se completan.", "related_route": "patients.create", "related_path": "/patients/create", "evidence": ["app/Http/Requests/StorePatientRequest.php"]
+    },
+    {
+      "id": "patients-blood-type", "title": "Tipo de sangre", "roles": ["administrador", "recepcionista"], "modules": ["patients"], "routes": ["patients.create", "patients.edit"], "permissions": ["patients.create", "patients.update"],
+      "intent": "update", "action": "seleccionar", "entity": "tipo de sangre", "question": "¿Cómo registro el tipo de sangre?", "keywords": ["tipo sangre A B AB O positivo negativo"],
+      "answer": "El tipo de sangre es opcional y se selecciona entre A+, A-, B+, B-, AB+, AB-, O+ u O-. No escribas un valor distinto a las opciones del formulario.", "evidence": ["app/Http/Requests/StorePatientRequest.php", "resources/views/patients/_form.blade.php"]
+    },
+    {
+      "id": "patients-duplicate-identification", "title": "Identificación duplicada", "roles": ["administrador", "recepcionista"], "modules": ["patients"], "routes": ["patients.store", "patients.update"], "permissions": ["patients.create", "patients.update"],
+      "intent": "troubleshoot", "action": "guardar", "entity": "identificación", "question": "¿Por qué indica identificación duplicada?", "keywords": ["identificación duplicada paciente ya existe"],
+      "answer": "La identificación debe ser única. Busca primero al paciente existente y evita crear un segundo registro.", "steps": ["Copia solo el valor de identificación necesario para la búsqueda.", "Busca al paciente en el listado.", "Si parece un error, contacta al administrador sin compartir la identificación completa."], "category": "error", "escalation": { "allowed": true, "message": "Solicita una revisión administrativa sin enviar la identificación completa por canales inseguros." }, "sensitive": true, "evidence": ["app/Http/Requests/StorePatientRequest.php", "app/Http/Requests/UpdatePatientRequest.php"]
+    },
+    {
+      "id": "patients-draft", "title": "Borrador offline de paciente", "roles": ["administrador", "recepcionista"], "modules": ["patients", "offline"], "routes": ["patients.create", "patients.edit"], "permissions": ["patients.create", "patients.update"],
+      "intent": "restore", "action": "guardar", "entity": "borrador de paciente", "question": "¿Cómo guardo y recupero un borrador de paciente?", "aliases": ["paciente offline", "restaurar borrador de paciente"], "keywords": ["borrador paciente restaurar descartar sin conexión"],
+      "answer": "El formulario de paciente admite borrador local. Sin conexión se guarda en el navegador; al volver debes abrir el mismo formulario, restaurarlo, revisarlo y enviarlo manualmente.", "steps": ["Completa el formulario.", "Si no hay conexión, deja que MediFlow guarde el borrador.", "Vuelve al mismo formulario.", "Elige Restaurar o Descartar."], "related_route": "patients.create", "related_path": "/patients/create", "category": "offline", "sensitive": true, "evidence": ["resources/views/patients/create.blade.php", "resources/views/patients/edit.blade.php", "resources/js/app.js"]
+    },
+    {
+      "id": "patients-save-error", "title": "Paciente no guardado", "roles": ["administrador", "recepcionista"], "modules": ["patients"], "routes": ["patients.store", "patients.update"], "permissions": ["patients.create", "patients.update"],
+      "intent": "troubleshoot", "action": "guardar", "entity": "paciente", "question": "¿Qué hago si el paciente no se guarda?", "aliases": ["no me deja guardar el paciente"], "keywords": ["paciente no guarda error validación conexión"],
+      "answer": "Revisa los mensajes de validación, la identificación duplicada y el estado de conexión. Sin conexión restaura el borrador y vuelve a enviarlo manualmente.", "steps": ["Corrige los campos marcados.", "Confirma que MediFlow esté Conectado.", "Busca posibles duplicados.", "Contacta al administrador si el error continúa."], "category": "error", "escalation": { "allowed": true, "message": "Indica el mensaje mostrado y la ruta; no compartas datos del paciente." }, "evidence": ["app/Http/Requests/StorePatientRequest.php", "resources/js/app.js"]
+    },
+
+    {
+      "id": "appointments-create", "title": "Crear cita", "roles": ["administrador", "recepcionista"], "modules": ["appointments"], "routes": ["appointments.create", "appointments.store"], "permissions": ["appointments.create"],
+      "intent": "create", "action": "crear", "entity": "cita", "question": "¿Cómo agendo una cita?", "aliases": ["cómo agendo un turno", "quiero registrar una cita", "donde creo una cita", "como hago un agendamiento"], "keywords": ["agendar cita crear cita nueva cita"],
+      "answer": "Para agendar una cita sigue estos pasos:", "steps": ["Abre Citas médicas y pulsa Nueva cita.", "Busca y selecciona al paciente.", "Elige el servicio.", "Selecciona un médico compatible.", "Consulta disponibilidad y elige fecha y hora.", "Revisa y guarda."], "related_route": "appointments.create", "related_path": "/appointments/create", "requires_online": true, "online_restrictions": ["Sin conexión solo se conserva un borrador; la disponibilidad debe comprobarse nuevamente al enviarlo."], "evidence": ["routes/web.php:appointments.create", "resources/views/appointments/create.blade.php", "app/Http/Controllers/AppointmentController.php"]
+    },
+    {
+      "id": "appointments-patient-service", "title": "Paciente y servicio de la cita", "roles": ["administrador", "recepcionista"], "modules": ["appointments"], "routes": ["appointments.patients.search", "appointments.create"], "permissions": ["appointments.create"],
+      "intent": "view", "action": "seleccionar", "entity": "cita", "question": "¿Cómo busco el paciente y elijo el servicio?", "keywords": ["buscar paciente elegir servicio cita"],
+      "answer": "En Nueva cita usa la búsqueda de pacientes y luego selecciona un servicio activo. El servicio determina la duración y limita los médicos compatibles.", "steps": ["Busca por nombre o identificación.", "Selecciona el paciente correcto.", "Elige el servicio antes de buscar médico."], "related_route": "appointments.create", "related_path": "/appointments/create", "evidence": ["app/Http/Controllers/AppointmentController.php:searchPatients", "app/Http/Controllers/AppointmentController.php:formData"]
+    },
+    {
+      "id": "appointments-compatible-doctors", "title": "Médicos compatibles", "roles": ["administrador", "recepcionista"], "modules": ["appointments", "doctors", "services"], "routes": ["appointments.doctors.search", "appointments.availability"], "permissions": ["appointments.create"],
+      "intent": "view", "action": "seleccionar", "entity": "médico", "question": "¿Por qué no aparece un médico al elegir servicio?", "aliases": ["médico no aparece", "médicos compatibles con servicio"], "keywords": ["médico compatible servicio activo no aparece"],
+      "answer": "La búsqueda solo devuelve médicos activos de la clínica que estén asociados al servicio seleccionado. Sin servicio, la lista de médicos queda vacía.", "steps": ["Selecciona primero el servicio.", "Confirma que el médico esté activo.", "Prueba otra búsqueda.", "Contacta al administrador si debe ofrecer ese servicio."], "category": "error", "escalation": { "allowed": true, "message": "El administrador puede revisar la relación entre médico y servicio." }, "evidence": ["app/Http/Controllers/AppointmentController.php:searchDoctors", "app/Http/Controllers/AppointmentController.php:ensureDoctorCanProvideService"]
+    },
+    {
+      "id": "appointments-availability", "title": "Disponibilidad de citas", "roles": ["administrador", "recepcionista"], "modules": ["appointments"], "routes": ["appointments.availability"], "permissions": ["appointments.create"],
+      "intent": "view", "action": "consultar", "entity": "disponibilidad", "question": "¿Cómo funciona la disponibilidad?", "aliases": ["horarios disponibles"], "keywords": ["disponibilidad horario médico servicio cita"],
+      "answer": "MediFlow calcula bloques entre 08:00 y 18:00 con la duración del servicio y excluye cruces con citas programadas o confirmadas del médico.", "steps": ["Selecciona servicio, médico y fecha.", "Espera la consulta de disponibilidad.", "Elige un bloque marcado como disponible."], "related_route": "appointments.create", "related_path": "/appointments/create", "requires_online": true, "online_restrictions": ["La disponibilidad se consulta al servidor."], "evidence": ["app/Http/Controllers/AppointmentController.php:availability", "app/Http/Controllers/AppointmentController.php:ACTIVE_BLOCKING_STATUSES"]
+    },
+    {
+      "id": "appointments-no-slots", "title": "Sin horarios disponibles", "roles": ["administrador", "recepcionista"], "modules": ["appointments"], "routes": ["appointments.availability"], "permissions": ["appointments.create"],
+      "intent": "troubleshoot", "action": "agendar", "entity": "horario", "question": "¿Qué hago si no hay horarios disponibles?", "keywords": ["no hay horarios bloques disponibles"],
+      "answer": "Puede que todos los bloques estén ocupados, que el médico no ofrezca el servicio o que la fecha no sea válida. Prueba otro médico compatible o fecha.", "steps": ["Confirma servicio y médico.", "Cambia la fecha.", "Prueba otro médico compatible.", "Contacta al administrador si nunca aparecen bloques."], "category": "error", "escalation": { "allowed": true, "message": "Solicita revisar la configuración del servicio y del médico." }, "evidence": ["app/Http/Controllers/AppointmentController.php:availability"]
+    },
+    {
+      "id": "appointments-slot-conflict", "title": "Horario ocupado", "roles": ["administrador", "recepcionista"], "modules": ["appointments"], "routes": ["appointments.store", "appointments.update", "appointments.availability"], "permissions": ["appointments.create", "appointments.update"],
+      "intent": "troubleshoot", "action": "agendar", "entity": "horario", "question": "¿Qué pasa si el horario fue ocupado?", "aliases": ["conflicto de horario", "cita duplicada"], "keywords": ["horario ocupado conflicto cita"],
+      "answer": "El servidor vuelve a validar el horario al guardar. Si otra cita lo ocupó, debes actualizar disponibilidad y elegir otro bloque.", "steps": ["Consulta nuevamente la disponibilidad.", "Elige otro horario libre.", "Guarda después de revisar el nuevo bloque."], "category": "error", "evidence": ["app/Http/Controllers/AppointmentController.php:ensureNoScheduleConflict"]
+    },
+    {
+      "id": "appointments-reschedule-cancel", "title": "Reprogramar o cancelar cita", "roles": ["administrador", "recepcionista"], "modules": ["appointments", "daily_agenda"], "routes": ["appointments.edit", "appointments.update", "daily-agenda.appointments.cancel"], "permissions": ["appointments.update"],
+      "intent": "update", "action": "reprogramar", "entity": "cita", "question": "¿Cómo reprogramo o cancelo una cita?", "aliases": ["cambiar fecha de cita", "anular cita"], "keywords": ["reprogramar cancelar cita fecha hora"],
+      "answer": "Para reprogramar usa Editar y selecciona un nuevo horario disponible. Para cancelar, usa la acción Cancelar desde Agenda del día y confirma el registro correcto.", "steps": ["Localiza la cita.", "Elige Editar para reprogramar o Cancelar en la agenda.", "Revisa paciente, fecha y hora.", "Confirma la acción."], "related_route": "daily-agenda.index", "related_path": "/daily-agenda", "requires_online": true, "online_restrictions": ["La modificación del estado requiere conexión."], "evidence": ["routes/web.php:daily-agenda.appointments.cancel", "app/Http/Controllers/DailyAgendaController.php:cancel"]
+    },
+    {
+      "id": "appointments-no-show", "title": "Marcar no asistió", "roles": ["administrador", "recepcionista"], "modules": ["daily_agenda", "appointments"], "routes": ["daily-agenda.appointments.no-show"], "permissions": ["appointments.update"],
+      "intent": "update", "action": "marcar", "entity": "cita", "question": "¿Cómo marco que el paciente no asistió?", "aliases": ["marcar no show"], "keywords": ["no asistió no_show cita"],
+      "answer": "Desde Agenda del día usa Marcar no asistió. La acción no se aplica a citas canceladas o completadas.", "steps": ["Abre Agenda del día.", "Localiza la cita.", "Pulsa Marcar no asistió y confirma."], "related_route": "daily-agenda.index", "related_path": "/daily-agenda", "requires_online": true, "evidence": ["routes/web.php:daily-agenda.appointments.no-show", "app/Http/Controllers/DailyAgendaController.php:markNoShow"]
+    },
+    {
+      "id": "daily-agenda-guide", "title": "Agenda del día", "roles": ["administrador", "recepcionista", "medico", "caja_finanzas"], "modules": ["daily_agenda", "appointments"], "routes": ["daily-agenda.index"], "permissions": ["appointments.view"],
+      "intent": "view", "action": "revisar", "entity": "agenda", "question": "¿Cómo reviso la agenda diaria?", "aliases": ["citas de hoy", "agenda propia"], "keywords": ["agenda del día citas estado pago"],
+      "answer": "Agenda del día muestra las citas de la fecha seleccionada, filtros por estado y estado básico del pago. El médico ve solo citas asignadas a su perfil; los montos dependen del permiso financiero.", "steps": ["Abre Agenda del día.", "Selecciona la fecha.", "Aplica filtros de cita o pago.", "Abre el registro permitido."], "related_route": "daily-agenda.index", "related_path": "/daily-agenda", "requires_online": true, "evidence": ["app/Http/Controllers/DailyAgendaController.php:index", "resources/views/daily-agenda/index.blade.php"]
+    },
+    {
+      "id": "appointments-basic-payment", "title": "Estado básico del pago", "roles": ["administrador", "recepcionista", "medico", "caja_finanzas"], "modules": ["appointments", "daily_agenda", "payments"], "routes": ["appointments.show", "daily-agenda.index"], "permissions": ["appointments.view"],
+      "intent": "view", "action": "revisar", "entity": "pago", "question": "¿Cómo reviso el estado básico del pago de una cita?", "aliases": ["la cita está pagada", "pago pendiente de cita"], "keywords": ["estado básico pago pendiente pagado cancelado reembolsado"],
+      "answer": "La cita y la agenda muestran el estado asociado: pendiente, pagado, cancelado o reembolsado, y también pueden indicar que no existe pago. Solo caja y administración gestionan cobros.", "related_route": "daily-agenda.index", "related_path": "/daily-agenda", "evidence": ["app/Http/Controllers/DailyAgendaController.php:paymentStatuses", "resources/views/daily-agenda/index.blade.php"]
+    },
+    {
+      "id": "appointments-offline-draft", "title": "Borrador offline de cita", "roles": ["administrador", "recepcionista"], "modules": ["appointments", "offline"], "routes": ["appointments.create", "appointments.edit"], "permissions": ["appointments.create", "appointments.update"],
+      "intent": "restore", "action": "guardar", "entity": "borrador de cita", "question": "¿Cómo funciona el borrador offline de una cita?", "aliases": ["guardar cita sin conexión"], "keywords": ["borrador cita offline restaurar"],
+      "answer": "El formulario de cita puede guardarse como borrador local. Al restaurarlo debes volver a consultar disponibilidad porque el horario pudo ocuparse.", "steps": ["Restaura el borrador en el mismo formulario.", "Revisa paciente, servicio y médico.", "Consulta otra vez la disponibilidad.", "Elige un bloque libre y envía manualmente."], "related_route": "appointments.create", "related_path": "/appointments/create", "category": "offline", "evidence": ["resources/views/appointments/create.blade.php", "resources/views/appointments/edit.blade.php", "resources/js/app.js"]
+    },
+
+    {
+      "id": "payments-pending", "title": "Pagos pendientes", "roles": ["administrador", "caja_finanzas"], "modules": ["payments"], "routes": ["payments.index"], "permissions": ["payments.view"],
+      "intent": "view", "action": "ver", "entity": "pago", "question": "¿Cómo veo los pagos pendientes?", "aliases": ["cola de cobros", "deudas pendientes"], "keywords": ["pagos pendientes cola filtros"],
+      "answer": "Abre Pagos y Finanzas. Sin filtros, MediFlow muestra una cola de pagos pendientes; también puedes filtrar por estado Pendiente.", "steps": ["Abre Pagos y Finanzas.", "Usa el filtro Estado: Pendiente.", "Abre el pago que vas a revisar."], "related_route": "payments.index", "related_path": "/payments", "requires_online": true, "evidence": ["app/Http/Controllers/PaymentController.php:index", "resources/views/payments/index.blade.php"]
+    },
+    {
+      "id": "payments-charge", "title": "Registrar cobro", "roles": ["administrador", "caja_finanzas"], "modules": ["payments"], "routes": ["payments.create", "payments.store", "payments.edit", "payments.update"], "permissions": ["payments.create", "payments.update"],
+      "intent": "create", "action": "crear", "entity": "pago", "question": "¿Cómo registro un cobro?", "aliases": ["como cobro un pago", "quiero registrar un pago", "donde confirmo un pago", "como hago un cobro"], "keywords": ["registrar cobro crear pago cobrar"],
+      "answer": "Para registrar un cobro sigue estos pasos:", "steps": ["Abre Pagos y Finanzas.", "Localiza el pago pendiente o pulsa Nuevo pago.", "Verifica paciente, cita, servicio y monto.", "Selecciona método y estado Pagado.", "Confirma la fecha y guarda."], "related_route": "payments.index", "related_path": "/payments", "requires_online": true, "online_restrictions": ["Los pagos no se pueden registrar ni modificar sin conexión para evitar duplicaciones o inconsistencias."], "evidence": ["app/Http/Controllers/PaymentController.php:store", "app/Http/Controllers/PaymentController.php:update", "resources/views/payments/_form.blade.php"]
+    },
+    {
+      "id": "payments-method-date-status", "title": "Método, fecha y estado del pago", "roles": ["administrador", "caja_finanzas"], "modules": ["payments"], "routes": ["payments.create", "payments.edit"], "permissions": ["payments.create", "payments.update"],
+      "intent": "update", "action": "completar", "entity": "pago", "question": "¿Qué métodos, fecha y estados admite un pago?", "aliases": ["métodos de pago", "fecha de pago", "pago pagado cancelado reembolsado"], "keywords": ["efectivo tarjeta transferencia otro pendiente pagado cancelado reembolsado fecha"],
+      "answer": "Los métodos son efectivo, tarjeta, transferencia u otro. Los estados son pendiente, pagado, cancelado y reembolsado. Al marcar Pagado sin fecha, MediFlow asigna la fecha y hora local actual.", "evidence": ["app/Http/Controllers/PaymentController.php:index", "app/Http/Controllers/PaymentController.php:prepareData", "app/Http/Requests/StorePaymentRequest.php"]
+    },
+    {
+      "id": "payments-show", "title": "Ficha del pago", "roles": ["administrador", "caja_finanzas"], "modules": ["payments"], "routes": ["payments.show"], "permissions": ["payments.view"],
+      "intent": "view", "action": "ver", "entity": "pago", "question": "¿Cómo veo la ficha de un pago?", "keywords": ["detalle ficha pago comprobante"],
+      "answer": "Abre el pago desde el listado. La ficha muestra la información autorizada y las opciones de recibo; el backend verifica que pertenezca a la clínica activa.", "related_route": "payments.index", "related_path": "/payments", "evidence": ["routes/web.php:payments.show", "app/Http/Controllers/PaymentController.php:show"]
+    },
+    {
+      "id": "receipts-download-print", "title": "Descargar o imprimir recibo", "roles": ["administrador", "caja_finanzas"], "modules": ["receipts", "payments"], "routes": ["payments.receipt", "payments.receipt.print"], "permissions": ["payments.view"],
+      "intent": "export", "action": "exportar", "entity": "recibo", "question": "¿Cómo descargo o imprimo un recibo?", "aliases": ["donde descargo el recibo", "como bajo un recibo", "quiero exportar el comprobante"], "keywords": ["descargar recibo imprimir comprobante pago"],
+      "answer": "Abre el detalle del pago y utiliza la opción Recibo o Imprimir. Verifica que el pago y la clínica sean correctos antes de generar el documento.", "steps": ["Abre la ficha del pago.", "Selecciona Descargar recibo PDF o Imprimir.", "Revisa el número REC y la clínica."], "related_route": "payments.index", "related_path": "/payments", "requires_online": true, "evidence": ["routes/web.php:payments.receipt", "routes/web.php:payments.receipt.print", "app/Http/Controllers/PaymentController.php"]
+    },
+    {
+      "id": "financial-report", "title": "Reporte financiero", "roles": ["administrador", "caja_finanzas"], "modules": ["reports", "payments"], "routes": ["reports.financial"], "permissions": ["reports.financial"],
+      "intent": "view", "action": "consultar", "entity": "reporte financiero", "question": "¿Cómo consulto el reporte financiero y sus filtros?", "aliases": ["reporte de pagos", "filtros financieros"], "keywords": ["reporte financiero rango fechas estado método servicio médico"],
+      "answer": "El reporte financiero usa la clínica activa y permite filtrar por rango de fechas, estado, método de pago, servicio y médico. Incluye totales pagados, pendientes y agrupaciones por método.", "steps": ["Abre Reportes.", "Entra en Reporte financiero.", "Define el rango y filtros.", "Revisa la clínica y los totales."], "related_route": "reports.financial", "related_path": "/reports/financial", "requires_online": true, "evidence": ["app/Http/Controllers/ReportController.php:financial", "app/Http/Controllers/ReportController.php:financialReportData"]
+    },
+    {
+      "id": "financial-exports", "title": "Exportar reporte financiero", "roles": ["administrador", "caja_finanzas"], "modules": ["reports"], "routes": ["reports.financial.export.pdf", "reports.financial.export.csv", "reports.financial.export.xlsx", "reports.financial.print"], "permissions": ["reports.financial"],
+      "intent": "export", "action": "exportar", "entity": "reporte financiero", "question": "¿Cómo exporto el reporte financiero?", "aliases": ["no aparece exportar excel", "descargar xlsx financiero"], "keywords": ["exportar financiero PDF CSV Excel XLSX imprimir"],
+      "answer": "Desde Reporte financiero puedes exportar PDF, CSV, Excel XLSX o abrir la vista de impresión. Las exportaciones respetan los filtros y la clínica activa.", "steps": ["Aplica filtros.", "Revisa resultados.", "Elige PDF, CSV, Excel XLSX o Imprimir."], "related_route": "reports.financial", "related_path": "/reports/financial", "requires_online": true, "online_restrictions": ["No se pueden generar reportes sin conexión."], "evidence": ["routes/web.php:reports.financial.export.*", "app/Http/Controllers/ReportController.php"]
+    },
+    {
+      "id": "financial-export-missing", "title": "Exportar Excel no visible", "roles": ["administrador", "caja_finanzas"], "modules": ["reports", "permissions"], "routes": ["reports.financial"], "permissions": ["reports.financial"],
+      "intent": "troubleshoot", "action": "exportar", "entity": "Excel", "question": "¿Por qué no aparece Exportar Excel?", "keywords": ["botón exportar Excel XLSX no aparece"],
+      "answer": "La opción XLSX existe en el reporte financiero, de citas y clínico, pero cada uno exige su permiso específico. También puede estar bloqueada mientras no haya conexión.", "steps": ["Confirma que estás en el reporte correcto.", "Revisa el estado de conexión.", "Contacta al administrador para validar el permiso."], "category": "error", "escalation": { "allowed": true, "message": "Indica el nombre del reporte y tu rol; no compartas su contenido." }, "evidence": ["routes/web.php", "resources/js/app.js:markSensitiveElements"]
+    },
+    {
+      "id": "financial-audit", "title": "Registro financiero", "roles": ["administrador", "caja_finanzas"], "modules": ["financial_audit"], "routes": ["financial-audit.index"], "permissions": ["reports.financial"],
+      "intent": "view", "action": "revisar", "entity": "registro financiero", "question": "¿Cómo reviso el registro financiero?", "aliases": ["auditoría financiera", "registro de caja"], "keywords": ["registro caja actividad financiera pagos cambios"],
+      "answer": "Abre Registro de caja para revisar eventos financieros auditados de la clínica activa, con filtros disponibles. Esta vista no concede permiso para modificar pagos.", "related_route": "financial-audit.index", "related_path": "/financial-audit", "requires_online": true, "sensitive": true, "evidence": ["routes/web.php:financial-audit.index", "app/Http/Controllers/FinancialAuditController.php"]
+    },
+    {
+      "id": "payments-offline", "title": "Pagos sin conexión", "roles": ["administrador", "caja_finanzas"], "modules": ["payments", "offline"], "routes": ["payments.create", "payments.edit"], "permissions": ["payments.create", "payments.update"],
+      "intent": "troubleshoot", "action": "cobrar", "entity": "pago", "question": "¿Por qué no puedo cobrar sin Internet?", "aliases": ["por que no puedo cobrar", "por que no puedo guardar", "por que no puedo guardar el pago", "no me deja registrar el pago"], "keywords": ["pago cobro bloqueado sin conexión"],
+      "answer": "Los pagos no se pueden registrar ni modificar sin conexión para evitar duplicaciones o inconsistencias.", "steps": ["Conserva la pantalla ya cargada solo para consulta.", "Espera a que el indicador muestre Conectado.", "Vuelve a verificar el estado del pago antes de cobrar."], "category": "offline", "evidence": ["resources/views/payments/create.blade.php", "resources/views/payments/edit.blade.php", "resources/js/app.js"]
+    },
+
+    {
+      "id": "doctor-own-agenda", "title": "Agenda propia del médico", "roles": ["medico"], "modules": ["appointments", "daily_agenda", "dashboard"], "routes": ["dashboard", "appointments.index", "daily-agenda.index"], "permissions": ["appointments.view"],
+      "intent": "view", "action": "ver", "entity": "agenda", "question": "¿Cómo veo mis citas asignadas?", "aliases": ["mi agenda", "mis citas"], "keywords": ["agenda propia citas asignadas médico"],
+      "answer": "El Dashboard, Citas y Agenda del día limitan los resultados al perfil médico asociado a tu usuario y clínica activa.", "steps": ["Abre Agenda del día.", "Selecciona la fecha.", "Revisa estado de cita y pago."], "related_route": "daily-agenda.index", "related_path": "/daily-agenda", "requires_online": true, "evidence": ["routes/web.php:dashboard", "app/Http/Controllers/AppointmentController.php:index", "app/Http/Controllers/DailyAgendaController.php:index"]
+    },
+    {
+      "id": "consultations-start", "title": "Iniciar consulta", "roles": ["administrador", "medico"], "modules": ["consultations", "daily_agenda"], "routes": ["consultations.create", "consultations.store", "daily-agenda.index"], "permissions": ["consultations.create"],
+      "intent": "create", "action": "crear", "entity": "consulta", "question": "¿Cómo inicio una consulta?", "aliases": ["atender cita", "crear consulta"], "keywords": ["iniciar consulta atender cita"],
+      "answer": "Localiza una cita válida en Agenda del día y usa Iniciar consulta. El médico solo puede atender sus citas y necesita un pago con estado Pagado; el administrador tiene la excepción implementada para pago previo.", "steps": ["Abre Agenda del día.", "Localiza la cita asignada.", "Verifica que no esté cancelada, no asistió ni atendida.", "Confirma el pago cuando aplique.", "Pulsa Iniciar consulta."], "related_route": "daily-agenda.index", "related_path": "/daily-agenda", "requires_online": true, "online_restrictions": ["El envío de la consulta al servidor requiere conexión; sin conexión puede conservarse un borrador."], "sensitive": true, "evidence": ["app/Http/Controllers/ConsultationController.php:appointmentForPrefill", "app/Http/Controllers/ConsultationController.php:ensureAppointmentIsPaidForClinicalCare"]
+    },
+    {
+      "id": "consultations-cannot-start", "title": "Consulta bloqueada", "roles": ["medico"], "modules": ["consultations", "daily_agenda"], "routes": ["consultations.create", "daily-agenda.index"], "permissions": ["consultations.create"],
+      "intent": "troubleshoot", "action": "iniciar", "entity": "consulta", "question": "¿Por qué no puedo iniciar una consulta?", "aliases": ["no aparece iniciar consulta", "botón iniciar bloqueado"], "keywords": ["consulta bloqueada pago pendiente cita atendida duplicada"],
+      "answer": "Las causas verificadas son: cita de otro médico, cita cancelada o no asistió, pago no pagado, o una consulta ya asociada a la cita.", "steps": ["Confirma que la cita está asignada a tu perfil.", "Revisa su estado.", "Revisa el estado básico del pago.", "Comprueba que no figure como atendida.", "Contacta al administrador si persiste."], "category": "error", "escalation": { "allowed": true, "message": "Indica el número interno de la cita sin incluir datos clínicos." }, "sensitive": true, "evidence": ["app/Http/Controllers/ConsultationController.php:prepareData", "app/Http/Controllers/ConsultationController.php:availableAppointments"]
+    },
+    {
+      "id": "consultations-save-complete", "title": "Guardar y completar consulta", "roles": ["administrador", "medico"], "modules": ["consultations"], "routes": ["consultations.store", "consultations.update"], "permissions": ["consultations.create", "consultations.update"],
+      "intent": "update", "action": "guardar", "entity": "consulta", "question": "¿Cómo guardo o completo una consulta?", "keywords": ["guardar completar consulta diagnóstico tratamiento"],
+      "answer": "Completa el formulario autorizado y guarda. Al registrar una consulta vinculada, MediFlow marca como completada una cita programada o confirmada.", "steps": ["Revisa paciente, médico y cita.", "Completa motivo, diagnóstico, tratamiento y observaciones permitidas.", "Guarda con conexión."], "related_route": "consultations.index", "related_path": "/consultations", "requires_online": true, "online_restrictions": ["Sin conexión se guarda un borrador local, no una consulta definitiva."], "sensitive": true, "evidence": ["app/Http/Controllers/ConsultationController.php:store", "app/Http/Controllers/ConsultationController.php:markAppointmentAsCompleted", "app/Http/Requests/StoreConsultationRequest.php"]
+    },
+    {
+      "id": "consultations-draft", "title": "Borrador clínico", "roles": ["administrador", "medico"], "modules": ["consultations", "offline"], "routes": ["consultations.create", "consultations.edit"], "permissions": ["consultations.create", "consultations.update"],
+      "intent": "restore", "action": "restaurar", "entity": "borrador clínico", "question": "¿Cómo recupero un borrador clínico?", "aliases": ["restaurar consulta", "consulta offline"], "keywords": ["borrador clínico consulta restaurar"],
+      "answer": "Abre el mismo formulario. Si existe un borrador de tu usuario, clínica y registro, pulsa Restaurar, revisa cuidadosamente y envíalo manualmente con conexión.", "steps": ["Abre el mismo formulario.", "Pulsa Restaurar borrador.", "Revisa todos los campos clínicos.", "Envía manualmente cuando vuelva la conexión."], "category": "offline", "sensitive": true, "evidence": ["resources/views/consultations/create.blade.php", "resources/views/consultations/edit.blade.php", "resources/js/app.js"]
+    },
+    {
+      "id": "medical-records-view", "title": "Ver historia clínica", "roles": ["administrador", "medico"], "modules": ["medical_records"], "routes": ["medical-records.index", "medical-records.show"], "permissions": ["medical_records.view"],
+      "intent": "view", "action": "ver", "entity": "historia clínica", "question": "¿Cómo consulto una historia clínica?", "aliases": ["ver historial clínico", "abrir historia clínica"], "keywords": ["historia historial clínico paciente"],
+      "answer": "Abre Historial clínico, busca el registro permitido y entra en su ficha. La vista reúne el registro y actividad reciente del paciente dentro de la clínica activa.", "related_route": "medical-records.index", "related_path": "/medical-records", "requires_online": true, "sensitive": true, "evidence": ["app/Http/Controllers/MedicalRecordController.php:index", "app/Http/Controllers/MedicalRecordController.php:show"]
+    },
+    {
+      "id": "medical-records-create-update", "title": "Crear o actualizar historia clínica", "roles": ["administrador", "medico"], "modules": ["medical_records"], "routes": ["medical-records.create", "medical-records.store", "medical-records.edit", "medical-records.update"], "permissions": ["medical_records.create", "medical_records.update"],
+      "intent": "update", "action": "actualizar", "entity": "historia clínica", "question": "¿Cómo creo o actualizo un registro médico?", "keywords": ["crear actualizar registro médico historia"],
+      "answer": "Cada paciente puede tener una historia clínica. El formulario permite antecedentes personales, familiares y quirúrgicos, alergias, hábitos, medicamentos actuales, enfermedades crónicas y observaciones.", "steps": ["Abre Historial clínico.", "Crea un registro para un paciente sin historia o abre Editar.", "Completa solo información autorizada.", "Revisa y guarda."], "related_route": "medical-records.index", "related_path": "/medical-records", "requires_online": true, "online_restrictions": ["Sin conexión solo se conserva un borrador local."], "sensitive": true, "evidence": ["app/Http/Controllers/MedicalRecordController.php:prepareData", "app/Http/Requests/StoreMedicalRecordRequest.php"]
+    },
+    {
+      "id": "medical-records-draft", "title": "Borrador de historia clínica", "roles": ["administrador", "medico"], "modules": ["medical_records", "offline"], "routes": ["medical-records.create", "medical-records.edit"], "permissions": ["medical_records.create", "medical_records.update"],
+      "intent": "restore", "action": "restaurar", "entity": "borrador clínico", "question": "¿Puedo guardar una historia clínica sin conexión?", "keywords": ["historia clínica offline borrador"],
+      "answer": "El formulario admite borrador local separado por usuario y clínica. No crea ni actualiza la historia en el servidor hasta que lo restaures y envíes manualmente.", "steps": ["Restaura en el mismo formulario.", "Revisa alergias, hábitos y demás campos.", "Envía con conexión."], "category": "offline", "sensitive": true, "evidence": ["resources/views/medical-records/create.blade.php", "resources/views/medical-records/edit.blade.php"]
+    },
+    {
+      "id": "prescriptions-create", "title": "Crear receta", "roles": ["administrador", "medico"], "modules": ["prescriptions"], "routes": ["prescriptions.create", "prescriptions.store", "consultations.show"], "permissions": ["prescriptions.create"],
+      "intent": "create", "action": "crear", "entity": "receta", "question": "¿Cómo creo una receta médica?", "aliases": ["como creo una receta medica", "como hago una receta", "quiero hacer una receta", "quiero generar una prescripcion", "donde genero una prescripcion", "donde creo una receta", "como emitir una receta"], "keywords": ["crear receta médica generar prescripción"],
+      "answer": "Abre Recetas médicas y pulsa Nueva receta. También puede iniciarse con una consulta preseleccionada. Completa medicamentos e indicaciones, revisa y guarda.", "steps": ["Abre Recetas médicas.", "Pulsa Nueva receta.", "Selecciona consulta, paciente y médico coherentes.", "Añade medicamentos e indicaciones.", "Guarda la receta."], "related_route": "prescriptions.create", "related_path": "/prescriptions/create", "requires_online": true, "online_restrictions": ["Sin conexión se conserva un borrador; firmar y enviar por correo siempre requieren conexión."], "ambiguity_label": "Crear una receta", "sensitive": true, "evidence": ["app/Http/Controllers/PrescriptionController.php:create", "app/Http/Controllers/PrescriptionController.php:store", "resources/views/prescriptions/create.blade.php"]
+    },
+    {
+      "id": "prescriptions-edit", "title": "Editar receta", "roles": ["administrador", "medico"], "modules": ["prescriptions"], "routes": ["prescriptions.edit", "prescriptions.update"], "permissions": ["prescriptions.update"],
+      "intent": "update", "action": "editar", "entity": "receta", "question": "¿Puedo editar una receta?", "keywords": ["editar actualizar receta firmada"],
+      "answer": "Sí, mientras no esté firmada. Una receta firmada no puede editarse; debe anularse o crearse una nueva según corresponda.", "steps": ["Abre la receta.", "Si no está firmada, pulsa Editar.", "Revisa y guarda los cambios."], "related_route": "prescriptions.index", "related_path": "/prescriptions", "requires_online": true, "sensitive": true, "evidence": ["app/Http/Controllers/PrescriptionController.php:edit", "app/Http/Controllers/PrescriptionController.php:update"]
+    },
+    {
+      "id": "prescriptions-sign", "title": "Firmar receta", "roles": ["administrador", "medico"], "modules": ["prescriptions"], "routes": ["prescriptions.sign", "prescriptions.show"], "permissions": ["prescriptions.update"],
+      "intent": "sign", "action": "firmar", "entity": "receta", "question": "¿Cómo firmo una receta?", "aliases": ["quiero firmar una receta", "donde firmo la receta"], "keywords": ["firmar receta firma electrónica interna"],
+      "answer": "Abre una receta activa y sin firma, revisa su contenido y pulsa Firmar. Es una firma electrónica interna verificable de MediFlow; después de firmar no puede editarse.", "steps": ["Abre el detalle.", "Revisa receta e ítems.", "Pulsa Firmar.", "Confirma la acción."], "related_route": "prescriptions.index", "related_path": "/prescriptions", "requires_online": true, "online_restrictions": ["La firma requiere conexión y se bloquea para recetas canceladas o ya firmadas."], "ambiguity_label": "Firmar una receta", "sensitive": true, "evidence": ["app/Http/Controllers/PrescriptionController.php:sign", "resources/views/prescriptions/show.blade.php"]
+    },
+    {
+      "id": "prescriptions-verification", "title": "Verificación y QR de receta", "roles": ["administrador", "medico"], "modules": ["prescriptions"], "routes": ["prescriptions.verify", "prescriptions.print", "prescriptions.pdf"], "permissions": ["prescriptions.view"],
+      "intent": "view", "action": "verificar", "entity": "firma de receta", "question": "¿Cómo funciona el código de verificación y el QR?", "keywords": ["código verificación QR firma receta hash"],
+      "answer": "Al firmar, MediFlow genera un código y una huella interna. El PDF o impresión puede incluir un QR hacia la ruta pública de verificación, que indica si la firma es válida, fue alterada o no existe.", "sensitive": true, "evidence": ["app/Http/Controllers/PrescriptionController.php:sign", "app/Http/Controllers/PrescriptionController.php:verify", "app/Http/Controllers/PrescriptionController.php:signatureQrDataUri"]
+    },
+    {
+      "id": "prescriptions-pdf-print", "title": "PDF e impresión de receta", "roles": ["administrador", "medico"], "modules": ["prescriptions"], "routes": ["prescriptions.pdf", "prescriptions.print"], "permissions": ["prescriptions.view"],
+      "intent": "export", "action": "exportar", "entity": "receta", "question": "¿Cómo descargo o imprimo una receta?", "keywords": ["descargar PDF imprimir receta"],
+      "answer": "Desde el detalle usa Descargar PDF o Imprimir. MediFlow registra la entrega y muestra la firma interna y QR cuando la receta está firmada.", "steps": ["Abre la receta.", "Elige PDF o Imprimir.", "Revisa el documento generado."], "related_route": "prescriptions.index", "related_path": "/prescriptions", "requires_online": true, "sensitive": true, "evidence": ["routes/web.php:prescriptions.pdf", "routes/web.php:prescriptions.print", "app/Http/Controllers/PrescriptionController.php"]
+    },
+    {
+      "id": "prescriptions-send", "title": "Enviar receta por correo", "roles": ["administrador", "medico"], "modules": ["prescriptions"], "routes": ["prescriptions.send-email", "prescriptions.show"], "permissions": ["prescriptions.update"],
+      "intent": "send", "action": "enviar", "entity": "receta", "question": "¿Cómo envío una receta por correo?", "aliases": ["quiero enviar una receta", "como mando la receta por correo", "donde envio la prescripcion"], "keywords": ["enviar receta correo email"],
+      "answer": "Abre la receta, revisa el correo del paciente o ingresa uno válido y usa Enviar. MediFlow adjunta el PDF y registra el último envío.", "steps": ["Abre el detalle.", "Confirma el destinatario.", "Pulsa Enviar por correo.", "Revisa el mensaje de resultado."], "related_route": "prescriptions.index", "related_path": "/prescriptions", "requires_online": true, "online_restrictions": ["El envío requiere conexión y una configuración de correo funcional."], "ambiguity_label": "Enviar una receta por correo", "sensitive": true, "evidence": ["app/Http/Controllers/PrescriptionController.php:sendEmail", "resources/views/prescriptions/show.blade.php"]
+    },
+    {
+      "id": "prescriptions-offline", "title": "Recetas sin conexión", "roles": ["administrador", "medico"], "modules": ["prescriptions", "offline"], "routes": ["prescriptions.create", "prescriptions.edit", "prescriptions.sign", "prescriptions.send-email"], "permissions": ["prescriptions.create", "prescriptions.update"],
+      "intent": "troubleshoot", "action": "firmar", "entity": "receta", "question": "¿Por qué no puedo firmar o enviar una receta sin conexión?", "aliases": ["no me deja firmar la receta", "firma bloqueada sin internet"], "keywords": ["firma envío receta bloqueado offline"],
+      "answer": "MediFlow bloquea la firma y el envío por correo sin conexión porque son acciones oficiales. Puedes conservar un borrador local y completarlas cuando se restablezca la conexión.", "steps": ["Guarda o conserva el borrador.", "Espera el estado Conectado.", "Restaura y revisa.", "Firma o envía manualmente."], "category": "offline", "sensitive": true, "evidence": ["resources/views/prescriptions/show.blade.php", "resources/js/app.js"]
+    },
+    {
+      "id": "doctor-reports", "title": "Reportes propios del médico", "roles": ["medico"], "modules": ["reports"], "routes": ["reports.appointments", "reports.clinical"], "permissions": ["reports.appointments", "reports.clinical"],
+      "intent": "view", "action": "ver", "entity": "reporte", "question": "¿Qué reportes puede ver un médico?", "aliases": ["mis reportes", "reporte clínico propio"], "keywords": ["reporte citas propio clínico médico"],
+      "answer": "El médico puede consultar el reporte de citas y el reporte clínico. El backend los limita al perfil médico asociado a su usuario, sin aceptar un filtro para otro médico.", "steps": ["Abre Reportes.", "Elige Citas o Clínico.", "Aplica rango y filtros permitidos."], "related_route": "reports.index", "related_path": "/reports", "requires_online": true, "sensitive": true, "evidence": ["app/Http/Controllers/ReportController.php:appointmentsReportData", "app/Http/Controllers/ReportController.php:clinicalReportData", "app/Http/Controllers/ReportController.php:scopeDoctorReportQuery"]
+    },
+    {
+      "id": "doctor-report-exports", "title": "Exportar reportes propios", "roles": ["medico"], "modules": ["reports"], "routes": ["reports.appointments.export.pdf", "reports.appointments.export.csv", "reports.appointments.export.xlsx", "reports.clinical.export.pdf", "reports.clinical.export.csv", "reports.clinical.export.xlsx"], "permissions": ["reports.appointments", "reports.clinical"],
+      "intent": "export", "action": "exportar", "entity": "reporte", "question": "¿Cómo exporto mis reportes de citas o clínicos?", "keywords": ["exportar reporte propio PDF CSV XLSX"],
+      "answer": "En el reporte de citas o clínico aplica filtros y elige PDF, CSV, Excel XLSX o impresión. La exportación conserva el alcance de tu perfil médico.", "steps": ["Abre el reporte permitido.", "Define el rango.", "Revisa resultados.", "Elige el formato."], "related_route": "reports.index", "related_path": "/reports", "requires_online": true, "online_restrictions": ["Las exportaciones se generan en el servidor."], "sensitive": true, "evidence": ["routes/web.php:reports.appointments.export.*", "routes/web.php:reports.clinical.export.*", "app/Http/Controllers/ReportController.php"]
+    },
+    {
+      "id": "doctor-no-finance", "title": "Sin acceso financiero del médico", "roles": ["medico"], "modules": ["reports", "payments", "permissions"], "routes": [], "permissions": [],
+      "intent": "troubleshoot", "action": "acceder", "entity": "finanzas", "question": "¿Por qué no veo pagos ni reportes financieros?", "keywords": ["médico sin pagos finanzas cobros"],
+      "answer": "El rol médico no tiene permisos de pagos ni reporte financiero. Puede ver el estado básico del pago vinculado a sus citas, pero no cobrar ni consultar montos financieros completos.", "category": "error", "evidence": ["app/Support/RolePermissions.php:medico", "resources/views/layouts/navigation.blade.php"]
+    },
+
+    {
+      "id": "admin-dashboard", "title": "Dashboard administrativo", "roles": ["administrador"], "modules": ["dashboard"], "routes": ["dashboard"], "permissions": ["dashboard.view"],
+      "intent": "view", "action": "ver", "entity": "dashboard", "question": "¿Qué muestra el Dashboard administrativo?", "keywords": ["dashboard métricas pacientes médicos citas consultas recetas ingresos"],
+      "answer": "El Dashboard calcula métricas de la clínica activa según permisos: pacientes, médicos, citas de hoy, consultas, recetas activas, ingresos pagados, pagos pendientes, servicios, usuarios y próximas citas.", "related_route": "dashboard", "related_path": "/dashboard", "requires_online": true, "evidence": ["routes/web.php:dashboard", "resources/views/dashboard.blade.php"]
+    },
+    {
+      "id": "admin-doctors-services", "title": "Médicos y servicios", "roles": ["administrador"], "modules": ["doctors", "services"], "routes": ["doctors.index", "services.index"], "permissions": ["doctors.view", "services.view"],
+      "intent": "view", "action": "gestionar", "entity": "catálogo clínico", "question": "¿Cómo gestiono médicos y servicios?", "keywords": ["gestionar médicos servicios especialidad precio duración"],
+      "answer": "Los módulos Médicos y Servicios ofrecen listados y CRUD según permisos. Los servicios incluyen precio, duración, estado y asociación con médicos, usada por la agenda.", "steps": ["Abre el módulo correspondiente.", "Crea o edita el registro.", "Revisa estado y, en Servicios, médicos asociados.", "Guarda con conexión."], "related_route": "services.index", "related_path": "/services", "requires_online": true, "evidence": ["app/Http/Controllers/DoctorController.php", "app/Http/Controllers/ServiceController.php", "app/Http/Requests/StoreServiceRequest.php"]
+    },
+    {
+      "id": "admin-users-roles", "title": "Usuarios y roles", "roles": ["administrador"], "modules": ["users"], "routes": ["users.index", "users.create", "users.edit"], "permissions": ["users.view", "users.create", "users.update"],
+      "intent": "update", "action": "gestionar", "entity": "usuario", "question": "¿Cómo creo o edito usuarios y roles?", "aliases": ["crear usuario", "asignar rol", "no puedo editar un usuario"], "keywords": ["usuarios roles administrador médico recepcionista caja finanzas"],
+      "answer": "En Usuarios y Roles puedes crear o editar cuentas con los roles administrador, médico, recepcionista o caja_finanzas. SuperAdmin no se asigna desde este módulo.", "steps": ["Abre Usuarios y Roles.", "Crea o edita una cuenta.", "Selecciona rol y estado.", "Si es médico, completa su perfil.", "Guarda."], "related_route": "users.index", "related_path": "/users", "requires_online": true, "online_restrictions": ["La gestión de usuarios se bloquea sin conexión."], "evidence": ["app/Http/Controllers/UserController.php", "app/Http/Requests/StoreUserRequest.php"]
+    },
+    {
+      "id": "admin-user-clinics", "title": "Asignar clínicas a usuarios", "roles": ["administrador"], "modules": ["users", "clinic_switch"], "routes": ["users.create", "users.edit"], "permissions": ["users.create", "users.update"],
+      "intent": "update", "action": "asignar", "entity": "clínica", "question": "¿Cómo asigno clínicas a un usuario?", "aliases": ["no puedo asignar una clínica"], "keywords": ["asignar clínicas usuario sucursales"],
+      "answer": "El formulario permite asignar únicamente clínicas activas que el administrador actual también administra. La clínica activa actual siempre se conserva en la asignación.", "steps": ["Abre el usuario.", "Selecciona clínicas disponibles.", "Guarda.", "Si falta una clínica, revisa tu propio acceso o su estado."], "requires_online": true, "category": "guide", "escalation": { "allowed": true, "message": "Si la clínica no aparece, solicita a SuperAdmin revisar su estado o tu asociación." }, "evidence": ["app/Http/Controllers/UserController.php:ensureAllowedClinicAssignments", "app/Http/Controllers/UserController.php:adminClinics"]
+    },
+    {
+      "id": "admin-clinic-settings", "title": "Configuración de clínica", "roles": ["administrador"], "modules": ["clinic_settings"], "routes": ["settings.clinic.edit", "settings.clinic.update"], "permissions": ["settings.clinic.view", "settings.clinic.update"],
+      "intent": "update", "action": "configurar", "entity": "clínica", "question": "¿Cómo actualizo la configuración de la clínica?", "keywords": ["configuración datos logo clínica"],
+      "answer": "Abre Configuración, confirma la clínica activa y modifica los campos autorizados. El controlador siempre actualiza la clínica resuelta para el usuario autenticado.", "steps": ["Abre Configuración.", "Revisa la clínica mostrada.", "Actualiza datos o logo.", "Guarda con conexión."], "related_route": "settings.clinic.edit", "related_path": "/settings/clinic", "requires_online": true, "online_restrictions": ["Los cambios administrativos se bloquean sin conexión."], "evidence": ["app/Http/Controllers/ClinicSettingsController.php", "resources/views/settings/clinic.blade.php"]
+    },
+    {
+      "id": "admin-audit", "title": "Auditoría de actividad", "roles": ["administrador"], "modules": ["audit"], "routes": ["audit-logs.index"], "permissions": ["audit_logs.view"],
+      "intent": "view", "action": "revisar", "entity": "auditoría", "question": "¿Cómo reviso la auditoría?", "keywords": ["auditoría historial actividad filtros"],
+      "answer": "Abre Auditoría para revisar eventos de la clínica activa con filtros por búsqueda, módulo, acción, usuario y fechas. La vista está protegida por audit_logs.view.", "related_route": "audit-logs.index", "related_path": "/audit-logs", "requires_online": true, "sensitive": true, "evidence": ["app/Http/Controllers/AuditLogController.php", "routes/web.php:audit-logs.index"]
+    },
+    {
+      "id": "admin-reports", "title": "Reportes administrativos", "roles": ["administrador"], "modules": ["reports"], "routes": ["reports.index", "reports.appointments", "reports.clinical", "reports.financial", "reports.patients", "reports.doctors", "reports.services"], "permissions": ["reports.view"],
+      "intent": "view", "action": "consultar", "entity": "reporte", "question": "¿Qué reportes puede consultar el administrador?", "keywords": ["reportes citas clínico financiero pacientes médicos servicios"],
+      "answer": "El administrador dispone de panel de reportes y vistas de citas, clínico, financiero, pacientes, médicos y servicios. PDF, CSV y XLSX están implementados para citas, clínico y financiero; las otras vistas no tienen rutas de exportación dedicadas.", "related_route": "reports.index", "related_path": "/reports", "requires_online": true, "evidence": ["routes/web.php:reports.*", "app/Support/RolePermissions.php:administrador"]
+    },
+    {
+      "id": "admin-offline", "title": "Acciones administrativas sin conexión", "roles": ["administrador"], "modules": ["offline", "users", "clinic_settings", "payments"], "routes": [], "permissions": [],
+      "intent": "troubleshoot", "action": "guardar", "entity": "acción administrativa", "question": "¿Qué acciones administrativas se bloquean sin conexión?", "aliases": ["que se bloquea sin internet"], "keywords": ["offline usuarios configuración pagos reportes bloqueados"],
+      "answer": "Se bloquean pagos, usuarios, configuración, firma y envío de recetas, exportaciones y otras acciones críticas. Pacientes, citas, consultas, historias y recetas sin firmar pueden conservarar borradores donde el formulario lo indica.", "category": "offline", "evidence": ["resources/js/app.js:markSensitiveElements", "resources/views/settings/clinic.blade.php"]
+    },
+
+    {
+      "id": "super-admin-panel", "title": "Panel global", "roles": ["super_admin"], "modules": ["super_admin_clinics"], "routes": ["super-admin.clinics.index"], "permissions": ["super_admin.access"],
+      "intent": "view", "action": "acceder", "entity": "panel global", "question": "¿Cómo accedo al panel global?", "aliases": ["administración global", "ver clínicas"], "keywords": ["super admin panel global clínicas"],
+      "answer": "El rol super_admin accede al listado global de clínicas. Su único permiso operativo es super_admin.access y no incluye módulos clínicos o financieros de una clínica.", "related_route": "super-admin.clinics.index", "related_path": "/super-admin/clinics", "requires_online": true, "evidence": ["routes/web.php:super-admin.*", "app/Support/RolePermissions.php:super_admin"]
+    },
+    {
+      "id": "super-admin-create-clinic", "title": "Crear clínica y administrador principal", "roles": ["super_admin"], "modules": ["super_admin_clinics", "onboarding"], "routes": ["super-admin.clinics.create", "super-admin.clinics.store"], "permissions": ["super_admin.access"],
+      "intent": "create", "action": "crear", "entity": "clínica", "question": "¿Cómo creo una clínica y su administrador principal?", "aliases": ["nueva clínica", "crear administrador principal"], "keywords": ["crear clínica administrador onboarding"],
+      "answer": "Nueva clínica crea la organización y, en la misma transacción, un usuario administrador asociado y activo. Debes completar nombre, estado y credenciales del administrador; los demás datos son opcionales según el formulario.", "steps": ["Abre Clínicas.", "Pulsa Nueva clínica.", "Completa datos generales, suscripción y estado.", "Completa nombre, correo y contraseña del administrador.", "Revisa y guarda."], "related_route": "super-admin.clinics.create", "related_path": "/super-admin/clinics/create", "requires_online": true, "online_restrictions": ["La creación global se bloquea sin conexión."], "evidence": ["app/Http/Controllers/SuperAdmin/ClinicController.php:store", "resources/views/super-admin/clinics/create.blade.php"]
+    },
+    {
+      "id": "super-admin-onboarding", "title": "Onboarding SaaS", "roles": ["super_admin"], "modules": ["onboarding"], "routes": ["super-admin.clinics.create", "super-admin.clinics.store"], "permissions": ["super_admin.access"],
+      "intent": "create", "action": "configurar", "entity": "onboarding", "question": "¿Cómo funciona el onboarding de una clínica?", "keywords": ["onboarding alta clínica responsable"],
+      "answer": "El onboarding implementado consiste en registrar datos de la clínica, estado, datos de suscripción y crear su administrador principal. No existe un asistente de pasos posterior separado.", "steps": ["Completa el formulario Nueva clínica.", "Revisa administrador, plan, fecha de corte y estado.", "Guarda para crear ambos registros."], "related_route": "super-admin.clinics.create", "related_path": "/super-admin/clinics/create", "requires_online": true, "evidence": ["app/Http/Controllers/SuperAdmin/ClinicController.php:store"]
+    },
+    {
+      "id": "super-admin-subscription", "title": "Plan y fecha de corte", "roles": ["super_admin"], "modules": ["subscriptions"], "routes": ["super-admin.clinics.create", "super-admin.clinics.edit", "super-admin.clinics.update"], "permissions": ["super_admin.access"],
+      "intent": "update", "action": "configurar", "entity": "suscripción", "question": "¿Cómo configuro el plan de suscripción y la fecha de corte?", "aliases": ["fecha de fin de suscripción", "plan de clínica"], "keywords": ["suscripción plan fecha corte end date"],
+      "answer": "En crear o editar clínica puedes indicar subscription_plan y subscription_end_date. Si el plan queda vacío, MediFlow guarda basic. No hay catálogo global de planes ni cobro automático implementado.", "related_route": "super-admin.clinics.index", "related_path": "/super-admin/clinics", "requires_online": true, "evidence": ["app/Http/Controllers/SuperAdmin/ClinicController.php"]
+    },
+    {
+      "id": "super-admin-notes", "title": "Notas internas", "roles": ["super_admin"], "modules": ["super_admin_clinics"], "routes": ["super-admin.clinics.create", "super-admin.clinics.edit"], "permissions": ["super_admin.access"],
+      "intent": "update", "action": "registrar", "entity": "nota interna", "question": "¿Dónde registro notas internas de una clínica?", "keywords": ["notas internas clínica"],
+      "answer": "El formulario global de clínica incluye internal_notes. Son notas administrativas internas; evita incluir datos clínicos, identificaciones o credenciales.", "requires_online": true, "sensitive": true, "evidence": ["app/Http/Controllers/SuperAdmin/ClinicController.php:store", "app/Http/Controllers/SuperAdmin/ClinicController.php:update"]
+    },
+    {
+      "id": "super-admin-status", "title": "Activar o inactivar clínica", "roles": ["super_admin"], "modules": ["super_admin_clinics"], "routes": ["super-admin.clinics.edit", "super-admin.clinics.update"], "permissions": ["super_admin.access"],
+      "intent": "update", "action": "activar", "entity": "clínica", "question": "¿Cómo activo o inactivo una clínica?", "keywords": ["activar inactivar estado clínica"],
+      "answer": "Abre Editar clínica y cambia el estado entre active e inactive. Una clínica inactiva queda fuera de selectores y sus rutas privadas por clínica responden 403.", "steps": ["Abre el listado global.", "Entra en Editar.", "Revisa la clínica.", "Cambia el estado y guarda."], "related_route": "super-admin.clinics.index", "related_path": "/super-admin/clinics", "requires_online": true, "online_restrictions": ["El cambio global se bloquea sin conexión."], "evidence": ["app/Http/Controllers/SuperAdmin/ClinicController.php:update", "app/Http/Middleware/EnsureActiveClinic.php"]
+    },
+    {
+      "id": "super-admin-difference", "title": "SuperAdmin y administrador de clínica", "roles": ["super_admin"], "modules": ["super_admin_clinics", "permissions"], "routes": ["super-admin.clinics.index"], "permissions": ["super_admin.access"],
+      "intent": "view", "action": "entender", "entity": "rol", "question": "¿Cuál es la diferencia entre SuperAdmin y administrador de clínica?", "keywords": ["diferencia super admin administrador clínica"],
+      "answer": "SuperAdmin gestiona organizaciones, estado, datos de suscripción y alta del administrador principal. El administrador de clínica gestiona la operación de sus clínicas. SuperAdmin no recibe permisos clínicos o financieros por su rol global.", "evidence": ["app/Support/RolePermissions.php", "routes/web.php"]
+    },
+    {
+      "id": "super-admin-offline", "title": "Panel global sin conexión", "roles": ["super_admin"], "modules": ["super_admin_clinics", "subscriptions", "onboarding", "offline"], "routes": [], "permissions": ["super_admin.access"],
+      "intent": "troubleshoot", "action": "guardar", "entity": "administración global", "question": "¿Qué acciones de SuperAdmin se bloquean sin conexión?", "aliases": ["super admin offline"], "keywords": ["clínicas suscripciones onboarding bloqueado sin conexión"],
+      "answer": "Crear o editar clínicas, cambiar estado, configurar suscripción y completar onboarding requieren conexión. El asistente solo explica estas funciones y no ejecuta cambios.", "category": "offline", "evidence": ["resources/js/app.js:markSensitiveElements", "routes/web.php:super-admin.*"]
+    }
+  ]
+}

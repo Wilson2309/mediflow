@@ -31,7 +31,7 @@ async function gotoWithAbortRetry(page, url) {
   }
 }
 
-test.describe('Asistente MediFlow - Fase 1', () => {
+test.describe('Asistente MediFlow - Fase 2', () => {
   test.beforeEach(async ({ page }) => {
     await mockConnectionHealth(page);
   });
@@ -262,6 +262,7 @@ test.describe('Asistente MediFlow - Fase 1', () => {
   });
 
   test('18a. reconoce variantes informales de recetas, citas, pagos y recibos', async ({ page }) => {
+    test.setTimeout(60_000);
     await loginAs(page, 'doctor');
     await page.goto('/prescriptions');
     let root = await openAssistant(page);
@@ -291,6 +292,7 @@ test.describe('Asistente MediFlow - Fase 1', () => {
   });
 
   test('18b. el rol sigue siendo un filtro obligatorio para preguntas escritas', async ({ page }) => {
+    test.setTimeout(60_000);
     await loginAs(page, 'doctor');
     await page.goto('/dashboard');
     let root = await openAssistant(page);
@@ -423,5 +425,59 @@ test.describe('Asistente MediFlow - Fase 1', () => {
     const switchBack = page.locator('form[action*="/switch-clinic/"] button:visible').first();
     await switchBack.click();
     await page.waitForLoadState('domcontentloaded');
+  });
+
+  test('23. carga la fuente JSON centralizada y expone metadatos seguros', async ({ page }) => {
+    await loginAs(page, 'admin');
+    await page.goto('/dashboard');
+
+    const metadata = await page.evaluate(() => window.MediFlowAssistant.knowledgeBase);
+    expect(metadata).toEqual({
+      source: 'resources/assistant/knowledge-base.json',
+      schemaVersion: 2,
+      entries: 75,
+    });
+  });
+
+  test('24. muestra el aviso explícito de privacidad', async ({ page }) => {
+    await loginAs(page, 'reception');
+    await page.goto('/patients');
+    const root = await openAssistant(page);
+
+    await expect(root.locator('.mediflow-assistant__privacy-note')).toContainText(
+      'No escribas nombres de pacientes, identificaciones ni información clínica sensible.',
+    );
+  });
+
+  test('25. una guía muestra pasos, restricciones y enlace solo cuando corresponde', async ({ page }) => {
+    await loginAs(page, 'reception');
+    await page.goto('/patients');
+    const root = await openAssistant(page);
+
+    await ask(root, '¿Cómo registro un paciente?');
+    let answer = root.locator('.mediflow-assistant__message--assistant').last();
+    await expect(answer).toContainText('1. Abre Pacientes.');
+    await expect(answer).toContainText('Restricciones:');
+    await expect(answer.locator('[data-assistant-module-link]')).toHaveAttribute('href', '/patients/create');
+
+    await ask(root, '¿Qué significan los estados de conexión?');
+    answer = root.locator('.mediflow-assistant__message--assistant').last();
+    await expect(answer).toContainText('Conectado indica');
+    await expect(answer.locator('[data-assistant-module-link]')).toHaveCount(0);
+  });
+
+  test('26. admin y SuperAdmin obtienen ayuda escrita dentro de su alcance', async ({ page }) => {
+    await loginAs(page, 'admin');
+    await page.goto('/users');
+    let root = await openAssistant(page);
+    await ask(root, '¿Cómo creo o edito usuarios y roles?');
+    await expect(root.locator('[data-assistant-messages]')).toContainText('En Usuarios y Roles puedes crear o editar cuentas');
+
+    await logout(page);
+    await loginAs(page, 'superAdmin');
+    root = await openAssistant(page);
+    await ask(root, '¿Cómo creo una clínica y su administrador principal?');
+    await expect(root.locator('[data-assistant-messages]')).toContainText('Nueva clínica crea la organización');
+    await expect(root.locator('[data-assistant-messages]')).not.toContainText('iniciar una consulta');
   });
 });

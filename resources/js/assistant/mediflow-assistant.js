@@ -1,8 +1,12 @@
 import {
+    KNOWLEDGE_BASE_META,
     MEDIFLOW_KNOWLEDGE_BASE,
     MODULE_LABELS,
     ROLE_LABELS,
     UNKNOWN_ANSWER,
+    isOfflineEntry as isOfflineKnowledgeEntry,
+    quickQuestionsFor as quickQuestionsForRole,
+    searchKnowledge as searchKnowledgeBase,
 } from './knowledge-base.js';
 
 const HISTORY_LIMIT = 50;
@@ -313,23 +317,25 @@ function storageWrite(key, value) {
 function buildAnswerContent(entry, connectionStatus) {
     const state = normalizeConnectionState(connectionStatus);
     const roleConnectionAnswers = {
-        'offline-reception': 'Actualmente no hay conexión a Internet. MediFlow local continúa disponible y puedes conservar borradores de pacientes y citas. Restáuralos, revísalos y envíalos manualmente cuando vuelva la conexión.',
-        'offline-cash': 'Actualmente no hay conexión a Internet. MediFlow bloquea los pagos y movimientos financieros para evitar duplicaciones o inconsistencias.',
-        'offline-doctor': 'Actualmente no hay conexión a Internet. Puedes conservar borradores clínicos, pero MediFlow bloquea la firma y el envío de recetas hasta recuperar la conexión.',
-        'offline-admin': 'Actualmente no hay conexión a Internet. MediFlow local continúa disponible, pero las acciones administrativas y financieras críticas permanecen bloqueadas.',
-        'offline-super-admin': 'Actualmente no hay conexión a Internet. Las acciones globales críticas permanecen bloqueadas hasta recuperar la conexión.',
-        'prescriptions-offline-sign': 'Actualmente no hay conexión a Internet. MediFlow bloquea la firma y el envío de recetas porque son acciones oficiales. Puedes conservar un borrador local y completarlas cuando vuelva la conexión.',
+        'payments-offline': 'Actualmente no hay conexión a Internet. MediFlow bloquea los pagos y movimientos financieros para evitar duplicaciones o inconsistencias.',
+        'prescriptions-offline': 'Actualmente no hay conexión a Internet. Puedes conservar borradores clínicos, pero MediFlow bloquea la firma y el envío de recetas hasta recuperar la conexión.',
+        'admin-offline': 'Actualmente no hay conexión a Internet. MediFlow local continúa disponible, pero las acciones administrativas y financieras críticas permanecen bloqueadas.',
+        'super-admin-offline': 'Actualmente no hay conexión a Internet. Las acciones globales críticas permanecen bloqueadas hasta recuperar la conexión.',
     };
     let answer = entry.answer;
 
     if (state === 'INTERNET_UNAVAILABLE' && roleConnectionAnswers[entry.id]) {
         answer = roleConnectionAnswers[entry.id];
-    } else if (state === 'SERVER_UNAVAILABLE' && (isOfflineEntry(entry) || entry.id === 'prescriptions-offline-sign')) {
+    } else if (state === 'SERVER_UNAVAILABLE' && isOfflineKnowledgeEntry(entry)) {
         answer = 'No se puede establecer comunicación con el servidor MediFlow.';
     }
 
     const lines = [answer];
     (entry.steps || []).forEach((step, index) => lines.push(`${index + 1}. ${step}`));
+    if (entry.online_restrictions?.length) {
+        lines.push('');
+        lines.push(`Restricciones: ${entry.online_restrictions.join(' ')}`);
+    }
     if (entry.requiresConnection && state !== 'ONLINE') {
         const connectionNotes = {
             INTERNET_UNAVAILABLE: 'Esta acción requiere Internet. Puedes revisar la guía ahora y continuar cuando la conexión se restablezca.',
@@ -387,6 +393,7 @@ class MediFlowAssistant {
             connectionDot: root.querySelector('[data-assistant-connection-dot]'),
             connectionLabel: root.querySelector('[data-assistant-connection-label]'),
             escalation: root.querySelector('[data-assistant-escalation]'),
+            escalationMessage: root.querySelector('[data-assistant-escalation-message]'),
             form: root.querySelector('[data-assistant-form]'),
             input: root.querySelector('[data-assistant-input]'),
             minimize: root.querySelector('[data-assistant-minimize]'),
@@ -418,6 +425,7 @@ class MediFlowAssistant {
         window.MediFlowAssistant = Object.freeze({
             context: this.context,
             storageKeys: this.keys,
+            knowledgeBase: KNOWLEDGE_BASE_META,
             get connectionStatus() {
                 return connectionSnapshot();
             },
@@ -576,6 +584,9 @@ class MediFlowAssistant {
         }
 
         this.elements.escalation.hidden = true;
+        if (this.elements.escalationMessage) {
+            this.elements.escalationMessage.textContent = 'No se enviará información fuera de MediFlow.';
+        }
         this.lastQuestion = containsSensitiveInput(question) ? '[Pregunta omitida por seguridad]' : question;
         this.elements.input.value = '';
         this.elements.input.style.height = 'auto';
@@ -589,7 +600,7 @@ class MediFlowAssistant {
         this.addMessage('user', question);
         const result = directEntry
             ? { entry: directEntry, alternatives: [] }
-            : searchKnowledge(question, this.context, this.connectionStatus);
+            : searchKnowledgeBase(question, this.context, this.connectionStatus);
         const entry = result.entry;
         if (! entry) {
             if (result.alternatives.length) {
@@ -602,11 +613,17 @@ class MediFlowAssistant {
         }
 
         this.addMessage('assistant', buildAnswerContent(entry, this.connectionStatus), { entry });
+        if (entry.escalation?.allowed) {
+            if (this.elements.escalationMessage) {
+                this.elements.escalationMessage.textContent = entry.escalation.message;
+            }
+            this.elements.escalation.hidden = false;
+        }
     }
 
     renderQuickQuestions() {
         this.elements.quickList.replaceChildren();
-        quickQuestionsFor(this.context, this.connectionStatus).forEach((entry) => {
+        quickQuestionsForRole(this.context, this.connectionStatus).forEach((entry) => {
             const button = createElement('button', 'mediflow-assistant__quick-button', entry.question);
             button.type = 'button';
             button.dataset.knowledgeId = entry.id;
@@ -692,7 +709,7 @@ class MediFlowAssistant {
         const entry = MEDIFLOW_KNOWLEDGE_BASE.find((candidate) =>
             candidate.roles.includes(this.context.role)
             && candidate.modules.includes(this.context.module)
-            && ! isOfflineEntry(candidate));
+            && ! isOfflineKnowledgeEntry(candidate));
 
         if (! entry) {
             this.addMessage('assistant', 'No hay una guía general adicional para este módulo y tu rol. Contacta al administrador si necesitas orientación autorizada.');

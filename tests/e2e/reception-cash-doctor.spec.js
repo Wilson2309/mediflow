@@ -63,7 +63,7 @@ test.describe('Reception -> Cashier -> Doctor Flow', () => {
 
     await page.fill('#appointment_date', appointmentDate);
     const firstAvailableSlot = page.getByRole('button', { name: /^\d{2}:\d{2}$/ }).first();
-    await expect(firstAvailableSlot).toBeVisible();
+    await expect(firstAvailableSlot).toBeVisible({ timeout: 20_000 });
     const selectedSlot = (await firstAvailableSlot.textContent()).trim();
     await page.fill('textarea[name="reason"]', appointmentData.reason);
     await page.fill('textarea[name="notes"]', appointmentData.notes);

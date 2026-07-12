@@ -5,6 +5,9 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
+        "assistant:validate": "node scripts/validate-assistant-knowledge.mjs",
+        "assistant:validate:test": "node --test tests/node/assistant-knowledge-validator.test.mjs",
+        "assistant:manuals": "node scripts/generate-assistant-manuals.mjs",
         "test:e2e": "playwright test",
         "test:e2e:headed": "playwright test --headed",
         "test:e2e:ui": "playwright test --ui",

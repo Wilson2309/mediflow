@@ -10,19 +10,19 @@
     $assistantModule = match (true) {
         str_starts_with($assistantRouteName, 'patients.') => 'patients',
         str_starts_with($assistantRouteName, 'doctors.') => 'doctors',
-        str_starts_with($assistantRouteName, 'appointments.'),
-        str_starts_with($assistantRouteName, 'daily-agenda.') => 'appointments',
+        str_starts_with($assistantRouteName, 'appointments.') => 'appointments',
+        str_starts_with($assistantRouteName, 'daily-agenda.') => 'daily_agenda',
         str_starts_with($assistantRouteName, 'consultations.') => 'consultations',
-        str_starts_with($assistantRouteName, 'medical-records.') => 'medical-records',
+        str_starts_with($assistantRouteName, 'medical-records.') => 'medical_records',
         str_starts_with($assistantRouteName, 'prescriptions.') => 'prescriptions',
-        str_starts_with($assistantRouteName, 'payments.'),
-        str_starts_with($assistantRouteName, 'financial-audit.') => 'payments',
+        str_starts_with($assistantRouteName, 'payments.') => 'payments',
+        str_starts_with($assistantRouteName, 'financial-audit.') => 'financial_audit',
         str_starts_with($assistantRouteName, 'reports.') => 'reports',
         str_starts_with($assistantRouteName, 'users.') => 'users',
-        str_starts_with($assistantRouteName, 'settings.') => 'settings',
+        str_starts_with($assistantRouteName, 'settings.') => 'clinic_settings',
         str_starts_with($assistantRouteName, 'audit-logs.') => 'audit',
         str_starts_with($assistantRouteName, 'services.') => 'services',
-        str_starts_with($assistantRouteName, 'super-admin.') => 'super-admin',
+        str_starts_with($assistantRouteName, 'super-admin.') => 'super_admin_clinics',
         str_starts_with($assistantRouteName, 'demo-requests.') => 'demo-requests',
         str_starts_with($assistantRouteName, 'profile.') => 'profile',
         $assistantRouteName === 'dashboard' => 'dashboard',
@@ -123,7 +123,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 2.75 16 5v4.4c0 3.7-2.4 6.6-6 7.85-3.6-1.25-6-4.15-6-7.85V5l6-2.25Z" />
                     <path stroke-linecap="round" d="m7.5 10 1.6 1.6 3.4-3.7" />
                 </svg>
-                <span>Ayuda local. No incluyas datos de pacientes, diagnósticos, pagos ni credenciales.</span>
+                <span>No escribas nombres de pacientes, identificaciones ni información clínica sensible.</span>
             </div>
 
             <div class="mediflow-assistant__messages mediflow-scrollbar" data-assistant-messages tabindex="0"></div>
@@ -137,7 +137,7 @@
             </div>
 
             <div class="mediflow-assistant__escalation" data-assistant-escalation hidden>
-                <p>No se enviará información fuera de MediFlow.</p>
+                <p data-assistant-escalation-message>No se enviará información fuera de MediFlow.</p>
                 <div>
                     <button type="button" data-assistant-contact-admin>Contactar administrador</button>
                     <button type="button" data-assistant-copy-support>Copiar detalles para soporte</button>

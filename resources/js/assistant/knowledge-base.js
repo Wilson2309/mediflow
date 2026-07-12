@@ -1,637 +1,344 @@
-const ADMIN = 'administrador';
-const RECEPTION = 'recepcionista';
-const CASH = 'caja_finanzas';
-const DOCTOR = 'medico';
-const SUPER_ADMIN = 'super_admin';
+import knowledgeDocument from '../../assistant/knowledge-base.json';
 
-/**
- * Base local y controlada para la Fase 1 del Asistente MediFlow.
- * Solo contiene orientación de uso; nunca contiene ni consulta datos reales.
- */
-export const MEDIFLOW_KNOWLEDGE_BASE = [
-    {
-        id: 'patients-create',
-        roles: [ADMIN, RECEPTION],
-        modules: ['patients'],
-        routes: ['/patients', '/patients/create'],
-        question: '¿Cómo registro un paciente?',
-        aliases: ['como creo un paciente', 'quiero registrar un paciente', 'donde creo un paciente'],
-        keywords: ['registrar paciente', 'crear paciente', 'nuevo paciente'],
-        intent: 'create',
-        action: 'crear',
-        module: 'patients',
-        answer: 'Para registrar un paciente sigue estos pasos:',
-        steps: ['Abre el módulo Pacientes.', 'Pulsa Nuevo paciente.', 'Completa únicamente los datos solicitados.', 'Revisa la información y guarda el registro.'],
-        suggestedRoute: '/patients/create',
-        requiresConnection: true,
-    },
-    {
-        id: 'patients-required-fields',
-        roles: [ADMIN, RECEPTION],
-        modules: ['patients'],
-        routes: ['/patients/create', '/patients/*/edit'],
-        question: '¿Qué datos son obligatorios?',
-        keywords: ['datos obligatorios', 'campos obligatorios', 'requisitos paciente'],
-        answer: 'Los campos obligatorios están marcados en el formulario. MediFlow validará la información antes de guardar y mostrará qué campo debes corregir.',
-        steps: [],
-        suggestedRoute: '/patients/create',
-        requiresConnection: false,
-    },
-    {
-        id: 'patients-edit',
-        roles: [ADMIN, RECEPTION],
-        modules: ['patients'],
-        routes: ['/patients', '/patients/*/edit'],
-        question: '¿Cómo edito un paciente?',
-        keywords: ['editar paciente', 'actualizar paciente', 'corregir paciente'],
-        answer: 'Busca el paciente, abre su ficha y utiliza la opción Editar. Revisa los cambios antes de guardarlos.',
-        steps: ['Abre Pacientes.', 'Busca y selecciona el registro.', 'Pulsa Editar.', 'Actualiza los campos permitidos y guarda.'],
-        suggestedRoute: '/patients',
-        requiresConnection: true,
-    },
-    {
-        id: 'patients-restore-draft',
-        roles: [ADMIN, RECEPTION],
-        modules: ['patients'],
-        routes: ['/patients/create', '/patients/*/edit'],
-        question: '¿Cómo restauro un borrador?',
-        keywords: ['restaurar borrador', 'recuperar borrador', 'borrador paciente'],
-        answer: 'Si existe un borrador local para este formulario, MediFlow muestra un aviso al abrirlo. Pulsa Restaurar borrador, revisa todo y envíalo manualmente cuando vuelva la conexión.',
-        steps: ['Abre el mismo formulario donde se creó el borrador.', 'Pulsa Restaurar borrador.', 'Revisa la información recuperada.', 'Guarda manualmente cuando exista conexión.'],
-        suggestedRoute: '/patients/create',
-        requiresConnection: false,
-    },
-    {
-        id: 'patients-offline',
-        roles: [ADMIN, RECEPTION],
-        modules: ['patients'],
-        routes: ['/patients', '/patients/create'],
-        question: '¿Qué pasa si no tengo internet?',
-        keywords: ['paciente sin internet', 'paciente offline', 'guardar paciente sin conexion'],
-        answer: 'Puedes conservar el formulario como borrador local. Cuando vuelva la conexión, restaura el borrador, revisa su contenido y envíalo manualmente.',
-        steps: [],
-        suggestedRoute: '/patients/create',
-        requiresConnection: false,
-    },
-    {
-        id: 'appointments-create',
-        roles: [ADMIN, RECEPTION],
-        modules: ['appointments'],
-        routes: ['/appointments', '/appointments/create', '/daily-agenda'],
-        question: '¿Cómo agendo una cita?',
-        aliases: ['cómo agendo un turno', 'quiero registrar una cita', 'donde creo una cita', 'como hago un agendamiento'],
-        keywords: ['agendar cita', 'crear cita', 'nueva cita', 'registrar cita'],
-        intent: 'create',
-        action: 'crear',
-        module: 'appointments',
-        answer: 'Para agendar una cita sigue estos pasos:',
-        steps: ['Abre el módulo Citas médicas.', 'Pulsa Nueva cita.', 'Selecciona el paciente y el servicio.', 'Selecciona un médico disponible.', 'Escoge la fecha y la hora.', 'Revisa la información y guarda la cita.'],
-        suggestedRoute: '/appointments/create',
-        requiresConnection: true,
-    },
-    {
-        id: 'appointments-doctor-missing',
-        roles: [ADMIN, RECEPTION],
-        modules: ['appointments'],
-        routes: ['/appointments/create', '/appointments/*/edit'],
-        question: '¿Por qué no aparece un médico?',
-        keywords: ['no aparece medico', 'medico no disponible', 'buscar medico cita'],
-        answer: 'El médico debe estar activo, pertenecer a la clínica seleccionada y tener disponibilidad para el servicio, fecha y horario consultados.',
-        steps: ['Confirma el servicio elegido.', 'Revisa la fecha y el horario.', 'Prueba otro horario disponible.', 'Si el médico debería aparecer, contacta al administrador.'],
-        suggestedRoute: '/appointments/create',
-        requiresConnection: true,
-    },
-    {
-        id: 'appointments-availability',
-        roles: [ADMIN, RECEPTION],
-        modules: ['appointments'],
-        routes: ['/appointments/create', '/appointments/*/edit'],
-        question: '¿Cómo funciona la disponibilidad?',
-        keywords: ['disponibilidad medica', 'horarios disponibles', 'disponibilidad cita'],
-        answer: 'MediFlow calcula los horarios disponibles según el médico, el servicio, la fecha y las citas ya registradas. Cambiar cualquiera de esos datos puede cambiar los horarios mostrados.',
-        steps: [],
-        suggestedRoute: '/appointments/create',
-        requiresConnection: true,
-    },
-    {
-        id: 'appointments-slot-occupied',
-        roles: [ADMIN, RECEPTION],
-        modules: ['appointments'],
-        routes: ['/appointments/create', '/appointments/*/edit'],
-        question: '¿Qué pasa si el horario ya está ocupado?',
-        keywords: ['horario ocupado', 'cita duplicada', 'conflicto horario'],
-        answer: 'MediFlow no debe guardar dos citas incompatibles en el mismo horario. Actualiza la disponibilidad y selecciona otro bloque libre.',
-        steps: ['Vuelve a consultar la disponibilidad.', 'Selecciona otro horario.', 'Guarda la cita después de verificar el nuevo bloque.'],
-        suggestedRoute: '/appointments/create',
-        requiresConnection: true,
-    },
-    {
-        id: 'appointments-reschedule',
-        roles: [ADMIN, RECEPTION],
-        modules: ['appointments'],
-        routes: ['/appointments', '/daily-agenda', '/appointments/*/edit'],
-        question: '¿Cómo reprogramo una cita?',
-        keywords: ['reprogramar cita', 'cambiar fecha cita', 'cambiar horario cita'],
-        answer: 'Abre la cita, selecciona Editar y elige una nueva fecha y hora disponibles. Revisa los cambios antes de guardar.',
-        steps: ['Localiza la cita.', 'Pulsa Editar.', 'Selecciona la nueva fecha y hora.', 'Confirma que exista disponibilidad y guarda.'],
-        suggestedRoute: '/appointments',
-        requiresConnection: true,
-    },
-    {
-        id: 'appointments-cancel',
-        roles: [ADMIN, RECEPTION],
-        modules: ['appointments'],
-        routes: ['/appointments', '/daily-agenda'],
-        question: '¿Cómo cancelo una cita?',
-        keywords: ['cancelar cita', 'anular cita'],
-        answer: 'Localiza la cita en Citas o Agenda del día y utiliza la opción Cancelar. Confirma únicamente después de revisar el paciente, la fecha y la hora mostrados.',
-        steps: [],
-        suggestedRoute: '/daily-agenda',
-        requiresConnection: true,
-    },
-    {
-        id: 'appointments-daily-agenda',
-        roles: [ADMIN, RECEPTION, DOCTOR],
-        modules: ['appointments', 'dashboard'],
-        routes: ['/daily-agenda', '/dashboard'],
-        question: '¿Cómo reviso la agenda diaria?',
-        keywords: ['agenda diaria', 'agenda del dia', 'citas de hoy'],
-        answer: 'Abre Agenda del día para revisar las citas de la jornada y sus estados. El contenido visible depende de tu rol y permisos.',
-        steps: [],
-        suggestedRoute: '/daily-agenda',
-        requiresConnection: true,
-    },
-    {
-        id: 'appointments-offline-draft',
-        roles: [ADMIN, RECEPTION],
-        modules: ['appointments'],
-        routes: ['/appointments/create', '/appointments/*/edit'],
-        question: '¿Cómo guardo un borrador offline de una cita?',
-        keywords: ['borrador cita', 'cita offline', 'guardar cita sin conexion'],
-        answer: 'Completa el formulario permitido y MediFlow conservará un borrador local. Debes restaurarlo, revisar la disponibilidad y enviarlo manualmente cuando vuelva la conexión.',
-        steps: [],
-        suggestedRoute: '/appointments/create',
-        requiresConnection: false,
-    },
-    {
-        id: 'payments-basic-status',
-        roles: [ADMIN, RECEPTION, CASH],
-        modules: ['payments', 'appointments'],
-        routes: ['/payments', '/appointments', '/daily-agenda'],
-        question: '¿Cómo reviso el estado básico de un pago?',
-        keywords: ['estado de pago', 'pago pendiente', 'pago pagado'],
-        answer: 'Revisa el badge o estado mostrado junto al registro. Según tus permisos, podrás ver si está pendiente, pagado, parcial o anulado.',
-        steps: [],
-        suggestedRoute: null,
-        requiresConnection: true,
-    },
-    {
-        id: 'payments-pending',
-        roles: [ADMIN, CASH],
-        modules: ['payments', 'dashboard'],
-        routes: ['/payments', '/dashboard'],
-        question: '¿Cómo veo los pagos pendientes?',
-        keywords: ['pagos pendientes', 'deudas pendientes', 'cobros pendientes'],
-        answer: 'Abre Pagos y Finanzas y utiliza los filtros disponibles para localizar los registros con estado Pendiente.',
-        steps: [],
-        suggestedRoute: '/payments',
-        requiresConnection: true,
-    },
-    {
-        id: 'payments-charge',
-        roles: [ADMIN, CASH],
-        modules: ['payments'],
-        routes: ['/payments', '/payments/create'],
-        question: '¿Cómo registro un cobro?',
-        aliases: ['como cobro un pago', 'quiero registrar un pago', 'donde confirmo un pago', 'como hago un cobro'],
-        keywords: ['registrar cobro', 'crear pago', 'registrar pago', 'cobrar'],
-        intent: 'create',
-        action: 'crear',
-        module: 'payments',
-        answer: 'Para registrar un cobro sigue estos pasos:',
-        steps: ['Abre Pagos y Finanzas.', 'Localiza el pago pendiente o pulsa Nuevo pago.', 'Selecciona el método de pago.', 'Verifica el monto y la referencia.', 'Confirma el cobro.', 'Descarga el recibo si es necesario.'],
-        suggestedRoute: '/payments',
-        requiresConnection: true,
-    },
-    {
-        id: 'payments-methods',
-        roles: [ADMIN, CASH],
-        modules: ['payments'],
-        routes: ['/payments/create', '/payments/*/edit'],
-        question: '¿Cómo selecciono el método de pago?',
-        keywords: ['metodo de pago', 'forma de pago', 'efectivo transferencia tarjeta'],
-        answer: 'En el formulario de pago selecciona uno de los métodos habilitados y completa únicamente la referencia solicitada. Nunca escribas datos completos de tarjetas en campos no destinados para ello.',
-        steps: [],
-        suggestedRoute: '/payments/create',
-        requiresConnection: true,
-    },
-    {
-        id: 'payments-receipt',
-        roles: [ADMIN, CASH],
-        modules: ['payments'],
-        routes: ['/payments', '/payments/*'],
-        question: '¿Cómo descargo un recibo?',
-        aliases: ['donde descargo el recibo', 'como bajo un recibo', 'quiero exportar el comprobante'],
-        keywords: ['descargar recibo', 'imprimir recibo', 'comprobante de pago'],
-        intent: 'export',
-        action: 'exportar',
-        module: 'payments',
-        answer: 'Abre el detalle del pago y utiliza la opción Recibo o Imprimir. Verifica que el pago y la clínica sean correctos antes de generar el documento.',
-        steps: [],
-        suggestedRoute: '/payments',
-        requiresConnection: true,
-    },
-    {
-        id: 'payments-financial-report',
-        roles: [ADMIN, CASH],
-        modules: ['payments', 'reports'],
-        routes: ['/payments', '/reports', '/reports/financial'],
-        question: '¿Cómo exporto el reporte financiero?',
-        keywords: ['exportar reporte financiero', 'descargar reporte financiero', 'reporte de pagos'],
-        answer: 'Abre Reportes, entra en Reporte financiero, aplica los filtros y elige el formato de exportación permitido.',
-        steps: ['Abre Reportes.', 'Selecciona Reporte financiero.', 'Define los filtros.', 'Revisa los resultados.', 'Elige PDF, CSV, XLSX o impresión.'],
-        suggestedRoute: '/reports/financial',
-        requiresConnection: true,
-    },
-    {
-        id: 'reports-operational',
-        roles: [ADMIN, RECEPTION],
-        modules: ['reports'],
-        routes: ['/reports', '/reports/appointments', '/reports/patients'],
-        question: '¿Cómo consulto reportes operativos?',
-        keywords: ['reportes operativos', 'reporte de citas', 'reporte de pacientes'],
-        answer: 'En Reportes selecciona una vista operativa disponible, como citas o pacientes, y aplica los filtros necesarios. Solo verás las opciones autorizadas para tu rol.',
-        steps: [],
-        suggestedRoute: '/reports',
-        requiresConnection: true,
-    },
-    {
-        id: 'reports-doctor',
-        roles: [DOCTOR],
-        modules: ['reports', 'dashboard'],
-        routes: ['/reports', '/reports/clinical', '/reports/appointments', '/dashboard'],
-        question: '¿Cómo reviso mis reportes?',
-        keywords: ['mis reportes', 'reportes propios', 'reporte medico'],
-        answer: 'Abre Reportes para consultar las vistas clínicas y de agenda permitidas para tu cuenta. MediFlow mantiene el alcance definido por tus permisos.',
-        steps: [],
-        suggestedRoute: '/reports',
-        requiresConnection: true,
-    },
-    {
-        id: 'consultations-start',
-        roles: [ADMIN, DOCTOR],
-        modules: ['consultations', 'appointments'],
-        routes: ['/consultations', '/consultations/create', '/daily-agenda'],
-        question: '¿Cómo inicio una consulta?',
-        keywords: ['iniciar consulta', 'crear consulta', 'atender cita'],
-        answer: 'Localiza la cita que cumple las condiciones de atención y utiliza la opción Iniciar consulta. Revisa la información visible antes de continuar.',
-        steps: ['Abre Agenda del día o Consultas.', 'Localiza la cita correspondiente.', 'Verifica que pueda iniciarse.', 'Pulsa Iniciar consulta.', 'Completa y guarda el formulario autorizado.'],
-        suggestedRoute: '/daily-agenda',
-        requiresConnection: true,
-    },
-    {
-        id: 'consultations-button-missing',
-        roles: [ADMIN, DOCTOR],
-        modules: ['consultations', 'appointments'],
-        routes: ['/consultations', '/daily-agenda'],
-        question: '¿Por qué no aparece el botón iniciar?',
-        keywords: ['no aparece boton iniciar', 'no puedo iniciar consulta', 'iniciar consulta bloqueado'],
-        answer: 'El botón depende del estado de la cita, la fecha, el médico asignado, el estado requerido del pago y tus permisos. Revisa esos datos sin modificar información ajena.',
-        steps: [],
-        suggestedRoute: '/daily-agenda',
-        requiresConnection: true,
-    },
-    {
-        id: 'consultations-unpaid',
-        roles: [ADMIN, DOCTOR],
-        modules: ['consultations', 'appointments'],
-        routes: ['/consultations', '/daily-agenda'],
-        question: '¿Qué pasa si la cita no está pagada?',
-        keywords: ['cita no pagada', 'consulta sin pago', 'pago requerido consulta'],
-        answer: 'Si la política configurada exige pago previo, MediFlow puede impedir iniciar la consulta. El personal autorizado de caja o administración debe revisar el pago; el médico no debe registrar el cobro.',
-        steps: [],
-        suggestedRoute: '/daily-agenda',
-        requiresConnection: true,
-    },
-    {
-        id: 'consultations-draft',
-        roles: [ADMIN, DOCTOR],
-        modules: ['consultations', 'medical-records'],
-        routes: ['/consultations/create', '/consultations/*/edit', '/medical-records/*/edit'],
-        question: '¿Cómo recupero un borrador clínico?',
-        keywords: ['recuperar borrador consulta', 'borrador clinico', 'restaurar consulta'],
-        answer: 'Abre el mismo formulario. Si existe un borrador local de tu usuario y clínica, pulsa Restaurar borrador, revisa cuidadosamente el contenido y envíalo manualmente cuando exista conexión.',
-        steps: [],
-        suggestedRoute: '/consultations',
-        requiresConnection: false,
-    },
-    {
-        id: 'medical-records-guide',
-        roles: [ADMIN, DOCTOR],
-        modules: ['medical-records'],
-        routes: ['/medical-records', '/medical-records/*'],
-        question: '¿Cómo consulto una historia clínica?',
-        keywords: ['consultar historia clinica', 'ver historial clinico', 'abrir historia clinica'],
-        answer: 'Abre Historial clínico y localiza el registro permitido. La información visible sigue protegida por los permisos y el aislamiento de la clínica activa.',
-        steps: [],
-        suggestedRoute: '/medical-records',
-        requiresConnection: true,
-    },
-    {
-        id: 'prescriptions-create',
-        roles: [ADMIN, DOCTOR],
-        modules: ['prescriptions'],
-        routes: ['/prescriptions', '/prescriptions/create'],
-        question: '¿Cómo creo una receta?',
-        aliases: ['como creo una receta medica', 'como hago una receta', 'quiero hacer una receta', 'quiero generar una prescripcion', 'donde genero una prescripcion', 'donde creo una receta', 'como emitir una receta'],
-        keywords: ['crear receta', 'nueva receta', 'registrar receta'],
-        intent: 'create',
-        action: 'crear',
-        module: 'prescriptions',
-        ambiguityLabel: 'Crear una receta',
-        answer: 'Abre Recetas médicas y pulsa Nueva receta. Selecciona únicamente los registros autorizados, completa la indicación y revisa todo antes de guardar.',
-        steps: ['Abre Recetas médicas.', 'Pulsa Nueva receta.', 'Completa la información solicitada.', 'Añade los ítems necesarios.', 'Revisa y guarda la receta.'],
-        suggestedRoute: '/prescriptions/create',
-        requiresConnection: true,
-    },
-    {
-        id: 'prescriptions-sign',
-        roles: [ADMIN, DOCTOR],
-        modules: ['prescriptions'],
-        routes: ['/prescriptions', '/prescriptions/*'],
-        question: '¿Cómo firmo una receta?',
-        aliases: ['no me deja firmar la receta', 'quiero firmar una receta', 'donde firmo la receta'],
-        keywords: ['firmar receta', 'firma electronica interna', 'firma de receta'],
-        intent: 'sign',
-        action: 'firmar',
-        module: 'prescriptions',
-        ambiguityLabel: 'Firmar una receta',
-        answer: 'Abre la receta, revisa que esté completa y utiliza Firmar. La firma es una acción oficial y requiere conexión.',
-        steps: ['Abre el detalle de la receta.', 'Revisa su contenido y estado.', 'Pulsa Firmar.', 'Confirma la acción únicamente si todo es correcto.'],
-        suggestedRoute: '/prescriptions',
-        requiresConnection: true,
-    },
-    {
-        id: 'prescriptions-send',
-        roles: [ADMIN, DOCTOR],
-        modules: ['prescriptions'],
-        routes: ['/prescriptions', '/prescriptions/*'],
-        question: '¿Cómo envío una receta por correo?',
-        aliases: ['quiero enviar una receta', 'como mando la receta por correo', 'donde envio la prescripcion'],
-        keywords: ['enviar receta por correo', 'correo receta', 'compartir receta'],
-        intent: 'send',
-        action: 'enviar',
-        module: 'prescriptions',
-        ambiguityLabel: 'Enviar una receta por correo',
-        answer: 'Abre una receta válida y firmada y utiliza la opción de envío disponible. El envío requiere conexión y solo debe hacerse desde la acción oficial de MediFlow.',
-        steps: [],
-        suggestedRoute: '/prescriptions',
-        requiresConnection: true,
-    },
-    {
-        id: 'prescriptions-offline-sign',
-        roles: [ADMIN, DOCTOR],
-        modules: ['prescriptions'],
-        routes: ['/prescriptions', '/prescriptions/*'],
-        question: '¿Por qué no puedo firmar sin conexión?',
-        aliases: ['no me deja firmar la receta', 'por que no puedo firmar la receta', 'firma bloqueada sin internet'],
-        keywords: ['firmar sin conexion', 'firma bloqueada offline', 'no puedo firmar receta'],
-        intent: 'troubleshoot',
-        action: 'firmar',
-        module: 'prescriptions',
-        answer: 'MediFlow bloquea la firma y el envío de recetas sin conexión porque son acciones oficiales. Puedes conservar un borrador local y completarlas cuando se restablezca la conexión.',
-        steps: [],
-        suggestedRoute: '/prescriptions',
-        requiresConnection: false,
-    },
-    {
-        id: 'users-create',
-        roles: [ADMIN],
-        modules: ['users'],
-        routes: ['/users', '/users/create'],
-        question: '¿Cómo creo un usuario?',
-        keywords: ['crear usuario', 'nuevo usuario', 'registrar usuario'],
-        answer: 'Abre Usuarios y Roles, pulsa Nuevo usuario, completa los datos autorizados, asigna el rol adecuado y revisa la clínica antes de guardar.',
-        steps: ['Abre Usuarios y Roles.', 'Pulsa Nuevo usuario.', 'Completa los datos de acceso.', 'Selecciona el rol correcto.', 'Revisa y guarda.'],
-        suggestedRoute: '/users/create',
-        requiresConnection: true,
-    },
-    {
-        id: 'users-roles',
-        roles: [ADMIN],
-        modules: ['users'],
-        routes: ['/users', '/users/create', '/users/*/edit'],
-        question: '¿Cómo asigno un rol?',
-        keywords: ['asignar rol', 'cambiar rol', 'permisos usuario'],
-        answer: 'Selecciona el rol desde el formulario del usuario. Los permisos efectivos los controla el backend; el asistente no puede ampliarlos ni reemplazarlos.',
-        steps: [],
-        suggestedRoute: '/users',
-        requiresConnection: true,
-    },
-    {
-        id: 'settings-clinic',
-        roles: [ADMIN],
-        modules: ['settings'],
-        routes: ['/settings/clinic'],
-        question: '¿Cómo actualizo la configuración de la clínica?',
-        keywords: ['configurar clinica', 'editar clinica', 'datos de clinica'],
-        answer: 'Abre Configuración, revisa la clínica activa y modifica únicamente los campos autorizados. Esta acción requiere conexión.',
-        steps: [],
-        suggestedRoute: '/settings/clinic',
-        requiresConnection: true,
-    },
-    {
-        id: 'audit-review',
-        roles: [ADMIN],
-        modules: ['audit'],
-        routes: ['/audit-logs'],
-        question: '¿Cómo reviso la auditoría?',
-        keywords: ['revisar auditoria', 'historial de actividad', 'audit logs'],
-        answer: 'Abre Auditoría y utiliza los filtros disponibles para revisar la actividad autorizada de la clínica activa.',
-        steps: [],
-        suggestedRoute: '/audit-logs',
-        requiresConnection: true,
-    },
-    {
-        id: 'super-admin-create-clinic',
-        roles: [SUPER_ADMIN],
-        modules: ['super-admin'],
-        routes: ['/super-admin/clinics', '/super-admin/clinics/create'],
-        question: '¿Cómo creo una clínica?',
-        keywords: ['crear clinica', 'nueva clinica', 'registrar clinica'],
-        answer: 'Abre la administración global de clínicas y pulsa Nueva clínica. Completa los datos de onboarding y revisa el estado antes de guardar.',
-        steps: ['Abre Clínicas.', 'Pulsa Nueva clínica.', 'Completa los datos generales.', 'Revisa el estado inicial.', 'Guarda y continúa el onboarding.'],
-        suggestedRoute: '/super-admin/clinics/create',
-        requiresConnection: true,
-    },
-    {
-        id: 'super-admin-onboarding',
-        roles: [SUPER_ADMIN],
-        modules: ['super-admin'],
-        routes: ['/super-admin/clinics', '/super-admin/clinics/create'],
-        question: '¿Cómo funciona el onboarding?',
-        keywords: ['onboarding clinica', 'configurar nueva clinica', 'alta de clinica'],
-        answer: 'El onboarding comienza con el registro de la clínica y continúa con la configuración administrativa y del responsable principal. Verifica cada dato antes de activar el acceso.',
-        steps: [],
-        suggestedRoute: '/super-admin/clinics',
-        requiresConnection: true,
-    },
-    {
-        id: 'super-admin-plans',
-        roles: [SUPER_ADMIN],
-        modules: ['super-admin'],
-        routes: ['/super-admin/clinics'],
-        question: '¿Cómo reviso los planes de suscripción?',
-        keywords: ['planes de suscripcion', 'suscripciones', 'plan de clinica'],
-        answer: 'Revisa la ficha administrativa de la clínica. La disponibilidad de planes depende de las funciones implementadas en el módulo global; el asistente no cambia suscripciones.',
-        steps: [],
-        suggestedRoute: '/super-admin/clinics',
-        requiresConnection: true,
-    },
-    {
-        id: 'super-admin-status',
-        roles: [SUPER_ADMIN],
-        modules: ['super-admin'],
-        routes: ['/super-admin/clinics', '/super-admin/clinics/*/edit'],
-        question: '¿Cómo activo o inactivo una clínica?',
-        keywords: ['activar clinica', 'inactivar clinica', 'estado de clinica'],
-        answer: 'Abre la edición de la clínica y revisa el estado administrativo. Cambiarlo es una acción global que requiere conexión y confirmación cuidadosa.',
-        steps: [],
-        suggestedRoute: '/super-admin/clinics',
-        requiresConnection: true,
-    },
-    {
-        id: 'super-admin-primary-admin',
-        roles: [SUPER_ADMIN],
-        modules: ['super-admin'],
-        routes: ['/super-admin/clinics'],
-        question: '¿Cómo gestiono administradores principales?',
-        keywords: ['administrador principal', 'admin de clinica', 'responsable de clinica'],
-        answer: 'La gestión del responsable principal debe realizarse desde las opciones globales autorizadas. Verifica la clínica y el usuario antes de cualquier cambio.',
-        steps: [],
-        suggestedRoute: '/super-admin/clinics',
-        requiresConnection: true,
-    },
-    {
-        id: 'super-admin-isolation',
-        roles: [SUPER_ADMIN],
-        modules: ['super-admin'],
-        routes: ['/super-admin/clinics'],
-        question: '¿Cómo funciona el aislamiento multi-clínica?',
-        keywords: ['aislamiento multi clinica', 'datos por clinica', 'tenant clinic'],
-        answer: 'MediFlow resuelve el acceso desde el usuario autenticado y la clínica validada. El asistente solo recibe identificadores de contexto y nunca reemplaza los permisos ni consulta información de una clínica.',
-        steps: [],
-        suggestedRoute: '/super-admin/clinics',
-        requiresConnection: false,
-    },
-    {
-        id: 'offline-reception',
-        roles: [RECEPTION],
-        modules: ['general', 'dashboard', 'patients', 'appointments'],
-        routes: [],
-        question: '¿Por qué no guarda cuando estoy sin conexión?',
-        aliases: ['estoy sin internet', 'por que no puedo guardar', 'no me deja guardar el paciente', 'no me deja guardar la cita'],
-        keywords: ['por que no guarda', 'por que esta bloqueado', 'no puedo registrar', 'no funciona', 'sin conexion', 'offline'],
-        intent: 'troubleshoot',
-        action: 'guardar',
-        module: 'connection',
-        answer: 'Actualmente estás sin conexión. Puedes guardar borradores de pacientes y citas, pero deberás restaurarlos, revisarlos y enviarlos manualmente cuando vuelva la conexión.',
-        steps: [],
-        suggestedRoute: null,
-        requiresConnection: false,
-    },
-    {
-        id: 'offline-cash',
-        roles: [CASH],
-        modules: ['general', 'dashboard', 'payments', 'reports'],
-        routes: [],
-        question: '¿Por qué no puedo cobrar?',
-        aliases: ['estoy sin internet', 'por que no puedo guardar', 'por que no puedo cobrar', 'no me deja registrar el pago'],
-        keywords: ['por que no puedo cobrar', 'por que no guarda', 'por que esta bloqueado', 'no puedo registrar', 'no funciona', 'sin conexion', 'offline'],
-        intent: 'troubleshoot',
-        action: 'guardar',
-        module: 'connection',
-        answer: 'Actualmente estás sin conexión o el servidor no responde. MediFlow bloquea los pagos y movimientos financieros sin conexión para evitar cobros duplicados o inconsistencias.',
-        steps: [],
-        suggestedRoute: null,
-        requiresConnection: false,
-    },
-    {
-        id: 'offline-doctor',
-        roles: [DOCTOR],
-        modules: ['general', 'dashboard', 'consultations', 'medical-records', 'prescriptions'],
-        routes: [],
-        question: '¿Qué puedo hacer sin conexión?',
-        aliases: ['estoy sin internet', 'por que no puedo guardar', 'no me deja guardar la consulta', 'no puedo firmar la receta'],
-        keywords: ['por que no guarda', 'por que esta bloqueado', 'no puedo registrar', 'no funciona', 'sin conexion', 'offline'],
-        intent: 'troubleshoot',
-        action: 'guardar',
-        module: 'connection',
-        answer: 'Actualmente estás sin conexión. Puedes guardar borradores de consultas, historias clínicas y recetas, pero no puedes firmar ni enviar recetas hasta recuperar conexión.',
-        steps: [],
-        suggestedRoute: null,
-        requiresConnection: false,
-    },
-    {
-        id: 'offline-admin',
-        roles: [ADMIN],
-        modules: ['general', 'dashboard', 'users', 'settings', 'payments'],
-        routes: [],
-        question: '¿Qué acciones se bloquean sin conexión?',
-        aliases: ['estoy sin internet', 'por que no puedo guardar', 'que se bloquea sin internet'],
-        keywords: ['por que no puedo cobrar', 'por que no guarda', 'por que esta bloqueado', 'no puedo registrar', 'no funciona', 'sin conexion', 'offline'],
-        intent: 'troubleshoot',
-        action: 'guardar',
-        module: 'connection',
-        answer: 'Actualmente estás sin conexión. MediFlow bloquea pagos, usuarios, configuración y otras acciones críticas. Los formularios permitidos pueden conservarse como borradores.',
-        steps: [],
-        suggestedRoute: null,
-        requiresConnection: false,
-    },
-    {
-        id: 'offline-super-admin',
-        roles: [SUPER_ADMIN],
-        modules: ['general', 'super-admin'],
-        routes: [],
-        question: '¿Qué acciones globales se bloquean sin conexión?',
-        aliases: ['estoy sin internet', 'por que no puedo guardar', 'que se bloquea sin internet'],
-        keywords: ['por que no guarda', 'por que esta bloqueado', 'no puedo registrar', 'no funciona', 'sin conexion', 'offline'],
-        intent: 'troubleshoot',
-        action: 'guardar',
-        module: 'connection',
-        answer: 'Actualmente estás sin conexión. Las acciones globales de clínicas y suscripciones están bloqueadas hasta recuperar conexión.',
-        steps: [],
-        suggestedRoute: null,
-        requiresConnection: false,
-    },
-];
+const MIN_SEARCH_SCORE = 62;
+const MIN_AMBIGUITY_SCORE = 30;
+const AMBIGUITY_DELTA = 10;
+const STOP_WORDS = new Set([
+    'como', 'puedo', 'podria', 'quiero', 'necesito', 'una', 'un', 'el', 'la',
+    'los', 'las', 'para', 'por', 'favor', 'me', 'se', 'que', 'del', 'de', 'y',
+]);
+const PHRASE_EQUIVALENCES = new Map([
+    ['receta medica', 'receta'],
+    ['usuario clinico', 'paciente'],
+    ['registrar pago', 'crear pago'],
+    ['confirmar pago', 'crear pago'],
+    ['sin internet', 'conexion'],
+    ['sin conexion', 'conexion'],
+    ['servidor no disponible', 'servidor conexion'],
+]);
+const WORD_EQUIVALENCES = new Map([
+    ['creo', 'crear'], ['hacer', 'crear'], ['hago', 'crear'], ['generar', 'crear'],
+    ['genero', 'crear'], ['elaborar', 'crear'], ['emitir', 'crear'], ['registro', 'crear'],
+    ['registrar', 'crear'], ['agendar', 'crear'], ['agendo', 'crear'],
+    ['prescripcion', 'receta'], ['recetario', 'receta'],
+    ['turno', 'cita'], ['agendamiento', 'cita'],
+    ['cobrar', 'crear pago'], ['cobro', 'crear pago'],
+    ['descargar', 'exportar'], ['bajar', 'exportar'],
+    ['informe', 'reporte'], ['excel', 'xlsx'],
+    ['internet', 'conexion'], ['red', 'conexion'], ['offline', 'conexion'],
+]);
+const SAFE_SINGULARS = new Map([
+    ['recetas', 'receta'], ['prescripciones', 'receta'], ['citas', 'cita'],
+    ['turnos', 'cita'], ['pagos', 'pago'], ['pacientes', 'paciente'],
+    ['recibos', 'recibo'], ['reportes', 'reporte'], ['informes', 'reporte'],
+    ['consultas', 'consulta'], ['usuarios', 'usuario'], ['borradores', 'borrador'],
+    ['historias', 'historia'], ['clinicas', 'clinica'], ['acciones', 'accion'],
+    ['medicos', 'medico'], ['servicios', 'servicio'], ['permisos', 'permiso'],
+]);
+const MODULE_TOKENS = Object.freeze({
+    patients: ['paciente'],
+    doctors: ['medico'],
+    services: ['servicio'],
+    appointments: ['cita'],
+    daily_agenda: ['agenda', 'cita'],
+    payments: ['pago', 'cobro'],
+    receipts: ['recibo', 'comprobante'],
+    prescriptions: ['receta'],
+    reports: ['reporte', 'xlsx'],
+    consultations: ['consulta'],
+    medical_records: ['historia', 'historial'],
+    users: ['usuario', 'rol'],
+    clinic_settings: ['configuracion', 'clinica'],
+    clinic_switch: ['clinica', 'sucursal'],
+    audit: ['auditoria'],
+    financial_audit: ['caja', 'financiero'],
+    super_admin_clinics: ['clinica', 'global'],
+    subscriptions: ['suscripcion', 'plan'],
+    onboarding: ['onboarding', 'alta'],
+    permissions: ['permiso', '403', 'boton'],
+    offline: ['conexion', 'borrador', 'servidor'],
+    support: ['soporte', 'ayuda'],
+});
 
 export const UNKNOWN_ANSWER = 'No encontré una respuesta exacta para eso. Puedes revisar la guía del módulo o contactar al administrador.';
 
-export const ROLE_LABELS = {
-    [ADMIN]: 'Administración',
-    [RECEPTION]: 'Recepción',
-    [CASH]: 'Caja y finanzas',
-    [DOCTOR]: 'Médico',
-    [SUPER_ADMIN]: 'Súper Admin',
-};
+export function expandKnowledgeDocument(document = knowledgeDocument) {
+    const defaults = document?.defaults || {};
 
-export const MODULE_LABELS = {
-    dashboard: 'Dashboard',
-    patients: 'Pacientes',
-    doctors: 'Médicos',
-    appointments: 'Citas',
-    consultations: 'Consultas',
-    'medical-records': 'Historial clínico',
-    prescriptions: 'Recetas',
-    payments: 'Pagos',
-    reports: 'Reportes',
-    users: 'Usuarios y roles',
-    settings: 'Configuración',
-    audit: 'Auditoría',
-    services: 'Servicios',
-    'super-admin': 'Administración global',
-    'demo-requests': 'Solicitudes de demo',
-    profile: 'Perfil',
-    general: 'MediFlow',
-};
+    return (document?.entries || []).map((entry) => ({
+        ...defaults,
+        ...entry,
+        aliases: [...(entry.aliases ?? defaults.aliases ?? [])],
+        keywords: [...(entry.keywords ?? defaults.keywords ?? [])],
+        steps: [...(entry.steps ?? defaults.steps ?? [])],
+        online_restrictions: [...(entry.online_restrictions ?? defaults.online_restrictions ?? [])],
+        tags: [...(entry.tags ?? defaults.tags ?? [])],
+        escalation: { ...(defaults.escalation || {}), ...(entry.escalation || {}) },
+        suggestedRoute: entry.related_path ?? defaults.related_path ?? null,
+        requiresConnection: entry.requires_online ?? defaults.requires_online ?? false,
+        ambiguityLabel: entry.ambiguity_label ?? null,
+        module: entry.modules?.[0] || 'support',
+    }));
+}
+
+export function validateKnowledgeEntries(document = knowledgeDocument) {
+    const errors = [];
+    const roleIds = new Set(Object.keys(document?.catalogs?.roles || {}));
+    const moduleIds = new Set(Object.keys(document?.catalogs?.modules || {}));
+    const ids = new Set();
+
+    expandKnowledgeDocument(document).forEach((entry, index) => {
+        const prefix = `entries[${index}]`;
+        if (! entry.id || ids.has(entry.id)) {
+            errors.push(`${prefix}: id ausente o duplicado (${entry.id || 'vacío'}).`);
+        }
+        ids.add(entry.id);
+        if (! entry.question?.trim() || ! entry.answer?.trim()) {
+            errors.push(`${prefix}: pregunta o respuesta vacía.`);
+        }
+        if (! entry.roles?.length || entry.roles.some((role) => ! roleIds.has(role))) {
+            errors.push(`${prefix}: rol inválido.`);
+        }
+        if (! entry.modules?.length || entry.modules.some((module) => ! moduleIds.has(module))) {
+            errors.push(`${prefix}: módulo inválido.`);
+        }
+    });
+
+    return errors;
+}
+
+const runtimeErrors = validateKnowledgeEntries();
+if (runtimeErrors.length) {
+    throw new Error(`Base de conocimiento inválida: ${runtimeErrors.join(' ')}`);
+}
+
+export const MEDIFLOW_KNOWLEDGE_BASE = Object.freeze(
+    expandKnowledgeDocument().filter((entry) => entry.status === 'active').map(Object.freeze),
+);
+export const ROLE_LABELS = Object.freeze({ ...knowledgeDocument.catalogs.roles });
+export const MODULE_LABELS = Object.freeze(Object.fromEntries(
+    Object.entries(knowledgeDocument.catalogs.modules).map(([id, config]) => [id, config.label]),
+));
+export const KNOWLEDGE_BASE_META = Object.freeze({
+    source: knowledgeDocument.source,
+    schemaVersion: knowledgeDocument.schema_version,
+    entries: MEDIFLOW_KNOWLEDGE_BASE.length,
+});
+export const KNOWLEDGE_INDEX_BY_ROLE = Object.freeze(Object.fromEntries(
+    Object.keys(ROLE_LABELS).map((role) => [
+        role,
+        Object.freeze(MEDIFLOW_KNOWLEDGE_BASE.filter((entry) => entry.roles.includes(role))),
+    ]),
+));
+
+export function normalizeAssistantText(value = '') {
+    let normalized = String(value)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    PHRASE_EQUIVALENCES.forEach((replacement, phrase) => {
+        normalized = normalized.replace(new RegExp(`\\b${phrase}\\b`, 'g'), replacement);
+    });
+
+    const tokens = normalized
+        .split(' ')
+        .flatMap((token) => String(WORD_EQUIVALENCES.get(token) || token).split(' '))
+        .map((token) => SAFE_SINGULARS.get(token) || token)
+        .filter((token) => token && ! STOP_WORDS.has(token));
+
+    return tokens.filter((token, index) => token !== tokens[index - 1]).join(' ');
+}
+
+export function normalizeConnectionState(value) {
+    const states = {
+        connected: 'ONLINE',
+        online: 'ONLINE',
+        offline: 'OFFLINE',
+        server_down: 'SERVER_UNAVAILABLE',
+        server_unavailable: 'SERVER_UNAVAILABLE',
+        internet_unavailable: 'INTERNET_UNAVAILABLE',
+    };
+    const normalized = String(value || '').toLowerCase();
+    return states[normalized] || (String(value || '').toUpperCase() || 'ONLINE');
+}
+
+export function isOfflineEntry(entry) {
+    return entry.category === 'offline' || entry.modules.includes('offline');
+}
+
+function tokensFor(value) {
+    return new Set(normalizeAssistantText(value).split(' ').filter((token) => token.length > 1));
+}
+
+function inferredIntent(tokens) {
+    const intentTokens = [
+        ['create', ['crear', 'nuevo', 'nueva']],
+        ['sign', ['firmar', 'firma']],
+        ['send', ['enviar', 'correo', 'compartir']],
+        ['export', ['exportar', 'imprimir', 'xlsx']],
+        ['update', ['editar', 'actualizar', 'corregir', 'cambiar', 'asignar']],
+        ['cancel', ['cancelar', 'anular']],
+        ['restore', ['restaurar', 'recuperar', 'borrador']],
+        ['view', ['ver', 'revisar', 'consultar', 'buscar', 'mostrar']],
+        ['troubleshoot', ['no', 'bloqueado', 'bloqueada', 'conexion', 'error', '403']],
+    ];
+    return intentTokens.find(([, candidates]) => candidates.some((token) => tokens.has(token)))?.[0] || null;
+}
+
+function queryModules(tokens) {
+    return Object.entries(MODULE_TOKENS)
+        .filter(([, candidates]) => candidates.some((token) => tokens.has(token)))
+        .map(([module]) => module);
+}
+
+function routeNameMatches(pattern, routeName) {
+    if (! pattern || ! routeName) {
+        return false;
+    }
+
+    const expression = pattern
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\\\*/g, '.*');
+    return new RegExp(`^${expression}$`).test(routeName);
+}
+
+function candidateScore(entry, normalizedQuestion, questionTokens, context, disconnected) {
+    const knownQuestions = [entry.question, ...(entry.aliases || [])].map(normalizeAssistantText);
+    const keywords = (entry.keywords || []).map(normalizeAssistantText);
+    const searchable = [...knownQuestions, ...keywords].filter(Boolean);
+    const identifiedModules = queryModules(questionTokens);
+    const moduleMatched = identifiedModules.some((module) => entry.modules.includes(module));
+    const questionIntent = inferredIntent(questionTokens);
+    const entryAction = normalizeAssistantText(entry.action || '').split(' ')[0];
+    const actionMatched = entryAction && questionTokens.has(entryAction);
+    let score = 0;
+
+    if (knownQuestions.includes(normalizedQuestion)) {
+        score = 140;
+    } else if (keywords.includes(normalizedQuestion)) {
+        score = 108;
+    } else {
+        if (entry.intent && questionIntent === entry.intent && moduleMatched) {
+            score = Math.max(score, 84);
+        } else if (actionMatched && moduleMatched) {
+            score = Math.max(score, 74);
+        }
+
+        searchable.forEach((knownText) => {
+            const knownTokens = tokensFor(knownText);
+            const overlap = [...knownTokens].filter((token) => questionTokens.has(token)).length;
+            const coverage = knownTokens.size ? overlap / knownTokens.size : 0;
+
+            if ((knownText.includes(normalizedQuestion) || normalizedQuestion.includes(knownText))
+                && knownTokens.size >= 2
+                && questionTokens.size >= 2) {
+                score = Math.max(score, 76);
+            } else if (overlap >= 2 && coverage >= 0.66) {
+                score = Math.max(score, 58);
+            } else if (moduleMatched && overlap >= 1) {
+                score = Math.max(score, 46);
+            }
+        });
+
+        if (moduleMatched) {
+            score = Math.max(score, 30);
+        }
+    }
+
+    if (score > 0 && entry.modules.includes(context.module)) {
+        score += 10;
+    }
+    if (score > 0 && entry.routes.some((pattern) => routeNameMatches(pattern, context.routeName))) {
+        score += 5;
+    }
+    if (score > 0 && disconnected && isOfflineEntry(entry)) {
+        score += 12;
+    }
+
+    return score;
+}
+
+export function searchKnowledge(question, context, connectionStatus = 'ONLINE') {
+    const normalizedQuestion = normalizeAssistantText(question);
+    if (! normalizedQuestion) {
+        return { entry: null, alternatives: [] };
+    }
+
+    const connectionState = normalizeConnectionState(connectionStatus);
+    const disconnected = connectionState !== 'ONLINE';
+    const questionTokens = tokensFor(normalizedQuestion);
+
+    const requestsPaymentWrite = questionTokens.has('pago') && questionTokens.has('crear');
+    if (requestsPaymentWrite && ! ['administrador', 'caja_finanzas'].includes(context.role)) {
+        return { entry: null, alternatives: [] };
+    }
+
+    const requestsClinicalContent = ['historia', 'historial', 'consulta', 'receta', 'diagnostico']
+        .some((token) => questionTokens.has(token));
+    if (requestsClinicalContent && ! ['administrador', 'medico'].includes(context.role)) {
+        return { entry: null, alternatives: [] };
+    }
+
+    // El rol se aplica antes de puntuar; nunca se busca primero en toda la base.
+    const roleEntries = KNOWLEDGE_INDEX_BY_ROLE[context.role] || [];
+    const candidates = roleEntries
+        .map((entry) => ({ entry, score: candidateScore(entry, normalizedQuestion, questionTokens, context, disconnected) }))
+        .filter((candidate) => candidate.score > 0)
+        .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id));
+
+    const best = candidates[0];
+    if (! best) {
+        return { entry: null, alternatives: [] };
+    }
+
+    const closeCandidates = candidates.filter((candidate) =>
+        candidate.score >= MIN_AMBIGUITY_SCORE
+        && best.score - candidate.score <= AMBIGUITY_DELTA);
+    const ambiguous = closeCandidates.length > 1 && best.score < 130;
+
+    if (ambiguous || (best.score < MIN_SEARCH_SCORE && closeCandidates.length > 1)) {
+        const alternatives = [...closeCandidates]
+            .sort((left, right) => Number(Boolean(right.entry.ambiguityLabel)) - Number(Boolean(left.entry.ambiguityLabel)))
+            .slice(0, 3)
+            .map((candidate) => candidate.entry);
+        return { entry: null, alternatives };
+    }
+
+    return best.score >= MIN_SEARCH_SCORE
+        ? { entry: best.entry, alternatives: [] }
+        : { entry: null, alternatives: [] };
+}
+
+export function findKnowledgeAnswer(question, context, connectionStatus = 'ONLINE') {
+    return searchKnowledge(question, context, connectionStatus).entry;
+}
+
+export function quickQuestionsFor(context, connectionStatus = 'ONLINE') {
+    const disconnected = normalizeConnectionState(connectionStatus) !== 'ONLINE';
+    const allowed = KNOWLEDGE_INDEX_BY_ROLE[context.role] || [];
+    const selected = [];
+    const seen = new Set();
+
+    const addFrom = (entries, limit) => {
+        entries.forEach((entry) => {
+            if (selected.length >= limit || seen.has(entry.id)) {
+                return;
+            }
+            seen.add(entry.id);
+            selected.push(entry);
+        });
+    };
+
+    addFrom(allowed.filter((entry) => ! isOfflineEntry(entry) && entry.modules.includes(context.module)), 3);
+    addFrom(allowed.filter((entry) => ! isOfflineEntry(entry) && entry.modules.includes('dashboard')), 5);
+    if (disconnected) {
+        addFrom(allowed.filter(isOfflineEntry), 6);
+    }
+    addFrom(allowed.filter((entry) => ! isOfflineEntry(entry)), 6);
+
+    return selected.slice(0, 6);
+}
