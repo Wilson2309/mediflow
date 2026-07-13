@@ -6,6 +6,12 @@ El widget consulta primero `resources/assistant/knowledge-base.json`. Una coinci
 
 El navegador nunca conoce la URL, el secreto ni el proveedor de n8n. Laravel valida el contexto, bloquea contenido sensible y es el único componente autorizado para realizar la solicitud externa.
 
+## Continuidad en Fase 4
+
+Este documento define el contrato Laravel. La configuración operativa de los workflows se encuentra en [n8n-full-setup.md](n8n-full-setup.md), la rotación y respuesta a incidentes en [n8n-security-operations.md](n8n-security-operations.md), y las pruebas sintéticas en [n8n-security-test-cases.md](n8n-security-test-cases.md). Supabase/pgvector es la variante persistente recomendada; Simple Vector Store es exclusivamente de desarrollo.
+
+La consulta persistente exige un manifiesto activo válido antes de recuperar documentos. Si falta, su versión no coincide o Supabase falla, el flujo termina en fallback sin ejecutar vector store ni modelo. La búsqueda obtiene hasta 30 candidatos y el postfiltro vuelve a exigir rol, módulo permitido, `status=active`, locale y el mismo checksum activo; solo entonces reduce el contexto al Top K final configurable entre 3 y 10.
+
 ## Endpoint Laravel
 
 - Método y ruta: `POST /assistant/message`
@@ -78,13 +84,15 @@ Laravel serializa el cuerpo JSON una sola vez y envía:
 - `X-MediFlow-Assistant-Version`
 - `Content-Type: application/json`
 
+`X-MediFlow-Assistant-Version` transporta la versión del conocimiento indicada por Laravel. No identifica la versión de n8n, del workflow, del modelo de chat ni del modelo de embeddings.
+
 La firma es:
 
 ```text
 HMAC-SHA256(secret, timestamp + "." + jsonBody)
 ```
 
-El futuro workflow de n8n deberá reconstruir exactamente esa cadena con el cuerpo recibido sin modificar, calcular el HMAC con el mismo secreto, comparar en tiempo constante, comprobar que el `request_id` coincida con la cabecera y rechazar timestamps antiguos para reducir reenvíos.
+El workflow de consulta de Fase 4 reconstruye exactamente esa cadena con el cuerpo recibido sin modificar, calcula el HMAC con el mismo secreto, compara en tiempo constante, comprueba que el `request_id` coincida con la cabecera y rechaza timestamps antiguos para reducir reenvíos.
 
 ## Respuesta permitida
 
@@ -98,7 +106,7 @@ El futuro workflow de n8n deberá reconstruir exactamente esa cadena con el cuer
 }
 ```
 
-Se acepta sólo este esquema. `answer` admite hasta 2.000 caracteres; `steps`, hasta 10 textos de 300 caracteres; `suggestions`, hasta 5 textos de 150 caracteres; y `confidence`, un número entre 0 y 1. Se descartan HTML, scripts, iframes, JavaScript, URLs externas, comandos o rutas de acción. El widget renderiza con `textContent`, nunca como HTML.
+Se acepta exactamente este contrato de cinco campos, todos obligatorios: `answer`, `confidence`, `steps`, `suggestions` y `can_escalate`. No se permiten campos adicionales ni ausentes. `answer` admite hasta 2.000 caracteres; `steps`, hasta 10 textos de 300 caracteres; `suggestions`, hasta 5 textos de 150 caracteres; y `confidence`, un número entre 0 y 1. Se descartan HTML, scripts, iframes, JavaScript, URLs externas, comandos o rutas de acción. El widget renderiza con `textContent`, nunca como HTML.
 
 ## Privacidad y fallbacks
 
@@ -108,7 +116,9 @@ Errores de configuración, timeout, red, HTTP, JSON o esquema producen el fallba
 
 > No encontré una respuesta exacta para eso. Puedes revisar la guía del módulo o contactar al administrador.
 
-Las respuestas no revelan URL, secreto, excepción, payload o clases internas. Los logs de error contienen únicamente metadata técnica segura: `request_id`, proveedor, estado, duración, rol, módulo y código interno; nunca la pregunta o respuesta completa.
+Las respuestas no revelan URL, secreto, excepción, payload o clases internas. Los logs de error de Laravel contienen únicamente metadata técnica segura: `request_id`, proveedor, estado, duración, rol, módulo y código interno; nunca la pregunta o respuesta completa.
+
+En n8n se construye telemetría técnica permitida, pero su persistencia queda deliberadamente pendiente. Los workflows usan `saveDataSuccessExecution=none`, `saveDataErrorExecution=none`, desactivan el guardado manual y no tienen un sink de observabilidad. No debe habilitarse el guardado completo como sustituto, porque retendría pregunta, respuesta y contexto documental.
 
 ## Rate limiting
 
@@ -132,6 +142,8 @@ Http::fake([
 
 `Http::assertSent()` comprueba método, URL, payload mínimo y cabeceras HMAC. También se simulan timeout, error HTTP, JSON inválido y respuestas inseguras. Ninguna prueba realiza tráfico real.
 
-## Trabajo pendiente para la fase n8n
+## Activación de la fase n8n
 
-Todavía falta crear e importar el workflow, implementar allí la validación HMAC y de antigüedad, limitar el procesamiento a documentación autorizada por rol, construir el mecanismo RAG sobre los manuales generados, validar el esquema de salida antes de responder y definir observabilidad sin contenido sensible. La activación en producción debe hacerse sólo después de pruebas integrales en un entorno aislado.
+Los workflows versionados preparan HMAC, timestamp, antireplay, RAG por rol/módulo, parser estructurado y validación final. Aun así, importar los JSON no activa el servicio: el operador debe seleccionar credenciales, tablas, funciones RPC y modelos en n8n Cloud, ejecutar las pruebas integrales en un entorno aislado y mantener `ASSISTANT_REMOTE_ENABLED=false` hasta aprobarlas.
+
+Cuando cambien `knowledge-base.json`, el prompt del sistema o los catálogos de roles/módulos, se deben ejecutar `npm.cmd run assistant:n8n-documents` y `npm.cmd run assistant:n8n-workflows`, validar los artefactos y reimportar en n8n el par elegido. Regenerar solo los documentos puede dejar el contrato embebido del workflow desactualizado.

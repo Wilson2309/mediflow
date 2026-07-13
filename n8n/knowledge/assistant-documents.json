@@ -1,0 +1,2646 @@
+{
+  "schema_version": 1,
+  "source": "resources/assistant/knowledge-base.json",
+  "locale": "es-EC",
+  "knowledge_schema_version": 2,
+  "knowledge_version": 2,
+  "document_count": 161,
+  "checksum_algorithm": "sha256",
+  "checksum": "3426dea3a19861815b95bd744a8a1ca195290ad654b50b883924374ab4df929e",
+  "documents": [
+    {
+      "document_id": "admin-audit:administrador:v1",
+      "content": "Título: Auditoría de actividad\n\nPregunta: ¿Cómo reviso la auditoría?\n\nRespuesta: Abre Auditoría para revisar eventos de la clínica activa con filtros por búsqueda, módulo, acción, usuario y fechas. La vista está protegida por audit_logs.view.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "admin-audit",
+        "role": "administrador",
+        "modules": [
+          "audit"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "admin-clinic-settings:administrador:v1",
+      "content": "Título: Configuración de clínica\n\nPregunta: ¿Cómo actualizo la configuración de la clínica?\n\nRespuesta: Abre Configuración, confirma la clínica activa y modifica los campos autorizados. El controlador siempre actualiza la clínica resuelta para el usuario autenticado.\n\nPasos:\n- Abre Configuración.\n- Revisa la clínica mostrada.\n- Actualiza datos o logo.\n- Guarda con conexión.\n\nRestricciones en línea:\n- Los cambios administrativos se bloquean sin conexión.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "admin-clinic-settings",
+        "role": "administrador",
+        "modules": [
+          "clinic_settings"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "admin-dashboard:administrador:v1",
+      "content": "Título: Dashboard administrativo\n\nPregunta: ¿Qué muestra el Dashboard administrativo?\n\nRespuesta: El Dashboard calcula métricas de la clínica activa según permisos: pacientes, médicos, citas de hoy, consultas, recetas activas, ingresos pagados, pagos pendientes, servicios, usuarios y próximas citas.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "admin-dashboard",
+        "role": "administrador",
+        "modules": [
+          "dashboard"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "admin-doctors-services:administrador:v1",
+      "content": "Título: Médicos y servicios\n\nPregunta: ¿Cómo gestiono médicos y servicios?\n\nRespuesta: Los módulos Médicos y Servicios ofrecen listados y CRUD según permisos. Los servicios incluyen precio, duración, estado y asociación con médicos, usada por la agenda.\n\nPasos:\n- Abre el módulo correspondiente.\n- Crea o edita el registro.\n- Revisa estado y, en Servicios, médicos asociados.\n- Guarda con conexión.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "admin-doctors-services",
+        "role": "administrador",
+        "modules": [
+          "doctors",
+          "services"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "admin-offline:administrador:v1",
+      "content": "Título: Acciones administrativas sin conexión\n\nPregunta: ¿Qué acciones administrativas se bloquean sin conexión?\n\nRespuesta: Se bloquean pagos, usuarios, configuración, firma y envío de recetas, exportaciones y otras acciones críticas. Pacientes, citas, consultas, historias y recetas sin firmar pueden conservarar borradores donde el formulario lo indica.\n\nFormas alternativas de preguntar:\n- que se bloquea sin internet\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "admin-offline",
+        "role": "administrador",
+        "modules": [
+          "offline",
+          "users",
+          "clinic_settings",
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "admin-reports:administrador:v1",
+      "content": "Título: Reportes administrativos\n\nPregunta: ¿Qué reportes puede consultar el administrador?\n\nRespuesta: El administrador dispone de panel de reportes y vistas de citas, clínico, financiero, pacientes, médicos y servicios. PDF, CSV y XLSX están implementados para citas, clínico y financiero; las otras vistas no tienen rutas de exportación dedicadas.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "admin-reports",
+        "role": "administrador",
+        "modules": [
+          "reports"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "admin-user-clinics:administrador:v1",
+      "content": "Título: Asignar clínicas a usuarios\n\nPregunta: ¿Cómo asigno clínicas a un usuario?\n\nRespuesta: El formulario permite asignar únicamente clínicas activas que el administrador actual también administra. La clínica activa actual siempre se conserva en la asignación.\n\nPasos:\n- Abre el usuario.\n- Selecciona clínicas disponibles.\n- Guarda.\n- Si falta una clínica, revisa tu propio acceso o su estado.\n\nFormas alternativas de preguntar:\n- no puedo asignar una clínica\n\nEscalado:\n- Permitido: sí. Si la clínica no aparece, solicita a SuperAdmin revisar su estado o tu asociación.",
+      "metadata": {
+        "entry_id": "admin-user-clinics",
+        "role": "administrador",
+        "modules": [
+          "users",
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "admin-users-roles:administrador:v1",
+      "content": "Título: Usuarios y roles\n\nPregunta: ¿Cómo creo o edito usuarios y roles?\n\nRespuesta: En Usuarios y Roles puedes crear o editar cuentas con los roles administrador, médico, recepcionista o caja_finanzas. SuperAdmin no se asigna desde este módulo.\n\nPasos:\n- Abre Usuarios y Roles.\n- Crea o edita una cuenta.\n- Selecciona rol y estado.\n- Si es médico, completa su perfil.\n- Guarda.\n\nRestricciones en línea:\n- La gestión de usuarios se bloquea sin conexión.\n\nFormas alternativas de preguntar:\n- crear usuario\n- asignar rol\n- no puedo editar un usuario\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "admin-users-roles",
+        "role": "administrador",
+        "modules": [
+          "users"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-availability:administrador:v1",
+      "content": "Título: Disponibilidad de citas\n\nPregunta: ¿Cómo funciona la disponibilidad?\n\nRespuesta: MediFlow calcula bloques entre 08:00 y 18:00 con la duración del servicio y excluye cruces con citas programadas o confirmadas del médico.\n\nPasos:\n- Selecciona servicio, médico y fecha.\n- Espera la consulta de disponibilidad.\n- Elige un bloque marcado como disponible.\n\nRestricciones en línea:\n- La disponibilidad se consulta al servidor.\n\nFormas alternativas de preguntar:\n- horarios disponibles\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-availability",
+        "role": "administrador",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-availability:recepcionista:v1",
+      "content": "Título: Disponibilidad de citas\n\nPregunta: ¿Cómo funciona la disponibilidad?\n\nRespuesta: MediFlow calcula bloques entre 08:00 y 18:00 con la duración del servicio y excluye cruces con citas programadas o confirmadas del médico.\n\nPasos:\n- Selecciona servicio, médico y fecha.\n- Espera la consulta de disponibilidad.\n- Elige un bloque marcado como disponible.\n\nRestricciones en línea:\n- La disponibilidad se consulta al servidor.\n\nFormas alternativas de preguntar:\n- horarios disponibles\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-availability",
+        "role": "recepcionista",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-basic-payment:administrador:v1",
+      "content": "Título: Estado básico del pago\n\nPregunta: ¿Cómo reviso el estado básico del pago de una cita?\n\nRespuesta: La cita y la agenda muestran el estado asociado: pendiente, pagado, cancelado o reembolsado, y también pueden indicar que no existe pago. Solo caja y administración gestionan cobros.\n\nFormas alternativas de preguntar:\n- la cita está pagada\n- pago pendiente de cita\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-basic-payment",
+        "role": "administrador",
+        "modules": [
+          "appointments",
+          "daily_agenda",
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-basic-payment:caja_finanzas:v1",
+      "content": "Título: Estado básico del pago\n\nPregunta: ¿Cómo reviso el estado básico del pago de una cita?\n\nRespuesta: La cita y la agenda muestran el estado asociado: pendiente, pagado, cancelado o reembolsado, y también pueden indicar que no existe pago. Solo caja y administración gestionan cobros.\n\nFormas alternativas de preguntar:\n- la cita está pagada\n- pago pendiente de cita\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-basic-payment",
+        "role": "caja_finanzas",
+        "modules": [
+          "appointments",
+          "daily_agenda",
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-basic-payment:medico:v1",
+      "content": "Título: Estado básico del pago\n\nPregunta: ¿Cómo reviso el estado básico del pago de una cita?\n\nRespuesta: La cita y la agenda muestran el estado asociado: pendiente, pagado, cancelado o reembolsado, y también pueden indicar que no existe pago. Solo caja y administración gestionan cobros.\n\nFormas alternativas de preguntar:\n- la cita está pagada\n- pago pendiente de cita\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-basic-payment",
+        "role": "medico",
+        "modules": [
+          "appointments",
+          "daily_agenda",
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-basic-payment:recepcionista:v1",
+      "content": "Título: Estado básico del pago\n\nPregunta: ¿Cómo reviso el estado básico del pago de una cita?\n\nRespuesta: La cita y la agenda muestran el estado asociado: pendiente, pagado, cancelado o reembolsado, y también pueden indicar que no existe pago. Solo caja y administración gestionan cobros.\n\nFormas alternativas de preguntar:\n- la cita está pagada\n- pago pendiente de cita\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-basic-payment",
+        "role": "recepcionista",
+        "modules": [
+          "appointments",
+          "daily_agenda",
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-compatible-doctors:administrador:v1",
+      "content": "Título: Médicos compatibles\n\nPregunta: ¿Por qué no aparece un médico al elegir servicio?\n\nRespuesta: La búsqueda solo devuelve médicos activos de la clínica que estén asociados al servicio seleccionado. Sin servicio, la lista de médicos queda vacía.\n\nPasos:\n- Selecciona primero el servicio.\n- Confirma que el médico esté activo.\n- Prueba otra búsqueda.\n- Contacta al administrador si debe ofrecer ese servicio.\n\nFormas alternativas de preguntar:\n- médico no aparece\n- médicos compatibles con servicio\n\nEscalado:\n- Permitido: sí. El administrador puede revisar la relación entre médico y servicio.",
+      "metadata": {
+        "entry_id": "appointments-compatible-doctors",
+        "role": "administrador",
+        "modules": [
+          "appointments",
+          "doctors",
+          "services"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-compatible-doctors:recepcionista:v1",
+      "content": "Título: Médicos compatibles\n\nPregunta: ¿Por qué no aparece un médico al elegir servicio?\n\nRespuesta: La búsqueda solo devuelve médicos activos de la clínica que estén asociados al servicio seleccionado. Sin servicio, la lista de médicos queda vacía.\n\nPasos:\n- Selecciona primero el servicio.\n- Confirma que el médico esté activo.\n- Prueba otra búsqueda.\n- Contacta al administrador si debe ofrecer ese servicio.\n\nFormas alternativas de preguntar:\n- médico no aparece\n- médicos compatibles con servicio\n\nEscalado:\n- Permitido: sí. El administrador puede revisar la relación entre médico y servicio.",
+      "metadata": {
+        "entry_id": "appointments-compatible-doctors",
+        "role": "recepcionista",
+        "modules": [
+          "appointments",
+          "doctors",
+          "services"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-create:administrador:v1",
+      "content": "Título: Crear cita\n\nPregunta: ¿Cómo agendo una cita?\n\nRespuesta: Para agendar una cita sigue estos pasos:\n\nPasos:\n- Abre Citas médicas y pulsa Nueva cita.\n- Busca y selecciona al paciente.\n- Elige el servicio.\n- Selecciona un médico compatible.\n- Consulta disponibilidad y elige fecha y hora.\n- Revisa y guarda.\n\nRestricciones en línea:\n- Sin conexión solo se conserva un borrador; la disponibilidad debe comprobarse nuevamente al enviarlo.\n\nFormas alternativas de preguntar:\n- cómo agendo un turno\n- quiero registrar una cita\n- donde creo una cita\n- como hago un agendamiento\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-create",
+        "role": "administrador",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-create:recepcionista:v1",
+      "content": "Título: Crear cita\n\nPregunta: ¿Cómo agendo una cita?\n\nRespuesta: Para agendar una cita sigue estos pasos:\n\nPasos:\n- Abre Citas médicas y pulsa Nueva cita.\n- Busca y selecciona al paciente.\n- Elige el servicio.\n- Selecciona un médico compatible.\n- Consulta disponibilidad y elige fecha y hora.\n- Revisa y guarda.\n\nRestricciones en línea:\n- Sin conexión solo se conserva un borrador; la disponibilidad debe comprobarse nuevamente al enviarlo.\n\nFormas alternativas de preguntar:\n- cómo agendo un turno\n- quiero registrar una cita\n- donde creo una cita\n- como hago un agendamiento\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-create",
+        "role": "recepcionista",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-no-show:administrador:v1",
+      "content": "Título: Marcar no asistió\n\nPregunta: ¿Cómo marco que el paciente no asistió?\n\nRespuesta: Desde Agenda del día usa Marcar no asistió. La acción no se aplica a citas canceladas o completadas.\n\nPasos:\n- Abre Agenda del día.\n- Localiza la cita.\n- Pulsa Marcar no asistió y confirma.\n\nFormas alternativas de preguntar:\n- marcar no show\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-no-show",
+        "role": "administrador",
+        "modules": [
+          "daily_agenda",
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-no-show:recepcionista:v1",
+      "content": "Título: Marcar no asistió\n\nPregunta: ¿Cómo marco que el paciente no asistió?\n\nRespuesta: Desde Agenda del día usa Marcar no asistió. La acción no se aplica a citas canceladas o completadas.\n\nPasos:\n- Abre Agenda del día.\n- Localiza la cita.\n- Pulsa Marcar no asistió y confirma.\n\nFormas alternativas de preguntar:\n- marcar no show\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-no-show",
+        "role": "recepcionista",
+        "modules": [
+          "daily_agenda",
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-no-slots:administrador:v1",
+      "content": "Título: Sin horarios disponibles\n\nPregunta: ¿Qué hago si no hay horarios disponibles?\n\nRespuesta: Puede que todos los bloques estén ocupados, que el médico no ofrezca el servicio o que la fecha no sea válida. Prueba otro médico compatible o fecha.\n\nPasos:\n- Confirma servicio y médico.\n- Cambia la fecha.\n- Prueba otro médico compatible.\n- Contacta al administrador si nunca aparecen bloques.\n\nEscalado:\n- Permitido: sí. Solicita revisar la configuración del servicio y del médico.",
+      "metadata": {
+        "entry_id": "appointments-no-slots",
+        "role": "administrador",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-no-slots:recepcionista:v1",
+      "content": "Título: Sin horarios disponibles\n\nPregunta: ¿Qué hago si no hay horarios disponibles?\n\nRespuesta: Puede que todos los bloques estén ocupados, que el médico no ofrezca el servicio o que la fecha no sea válida. Prueba otro médico compatible o fecha.\n\nPasos:\n- Confirma servicio y médico.\n- Cambia la fecha.\n- Prueba otro médico compatible.\n- Contacta al administrador si nunca aparecen bloques.\n\nEscalado:\n- Permitido: sí. Solicita revisar la configuración del servicio y del médico.",
+      "metadata": {
+        "entry_id": "appointments-no-slots",
+        "role": "recepcionista",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-offline-draft:administrador:v1",
+      "content": "Título: Borrador offline de cita\n\nPregunta: ¿Cómo funciona el borrador offline de una cita?\n\nRespuesta: El formulario de cita puede guardarse como borrador local. Al restaurarlo debes volver a consultar disponibilidad porque el horario pudo ocuparse.\n\nPasos:\n- Restaura el borrador en el mismo formulario.\n- Revisa paciente, servicio y médico.\n- Consulta otra vez la disponibilidad.\n- Elige un bloque libre y envía manualmente.\n\nFormas alternativas de preguntar:\n- guardar cita sin conexión\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-offline-draft",
+        "role": "administrador",
+        "modules": [
+          "appointments",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-offline-draft:recepcionista:v1",
+      "content": "Título: Borrador offline de cita\n\nPregunta: ¿Cómo funciona el borrador offline de una cita?\n\nRespuesta: El formulario de cita puede guardarse como borrador local. Al restaurarlo debes volver a consultar disponibilidad porque el horario pudo ocuparse.\n\nPasos:\n- Restaura el borrador en el mismo formulario.\n- Revisa paciente, servicio y médico.\n- Consulta otra vez la disponibilidad.\n- Elige un bloque libre y envía manualmente.\n\nFormas alternativas de preguntar:\n- guardar cita sin conexión\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-offline-draft",
+        "role": "recepcionista",
+        "modules": [
+          "appointments",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-patient-service:administrador:v1",
+      "content": "Título: Paciente y servicio de la cita\n\nPregunta: ¿Cómo busco el paciente y elijo el servicio?\n\nRespuesta: En Nueva cita usa la búsqueda de pacientes y luego selecciona un servicio activo. El servicio determina la duración y limita los médicos compatibles.\n\nPasos:\n- Busca por nombre o identificación.\n- Selecciona el paciente correcto.\n- Elige el servicio antes de buscar médico.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-patient-service",
+        "role": "administrador",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-patient-service:recepcionista:v1",
+      "content": "Título: Paciente y servicio de la cita\n\nPregunta: ¿Cómo busco el paciente y elijo el servicio?\n\nRespuesta: En Nueva cita usa la búsqueda de pacientes y luego selecciona un servicio activo. El servicio determina la duración y limita los médicos compatibles.\n\nPasos:\n- Busca por nombre o identificación.\n- Selecciona el paciente correcto.\n- Elige el servicio antes de buscar médico.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-patient-service",
+        "role": "recepcionista",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-reschedule-cancel:administrador:v1",
+      "content": "Título: Reprogramar o cancelar cita\n\nPregunta: ¿Cómo reprogramo o cancelo una cita?\n\nRespuesta: Para reprogramar usa Editar y selecciona un nuevo horario disponible. Para cancelar, usa la acción Cancelar desde Agenda del día y confirma el registro correcto.\n\nPasos:\n- Localiza la cita.\n- Elige Editar para reprogramar o Cancelar en la agenda.\n- Revisa paciente, fecha y hora.\n- Confirma la acción.\n\nRestricciones en línea:\n- La modificación del estado requiere conexión.\n\nFormas alternativas de preguntar:\n- cambiar fecha de cita\n- anular cita\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-reschedule-cancel",
+        "role": "administrador",
+        "modules": [
+          "appointments",
+          "daily_agenda"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-reschedule-cancel:recepcionista:v1",
+      "content": "Título: Reprogramar o cancelar cita\n\nPregunta: ¿Cómo reprogramo o cancelo una cita?\n\nRespuesta: Para reprogramar usa Editar y selecciona un nuevo horario disponible. Para cancelar, usa la acción Cancelar desde Agenda del día y confirma el registro correcto.\n\nPasos:\n- Localiza la cita.\n- Elige Editar para reprogramar o Cancelar en la agenda.\n- Revisa paciente, fecha y hora.\n- Confirma la acción.\n\nRestricciones en línea:\n- La modificación del estado requiere conexión.\n\nFormas alternativas de preguntar:\n- cambiar fecha de cita\n- anular cita\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-reschedule-cancel",
+        "role": "recepcionista",
+        "modules": [
+          "appointments",
+          "daily_agenda"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-slot-conflict:administrador:v1",
+      "content": "Título: Horario ocupado\n\nPregunta: ¿Qué pasa si el horario fue ocupado?\n\nRespuesta: El servidor vuelve a validar el horario al guardar. Si otra cita lo ocupó, debes actualizar disponibilidad y elegir otro bloque.\n\nPasos:\n- Consulta nuevamente la disponibilidad.\n- Elige otro horario libre.\n- Guarda después de revisar el nuevo bloque.\n\nFormas alternativas de preguntar:\n- conflicto de horario\n- cita duplicada\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-slot-conflict",
+        "role": "administrador",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "appointments-slot-conflict:recepcionista:v1",
+      "content": "Título: Horario ocupado\n\nPregunta: ¿Qué pasa si el horario fue ocupado?\n\nRespuesta: El servidor vuelve a validar el horario al guardar. Si otra cita lo ocupó, debes actualizar disponibilidad y elegir otro bloque.\n\nPasos:\n- Consulta nuevamente la disponibilidad.\n- Elige otro horario libre.\n- Guarda después de revisar el nuevo bloque.\n\nFormas alternativas de preguntar:\n- conflicto de horario\n- cita duplicada\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "appointments-slot-conflict",
+        "role": "recepcionista",
+        "modules": [
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-data-isolation:administrador:v1",
+      "content": "Título: Datos separados por clínica\n\nPregunta: ¿Los datos se separan por clínica?\n\nRespuesta: Sí. Las consultas y autorizaciones usan la clínica activa. El cambio de clínica modifica el contexto, no combina información entre clínicas.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-data-isolation",
+        "role": "administrador",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-data-isolation:caja_finanzas:v1",
+      "content": "Título: Datos separados por clínica\n\nPregunta: ¿Los datos se separan por clínica?\n\nRespuesta: Sí. Las consultas y autorizaciones usan la clínica activa. El cambio de clínica modifica el contexto, no combina información entre clínicas.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-data-isolation",
+        "role": "caja_finanzas",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-data-isolation:medico:v1",
+      "content": "Título: Datos separados por clínica\n\nPregunta: ¿Los datos se separan por clínica?\n\nRespuesta: Sí. Las consultas y autorizaciones usan la clínica activa. El cambio de clínica modifica el contexto, no combina información entre clínicas.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-data-isolation",
+        "role": "medico",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-data-isolation:recepcionista:v1",
+      "content": "Título: Datos separados por clínica\n\nPregunta: ¿Los datos se separan por clínica?\n\nRespuesta: Sí. Las consultas y autorizaciones usan la clínica activa. El cambio de clínica modifica el contexto, no combina información entre clínicas.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-data-isolation",
+        "role": "recepcionista",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-inactive:administrador:v1",
+      "content": "Título: Clínica inactiva\n\nPregunta: ¿Qué pasa si una clínica está inactiva?\n\nRespuesta: Una clínica inactiva no puede seleccionarse como clínica activa y las rutas protegidas por clínica rechazan el acceso. Solo SuperAdmin puede cambiar su estado global.\n\nPasos:\n- No intentes continuar con otra URL.\n- El personal debe contactar a su administrador.\n- SuperAdmin puede revisar el estado desde el panel global.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-inactive",
+        "role": "administrador",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-inactive:caja_finanzas:v1",
+      "content": "Título: Clínica inactiva\n\nPregunta: ¿Qué pasa si una clínica está inactiva?\n\nRespuesta: Una clínica inactiva no puede seleccionarse como clínica activa y las rutas protegidas por clínica rechazan el acceso. Solo SuperAdmin puede cambiar su estado global.\n\nPasos:\n- No intentes continuar con otra URL.\n- El personal debe contactar a su administrador.\n- SuperAdmin puede revisar el estado desde el panel global.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-inactive",
+        "role": "caja_finanzas",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-inactive:medico:v1",
+      "content": "Título: Clínica inactiva\n\nPregunta: ¿Qué pasa si una clínica está inactiva?\n\nRespuesta: Una clínica inactiva no puede seleccionarse como clínica activa y las rutas protegidas por clínica rechazan el acceso. Solo SuperAdmin puede cambiar su estado global.\n\nPasos:\n- No intentes continuar con otra URL.\n- El personal debe contactar a su administrador.\n- SuperAdmin puede revisar el estado desde el panel global.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-inactive",
+        "role": "medico",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-inactive:recepcionista:v1",
+      "content": "Título: Clínica inactiva\n\nPregunta: ¿Qué pasa si una clínica está inactiva?\n\nRespuesta: Una clínica inactiva no puede seleccionarse como clínica activa y las rutas protegidas por clínica rechazan el acceso. Solo SuperAdmin puede cambiar su estado global.\n\nPasos:\n- No intentes continuar con otra URL.\n- El personal debe contactar a su administrador.\n- SuperAdmin puede revisar el estado desde el panel global.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-inactive",
+        "role": "recepcionista",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-inactive:super_admin:v1",
+      "content": "Título: Clínica inactiva\n\nPregunta: ¿Qué pasa si una clínica está inactiva?\n\nRespuesta: Una clínica inactiva no puede seleccionarse como clínica activa y las rutas protegidas por clínica rechazan el acceso. Solo SuperAdmin puede cambiar su estado global.\n\nPasos:\n- No intentes continuar con otra URL.\n- El personal debe contactar a su administrador.\n- SuperAdmin puede revisar el estado desde el panel global.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-inactive",
+        "role": "super_admin",
+        "modules": [
+          "super_admin_clinics"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-switch-missing:administrador:v1",
+      "content": "Título: Clínica ausente del selector\n\nPregunta: ¿Por qué no aparece otra clínica en el selector?\n\nRespuesta: El selector solo lista clínicas activas asociadas al usuario. Si falta una clínica, puede estar inactiva o no estar asignada a tu cuenta.\n\nPasos:\n- Confirma que usas la cuenta correcta.\n- Contacta al administrador para revisar la asignación y el estado de la clínica.\n\nEscalado:\n- Permitido: sí. Solicita al administrador que revise la asociación de tu usuario; no compartas credenciales.",
+      "metadata": {
+        "entry_id": "clinic-switch-missing",
+        "role": "administrador",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-switch-missing:caja_finanzas:v1",
+      "content": "Título: Clínica ausente del selector\n\nPregunta: ¿Por qué no aparece otra clínica en el selector?\n\nRespuesta: El selector solo lista clínicas activas asociadas al usuario. Si falta una clínica, puede estar inactiva o no estar asignada a tu cuenta.\n\nPasos:\n- Confirma que usas la cuenta correcta.\n- Contacta al administrador para revisar la asignación y el estado de la clínica.\n\nEscalado:\n- Permitido: sí. Solicita al administrador que revise la asociación de tu usuario; no compartas credenciales.",
+      "metadata": {
+        "entry_id": "clinic-switch-missing",
+        "role": "caja_finanzas",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-switch-missing:medico:v1",
+      "content": "Título: Clínica ausente del selector\n\nPregunta: ¿Por qué no aparece otra clínica en el selector?\n\nRespuesta: El selector solo lista clínicas activas asociadas al usuario. Si falta una clínica, puede estar inactiva o no estar asignada a tu cuenta.\n\nPasos:\n- Confirma que usas la cuenta correcta.\n- Contacta al administrador para revisar la asignación y el estado de la clínica.\n\nEscalado:\n- Permitido: sí. Solicita al administrador que revise la asociación de tu usuario; no compartas credenciales.",
+      "metadata": {
+        "entry_id": "clinic-switch-missing",
+        "role": "medico",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-switch-missing:recepcionista:v1",
+      "content": "Título: Clínica ausente del selector\n\nPregunta: ¿Por qué no aparece otra clínica en el selector?\n\nRespuesta: El selector solo lista clínicas activas asociadas al usuario. Si falta una clínica, puede estar inactiva o no estar asignada a tu cuenta.\n\nPasos:\n- Confirma que usas la cuenta correcta.\n- Contacta al administrador para revisar la asignación y el estado de la clínica.\n\nEscalado:\n- Permitido: sí. Solicita al administrador que revise la asociación de tu usuario; no compartas credenciales.",
+      "metadata": {
+        "entry_id": "clinic-switch-missing",
+        "role": "recepcionista",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-switch:administrador:v1",
+      "content": "Título: Cambiar de clínica\n\nPregunta: ¿Cómo cambio de clínica?\n\nRespuesta: Usa el selector Sucursal activa de la navegación. Solo aparecen clínicas activas asociadas a tu usuario.\n\nPasos:\n- Abre el selector Sucursal activa.\n- Selecciona otra clínica disponible.\n- Espera la recarga y confirma el nombre mostrado.\n\nRestricciones en línea:\n- El cambio requiere comunicación con el servidor.\n\nFormas alternativas de preguntar:\n- cambiar sucursal\n- seleccionar otra clínica\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-switch",
+        "role": "administrador",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-switch:caja_finanzas:v1",
+      "content": "Título: Cambiar de clínica\n\nPregunta: ¿Cómo cambio de clínica?\n\nRespuesta: Usa el selector Sucursal activa de la navegación. Solo aparecen clínicas activas asociadas a tu usuario.\n\nPasos:\n- Abre el selector Sucursal activa.\n- Selecciona otra clínica disponible.\n- Espera la recarga y confirma el nombre mostrado.\n\nRestricciones en línea:\n- El cambio requiere comunicación con el servidor.\n\nFormas alternativas de preguntar:\n- cambiar sucursal\n- seleccionar otra clínica\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-switch",
+        "role": "caja_finanzas",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-switch:medico:v1",
+      "content": "Título: Cambiar de clínica\n\nPregunta: ¿Cómo cambio de clínica?\n\nRespuesta: Usa el selector Sucursal activa de la navegación. Solo aparecen clínicas activas asociadas a tu usuario.\n\nPasos:\n- Abre el selector Sucursal activa.\n- Selecciona otra clínica disponible.\n- Espera la recarga y confirma el nombre mostrado.\n\nRestricciones en línea:\n- El cambio requiere comunicación con el servidor.\n\nFormas alternativas de preguntar:\n- cambiar sucursal\n- seleccionar otra clínica\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-switch",
+        "role": "medico",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "clinic-switch:recepcionista:v1",
+      "content": "Título: Cambiar de clínica\n\nPregunta: ¿Cómo cambio de clínica?\n\nRespuesta: Usa el selector Sucursal activa de la navegación. Solo aparecen clínicas activas asociadas a tu usuario.\n\nPasos:\n- Abre el selector Sucursal activa.\n- Selecciona otra clínica disponible.\n- Espera la recarga y confirma el nombre mostrado.\n\nRestricciones en línea:\n- El cambio requiere comunicación con el servidor.\n\nFormas alternativas de preguntar:\n- cambiar sucursal\n- seleccionar otra clínica\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "clinic-switch",
+        "role": "recepcionista",
+        "modules": [
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-restored:administrador:v1",
+      "content": "Título: Conexión restablecida\n\nPregunta: ¿Qué hago cuando vuelve la conexión?\n\nRespuesta: Cuando el indicador vuelva a Conectado, revisa la información antes de enviarla. Los borradores no se sincronizan solos y las acciones críticas deben repetirse manualmente.\n\nPasos:\n- Confirma que el indicador muestre Conectado.\n- Restaura el borrador si existe.\n- Revisa datos y disponibilidad actuales.\n- Envía o confirma la acción manualmente.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-restored",
+        "role": "administrador",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-restored:caja_finanzas:v1",
+      "content": "Título: Conexión restablecida\n\nPregunta: ¿Qué hago cuando vuelve la conexión?\n\nRespuesta: Cuando el indicador vuelva a Conectado, revisa la información antes de enviarla. Los borradores no se sincronizan solos y las acciones críticas deben repetirse manualmente.\n\nPasos:\n- Confirma que el indicador muestre Conectado.\n- Restaura el borrador si existe.\n- Revisa datos y disponibilidad actuales.\n- Envía o confirma la acción manualmente.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-restored",
+        "role": "caja_finanzas",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-restored:medico:v1",
+      "content": "Título: Conexión restablecida\n\nPregunta: ¿Qué hago cuando vuelve la conexión?\n\nRespuesta: Cuando el indicador vuelva a Conectado, revisa la información antes de enviarla. Los borradores no se sincronizan solos y las acciones críticas deben repetirse manualmente.\n\nPasos:\n- Confirma que el indicador muestre Conectado.\n- Restaura el borrador si existe.\n- Revisa datos y disponibilidad actuales.\n- Envía o confirma la acción manualmente.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-restored",
+        "role": "medico",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-restored:recepcionista:v1",
+      "content": "Título: Conexión restablecida\n\nPregunta: ¿Qué hago cuando vuelve la conexión?\n\nRespuesta: Cuando el indicador vuelva a Conectado, revisa la información antes de enviarla. Los borradores no se sincronizan solos y las acciones críticas deben repetirse manualmente.\n\nPasos:\n- Confirma que el indicador muestre Conectado.\n- Restaura el borrador si existe.\n- Revisa datos y disponibilidad actuales.\n- Envía o confirma la acción manualmente.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-restored",
+        "role": "recepcionista",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-restored:super_admin:v1",
+      "content": "Título: Conexión restablecida\n\nPregunta: ¿Qué hago cuando vuelve la conexión?\n\nRespuesta: Cuando el indicador vuelva a Conectado, revisa la información antes de enviarla. Los borradores no se sincronizan solos y las acciones críticas deben repetirse manualmente.\n\nPasos:\n- Confirma que el indicador muestre Conectado.\n- Restaura el borrador si existe.\n- Revisa datos y disponibilidad actuales.\n- Envía o confirma la acción manualmente.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-restored",
+        "role": "super_admin",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-states:administrador:v1",
+      "content": "Título: Estados de conexión\n\nPregunta: ¿Qué significan los estados de conexión?\n\nRespuesta: Conectado indica que MediFlow y el acceso a Internet responden. Sin Internet indica que el servidor local responde, pero no hay salida a Internet. Servidor no disponible indica que MediFlow no responde. Sin conexión indica que el navegador tampoco tiene red.\n\nPasos:\n- Revisa el indicador del encabezado.\n- Conserva la pantalla abierta si necesitas consultar información ya cargada.\n- Espera a que el estado vuelva a Conectado antes de ejecutar acciones bloqueadas.\n\nFormas alternativas de preguntar:\n- que significa conectado\n- diferencia sin internet y servidor no disponible\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-states",
+        "role": "administrador",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-states:caja_finanzas:v1",
+      "content": "Título: Estados de conexión\n\nPregunta: ¿Qué significan los estados de conexión?\n\nRespuesta: Conectado indica que MediFlow y el acceso a Internet responden. Sin Internet indica que el servidor local responde, pero no hay salida a Internet. Servidor no disponible indica que MediFlow no responde. Sin conexión indica que el navegador tampoco tiene red.\n\nPasos:\n- Revisa el indicador del encabezado.\n- Conserva la pantalla abierta si necesitas consultar información ya cargada.\n- Espera a que el estado vuelva a Conectado antes de ejecutar acciones bloqueadas.\n\nFormas alternativas de preguntar:\n- que significa conectado\n- diferencia sin internet y servidor no disponible\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-states",
+        "role": "caja_finanzas",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-states:medico:v1",
+      "content": "Título: Estados de conexión\n\nPregunta: ¿Qué significan los estados de conexión?\n\nRespuesta: Conectado indica que MediFlow y el acceso a Internet responden. Sin Internet indica que el servidor local responde, pero no hay salida a Internet. Servidor no disponible indica que MediFlow no responde. Sin conexión indica que el navegador tampoco tiene red.\n\nPasos:\n- Revisa el indicador del encabezado.\n- Conserva la pantalla abierta si necesitas consultar información ya cargada.\n- Espera a que el estado vuelva a Conectado antes de ejecutar acciones bloqueadas.\n\nFormas alternativas de preguntar:\n- que significa conectado\n- diferencia sin internet y servidor no disponible\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-states",
+        "role": "medico",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-states:recepcionista:v1",
+      "content": "Título: Estados de conexión\n\nPregunta: ¿Qué significan los estados de conexión?\n\nRespuesta: Conectado indica que MediFlow y el acceso a Internet responden. Sin Internet indica que el servidor local responde, pero no hay salida a Internet. Servidor no disponible indica que MediFlow no responde. Sin conexión indica que el navegador tampoco tiene red.\n\nPasos:\n- Revisa el indicador del encabezado.\n- Conserva la pantalla abierta si necesitas consultar información ya cargada.\n- Espera a que el estado vuelva a Conectado antes de ejecutar acciones bloqueadas.\n\nFormas alternativas de preguntar:\n- que significa conectado\n- diferencia sin internet y servidor no disponible\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-states",
+        "role": "recepcionista",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "connection-states:super_admin:v1",
+      "content": "Título: Estados de conexión\n\nPregunta: ¿Qué significan los estados de conexión?\n\nRespuesta: Conectado indica que MediFlow y el acceso a Internet responden. Sin Internet indica que el servidor local responde, pero no hay salida a Internet. Servidor no disponible indica que MediFlow no responde. Sin conexión indica que el navegador tampoco tiene red.\n\nPasos:\n- Revisa el indicador del encabezado.\n- Conserva la pantalla abierta si necesitas consultar información ya cargada.\n- Espera a que el estado vuelva a Conectado antes de ejecutar acciones bloqueadas.\n\nFormas alternativas de preguntar:\n- que significa conectado\n- diferencia sin internet y servidor no disponible\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "connection-states",
+        "role": "super_admin",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "consultations-cannot-start:medico:v1",
+      "content": "Título: Consulta bloqueada\n\nPregunta: ¿Por qué no puedo iniciar una consulta?\n\nRespuesta: Las causas verificadas son: cita de otro médico, cita cancelada o no asistió, pago no pagado, o una consulta ya asociada a la cita.\n\nPasos:\n- Confirma que la cita está asignada a tu perfil.\n- Revisa su estado.\n- Revisa el estado básico del pago.\n- Comprueba que no figure como atendida.\n- Contacta al administrador si persiste.\n\nFormas alternativas de preguntar:\n- no aparece iniciar consulta\n- botón iniciar bloqueado\n\nEscalado:\n- Permitido: sí. Indica el número interno de la cita sin incluir datos clínicos.",
+      "metadata": {
+        "entry_id": "consultations-cannot-start",
+        "role": "medico",
+        "modules": [
+          "consultations",
+          "daily_agenda"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "consultations-draft:administrador:v1",
+      "content": "Título: Borrador clínico\n\nPregunta: ¿Cómo recupero un borrador clínico?\n\nRespuesta: Abre el mismo formulario. Si existe un borrador de tu usuario, clínica y registro, pulsa Restaurar, revisa cuidadosamente y envíalo manualmente con conexión.\n\nPasos:\n- Abre el mismo formulario.\n- Pulsa Restaurar borrador.\n- Revisa todos los campos clínicos.\n- Envía manualmente cuando vuelva la conexión.\n\nFormas alternativas de preguntar:\n- restaurar consulta\n- consulta offline\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "consultations-draft",
+        "role": "administrador",
+        "modules": [
+          "consultations",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "consultations-draft:medico:v1",
+      "content": "Título: Borrador clínico\n\nPregunta: ¿Cómo recupero un borrador clínico?\n\nRespuesta: Abre el mismo formulario. Si existe un borrador de tu usuario, clínica y registro, pulsa Restaurar, revisa cuidadosamente y envíalo manualmente con conexión.\n\nPasos:\n- Abre el mismo formulario.\n- Pulsa Restaurar borrador.\n- Revisa todos los campos clínicos.\n- Envía manualmente cuando vuelva la conexión.\n\nFormas alternativas de preguntar:\n- restaurar consulta\n- consulta offline\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "consultations-draft",
+        "role": "medico",
+        "modules": [
+          "consultations",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "consultations-save-complete:administrador:v1",
+      "content": "Título: Guardar y completar consulta\n\nPregunta: ¿Cómo guardo o completo una consulta?\n\nRespuesta: Completa el formulario autorizado y guarda. Al registrar una consulta vinculada, MediFlow marca como completada una cita programada o confirmada.\n\nPasos:\n- Revisa paciente, médico y cita.\n- Completa motivo, diagnóstico, tratamiento y observaciones permitidas.\n- Guarda con conexión.\n\nRestricciones en línea:\n- Sin conexión se guarda un borrador local, no una consulta definitiva.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "consultations-save-complete",
+        "role": "administrador",
+        "modules": [
+          "consultations"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "consultations-save-complete:medico:v1",
+      "content": "Título: Guardar y completar consulta\n\nPregunta: ¿Cómo guardo o completo una consulta?\n\nRespuesta: Completa el formulario autorizado y guarda. Al registrar una consulta vinculada, MediFlow marca como completada una cita programada o confirmada.\n\nPasos:\n- Revisa paciente, médico y cita.\n- Completa motivo, diagnóstico, tratamiento y observaciones permitidas.\n- Guarda con conexión.\n\nRestricciones en línea:\n- Sin conexión se guarda un borrador local, no una consulta definitiva.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "consultations-save-complete",
+        "role": "medico",
+        "modules": [
+          "consultations"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "consultations-start:administrador:v1",
+      "content": "Título: Iniciar consulta\n\nPregunta: ¿Cómo inicio una consulta?\n\nRespuesta: Localiza una cita válida en Agenda del día y usa Iniciar consulta. El médico solo puede atender sus citas y necesita un pago con estado Pagado; el administrador tiene la excepción implementada para pago previo.\n\nPasos:\n- Abre Agenda del día.\n- Localiza la cita asignada.\n- Verifica que no esté cancelada, no asistió ni atendida.\n- Confirma el pago cuando aplique.\n- Pulsa Iniciar consulta.\n\nRestricciones en línea:\n- El envío de la consulta al servidor requiere conexión; sin conexión puede conservarse un borrador.\n\nFormas alternativas de preguntar:\n- atender cita\n- crear consulta\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "consultations-start",
+        "role": "administrador",
+        "modules": [
+          "consultations",
+          "daily_agenda"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "consultations-start:medico:v1",
+      "content": "Título: Iniciar consulta\n\nPregunta: ¿Cómo inicio una consulta?\n\nRespuesta: Localiza una cita válida en Agenda del día y usa Iniciar consulta. El médico solo puede atender sus citas y necesita un pago con estado Pagado; el administrador tiene la excepción implementada para pago previo.\n\nPasos:\n- Abre Agenda del día.\n- Localiza la cita asignada.\n- Verifica que no esté cancelada, no asistió ni atendida.\n- Confirma el pago cuando aplique.\n- Pulsa Iniciar consulta.\n\nRestricciones en línea:\n- El envío de la consulta al servidor requiere conexión; sin conexión puede conservarse un borrador.\n\nFormas alternativas de preguntar:\n- atender cita\n- crear consulta\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "consultations-start",
+        "role": "medico",
+        "modules": [
+          "consultations",
+          "daily_agenda"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "daily-agenda-guide:administrador:v1",
+      "content": "Título: Agenda del día\n\nPregunta: ¿Cómo reviso la agenda diaria?\n\nRespuesta: Agenda del día muestra las citas de la fecha seleccionada, filtros por estado y estado básico del pago. El médico ve solo citas asignadas a su perfil; los montos dependen del permiso financiero.\n\nPasos:\n- Abre Agenda del día.\n- Selecciona la fecha.\n- Aplica filtros de cita o pago.\n- Abre el registro permitido.\n\nFormas alternativas de preguntar:\n- citas de hoy\n- agenda propia\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "daily-agenda-guide",
+        "role": "administrador",
+        "modules": [
+          "daily_agenda",
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "daily-agenda-guide:caja_finanzas:v1",
+      "content": "Título: Agenda del día\n\nPregunta: ¿Cómo reviso la agenda diaria?\n\nRespuesta: Agenda del día muestra las citas de la fecha seleccionada, filtros por estado y estado básico del pago. El médico ve solo citas asignadas a su perfil; los montos dependen del permiso financiero.\n\nPasos:\n- Abre Agenda del día.\n- Selecciona la fecha.\n- Aplica filtros de cita o pago.\n- Abre el registro permitido.\n\nFormas alternativas de preguntar:\n- citas de hoy\n- agenda propia\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "daily-agenda-guide",
+        "role": "caja_finanzas",
+        "modules": [
+          "daily_agenda",
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "daily-agenda-guide:medico:v1",
+      "content": "Título: Agenda del día\n\nPregunta: ¿Cómo reviso la agenda diaria?\n\nRespuesta: Agenda del día muestra las citas de la fecha seleccionada, filtros por estado y estado básico del pago. El médico ve solo citas asignadas a su perfil; los montos dependen del permiso financiero.\n\nPasos:\n- Abre Agenda del día.\n- Selecciona la fecha.\n- Aplica filtros de cita o pago.\n- Abre el registro permitido.\n\nFormas alternativas de preguntar:\n- citas de hoy\n- agenda propia\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "daily-agenda-guide",
+        "role": "medico",
+        "modules": [
+          "daily_agenda",
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "daily-agenda-guide:recepcionista:v1",
+      "content": "Título: Agenda del día\n\nPregunta: ¿Cómo reviso la agenda diaria?\n\nRespuesta: Agenda del día muestra las citas de la fecha seleccionada, filtros por estado y estado básico del pago. El médico ve solo citas asignadas a su perfil; los montos dependen del permiso financiero.\n\nPasos:\n- Abre Agenda del día.\n- Selecciona la fecha.\n- Aplica filtros de cita o pago.\n- Abre el registro permitido.\n\nFormas alternativas de preguntar:\n- citas de hoy\n- agenda propia\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "daily-agenda-guide",
+        "role": "recepcionista",
+        "modules": [
+          "daily_agenda",
+          "appointments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "doctor-no-finance:medico:v1",
+      "content": "Título: Sin acceso financiero del médico\n\nPregunta: ¿Por qué no veo pagos ni reportes financieros?\n\nRespuesta: El rol médico no tiene permisos de pagos ni reporte financiero. Puede ver el estado básico del pago vinculado a sus citas, pero no cobrar ni consultar montos financieros completos.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "doctor-no-finance",
+        "role": "medico",
+        "modules": [
+          "reports",
+          "payments",
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "doctor-own-agenda:medico:v1",
+      "content": "Título: Agenda propia del médico\n\nPregunta: ¿Cómo veo mis citas asignadas?\n\nRespuesta: El Dashboard, Citas y Agenda del día limitan los resultados al perfil médico asociado a tu usuario y clínica activa.\n\nPasos:\n- Abre Agenda del día.\n- Selecciona la fecha.\n- Revisa estado de cita y pago.\n\nFormas alternativas de preguntar:\n- mi agenda\n- mis citas\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "doctor-own-agenda",
+        "role": "medico",
+        "modules": [
+          "appointments",
+          "daily_agenda",
+          "dashboard"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "doctor-report-exports:medico:v1",
+      "content": "Título: Exportar reportes propios\n\nPregunta: ¿Cómo exporto mis reportes de citas o clínicos?\n\nRespuesta: En el reporte de citas o clínico aplica filtros y elige PDF, CSV, Excel XLSX o impresión. La exportación conserva el alcance de tu perfil médico.\n\nPasos:\n- Abre el reporte permitido.\n- Define el rango.\n- Revisa resultados.\n- Elige el formato.\n\nRestricciones en línea:\n- Las exportaciones se generan en el servidor.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "doctor-report-exports",
+        "role": "medico",
+        "modules": [
+          "reports"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "doctor-reports:medico:v1",
+      "content": "Título: Reportes propios del médico\n\nPregunta: ¿Qué reportes puede ver un médico?\n\nRespuesta: El médico puede consultar el reporte de citas y el reporte clínico. El backend los limita al perfil médico asociado a su usuario, sin aceptar un filtro para otro médico.\n\nPasos:\n- Abre Reportes.\n- Elige Citas o Clínico.\n- Aplica rango y filtros permitidos.\n\nFormas alternativas de preguntar:\n- mis reportes\n- reporte clínico propio\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "doctor-reports",
+        "role": "medico",
+        "modules": [
+          "reports"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-isolation:administrador:v1",
+      "content": "Título: Aislamiento de borradores\n\nPregunta: ¿Se mezclan borradores entre usuarios o clínicas?\n\nRespuesta: No. La clave local incluye clínica, usuario, rol, formulario y registro. Un borrador no debe aparecer en otro contexto.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-isolation",
+        "role": "administrador",
+        "modules": [
+          "offline",
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-isolation:medico:v1",
+      "content": "Título: Aislamiento de borradores\n\nPregunta: ¿Se mezclan borradores entre usuarios o clínicas?\n\nRespuesta: No. La clave local incluye clínica, usuario, rol, formulario y registro. Un borrador no debe aparecer en otro contexto.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-isolation",
+        "role": "medico",
+        "modules": [
+          "offline",
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-isolation:recepcionista:v1",
+      "content": "Título: Aislamiento de borradores\n\nPregunta: ¿Se mezclan borradores entre usuarios o clínicas?\n\nRespuesta: No. La clave local incluye clínica, usuario, rol, formulario y registro. Un borrador no debe aparecer en otro contexto.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-isolation",
+        "role": "recepcionista",
+        "modules": [
+          "offline",
+          "clinic_switch"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-lifecycle:administrador:v1",
+      "content": "Título: Ciclo de vida del borrador\n\nPregunta: ¿Cuándo se elimina o sincroniza un borrador?\n\nRespuesta: El borrador se elimina al descartarlo o al enviar el formulario mientras MediFlow está conectado. No se sincroniza automáticamente.\n\nPasos:\n- Restaura el borrador.\n- Revisa la información.\n- Envíalo manualmente con conexión.\n\nFormas alternativas de preguntar:\n- el borrador se sincroniza solo\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-lifecycle",
+        "role": "administrador",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-lifecycle:medico:v1",
+      "content": "Título: Ciclo de vida del borrador\n\nPregunta: ¿Cuándo se elimina o sincroniza un borrador?\n\nRespuesta: El borrador se elimina al descartarlo o al enviar el formulario mientras MediFlow está conectado. No se sincroniza automáticamente.\n\nPasos:\n- Restaura el borrador.\n- Revisa la información.\n- Envíalo manualmente con conexión.\n\nFormas alternativas de preguntar:\n- el borrador se sincroniza solo\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-lifecycle",
+        "role": "medico",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-lifecycle:recepcionista:v1",
+      "content": "Título: Ciclo de vida del borrador\n\nPregunta: ¿Cuándo se elimina o sincroniza un borrador?\n\nRespuesta: El borrador se elimina al descartarlo o al enviar el formulario mientras MediFlow está conectado. No se sincroniza automáticamente.\n\nPasos:\n- Restaura el borrador.\n- Revisa la información.\n- Envíalo manualmente con conexión.\n\nFormas alternativas de preguntar:\n- el borrador se sincroniza solo\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-lifecycle",
+        "role": "recepcionista",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-local:administrador:v1",
+      "content": "Título: Borradores locales\n\nPregunta: ¿Qué es un borrador local y dónde se guarda?\n\nRespuesta: Un borrador local es una copia temporal del formulario guardada en el almacenamiento local del navegador. Se separa por clínica, usuario, rol, formulario y registro; no se envía al servidor.\n\nFormas alternativas de preguntar:\n- donde se guardan los borradores\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-local",
+        "role": "administrador",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-local:medico:v1",
+      "content": "Título: Borradores locales\n\nPregunta: ¿Qué es un borrador local y dónde se guarda?\n\nRespuesta: Un borrador local es una copia temporal del formulario guardada en el almacenamiento local del navegador. Se separa por clínica, usuario, rol, formulario y registro; no se envía al servidor.\n\nFormas alternativas de preguntar:\n- donde se guardan los borradores\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-local",
+        "role": "medico",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-local:recepcionista:v1",
+      "content": "Título: Borradores locales\n\nPregunta: ¿Qué es un borrador local y dónde se guarda?\n\nRespuesta: Un borrador local es una copia temporal del formulario guardada en el almacenamiento local del navegador. Se separa por clínica, usuario, rol, formulario y registro; no se envía al servidor.\n\nFormas alternativas de preguntar:\n- donde se guardan los borradores\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-local",
+        "role": "recepcionista",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-restore-discard:administrador:v1",
+      "content": "Título: Restaurar o descartar borrador\n\nPregunta: ¿Cómo restauro o descarto un borrador?\n\nRespuesta: Al abrir el mismo formulario, MediFlow muestra un aviso si existe un borrador. Restaurar repone los campos guardados; Descartar elimina esa copia local.\n\nPasos:\n- Abre el mismo formulario y registro.\n- Pulsa Restaurar borrador para recuperar los campos o Descartar borrador para eliminarlo.\n- Si restauras, revisa todo antes de enviarlo.\n\nFormas alternativas de preguntar:\n- hay un borrador guardado\n- quiero borrar un borrador\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-restore-discard",
+        "role": "administrador",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-restore-discard:medico:v1",
+      "content": "Título: Restaurar o descartar borrador\n\nPregunta: ¿Cómo restauro o descarto un borrador?\n\nRespuesta: Al abrir el mismo formulario, MediFlow muestra un aviso si existe un borrador. Restaurar repone los campos guardados; Descartar elimina esa copia local.\n\nPasos:\n- Abre el mismo formulario y registro.\n- Pulsa Restaurar borrador para recuperar los campos o Descartar borrador para eliminarlo.\n- Si restauras, revisa todo antes de enviarlo.\n\nFormas alternativas de preguntar:\n- hay un borrador guardado\n- quiero borrar un borrador\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-restore-discard",
+        "role": "medico",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "drafts-restore-discard:recepcionista:v1",
+      "content": "Título: Restaurar o descartar borrador\n\nPregunta: ¿Cómo restauro o descarto un borrador?\n\nRespuesta: Al abrir el mismo formulario, MediFlow muestra un aviso si existe un borrador. Restaurar repone los campos guardados; Descartar elimina esa copia local.\n\nPasos:\n- Abre el mismo formulario y registro.\n- Pulsa Restaurar borrador para recuperar los campos o Descartar borrador para eliminarlo.\n- Si restauras, revisa todo antes de enviarlo.\n\nFormas alternativas de preguntar:\n- hay un borrador guardado\n- quiero borrar un borrador\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "drafts-restore-discard",
+        "role": "recepcionista",
+        "modules": [
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "financial-audit:administrador:v1",
+      "content": "Título: Registro financiero\n\nPregunta: ¿Cómo reviso el registro financiero?\n\nRespuesta: Abre Registro de caja para revisar eventos financieros auditados de la clínica activa, con filtros disponibles. Esta vista no concede permiso para modificar pagos.\n\nFormas alternativas de preguntar:\n- auditoría financiera\n- registro de caja\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "financial-audit",
+        "role": "administrador",
+        "modules": [
+          "financial_audit"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "financial-audit:caja_finanzas:v1",
+      "content": "Título: Registro financiero\n\nPregunta: ¿Cómo reviso el registro financiero?\n\nRespuesta: Abre Registro de caja para revisar eventos financieros auditados de la clínica activa, con filtros disponibles. Esta vista no concede permiso para modificar pagos.\n\nFormas alternativas de preguntar:\n- auditoría financiera\n- registro de caja\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "financial-audit",
+        "role": "caja_finanzas",
+        "modules": [
+          "financial_audit"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "financial-export-missing:administrador:v1",
+      "content": "Título: Exportar Excel no visible\n\nPregunta: ¿Por qué no aparece Exportar Excel?\n\nRespuesta: La opción XLSX existe en el reporte financiero, de citas y clínico, pero cada uno exige su permiso específico. También puede estar bloqueada mientras no haya conexión.\n\nPasos:\n- Confirma que estás en el reporte correcto.\n- Revisa el estado de conexión.\n- Contacta al administrador para validar el permiso.\n\nEscalado:\n- Permitido: sí. Indica el nombre del reporte y tu rol; no compartas su contenido.",
+      "metadata": {
+        "entry_id": "financial-export-missing",
+        "role": "administrador",
+        "modules": [
+          "reports",
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "financial-export-missing:caja_finanzas:v1",
+      "content": "Título: Exportar Excel no visible\n\nPregunta: ¿Por qué no aparece Exportar Excel?\n\nRespuesta: La opción XLSX existe en el reporte financiero, de citas y clínico, pero cada uno exige su permiso específico. También puede estar bloqueada mientras no haya conexión.\n\nPasos:\n- Confirma que estás en el reporte correcto.\n- Revisa el estado de conexión.\n- Contacta al administrador para validar el permiso.\n\nEscalado:\n- Permitido: sí. Indica el nombre del reporte y tu rol; no compartas su contenido.",
+      "metadata": {
+        "entry_id": "financial-export-missing",
+        "role": "caja_finanzas",
+        "modules": [
+          "reports",
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "financial-exports:administrador:v1",
+      "content": "Título: Exportar reporte financiero\n\nPregunta: ¿Cómo exporto el reporte financiero?\n\nRespuesta: Desde Reporte financiero puedes exportar PDF, CSV, Excel XLSX o abrir la vista de impresión. Las exportaciones respetan los filtros y la clínica activa.\n\nPasos:\n- Aplica filtros.\n- Revisa resultados.\n- Elige PDF, CSV, Excel XLSX o Imprimir.\n\nRestricciones en línea:\n- No se pueden generar reportes sin conexión.\n\nFormas alternativas de preguntar:\n- no aparece exportar excel\n- descargar xlsx financiero\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "financial-exports",
+        "role": "administrador",
+        "modules": [
+          "reports"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "financial-exports:caja_finanzas:v1",
+      "content": "Título: Exportar reporte financiero\n\nPregunta: ¿Cómo exporto el reporte financiero?\n\nRespuesta: Desde Reporte financiero puedes exportar PDF, CSV, Excel XLSX o abrir la vista de impresión. Las exportaciones respetan los filtros y la clínica activa.\n\nPasos:\n- Aplica filtros.\n- Revisa resultados.\n- Elige PDF, CSV, Excel XLSX o Imprimir.\n\nRestricciones en línea:\n- No se pueden generar reportes sin conexión.\n\nFormas alternativas de preguntar:\n- no aparece exportar excel\n- descargar xlsx financiero\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "financial-exports",
+        "role": "caja_finanzas",
+        "modules": [
+          "reports"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "financial-report:administrador:v1",
+      "content": "Título: Reporte financiero\n\nPregunta: ¿Cómo consulto el reporte financiero y sus filtros?\n\nRespuesta: El reporte financiero usa la clínica activa y permite filtrar por rango de fechas, estado, método de pago, servicio y médico. Incluye totales pagados, pendientes y agrupaciones por método.\n\nPasos:\n- Abre Reportes.\n- Entra en Reporte financiero.\n- Define el rango y filtros.\n- Revisa la clínica y los totales.\n\nFormas alternativas de preguntar:\n- reporte de pagos\n- filtros financieros\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "financial-report",
+        "role": "administrador",
+        "modules": [
+          "reports",
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "financial-report:caja_finanzas:v1",
+      "content": "Título: Reporte financiero\n\nPregunta: ¿Cómo consulto el reporte financiero y sus filtros?\n\nRespuesta: El reporte financiero usa la clínica activa y permite filtrar por rango de fechas, estado, método de pago, servicio y médico. Incluye totales pagados, pendientes y agrupaciones por método.\n\nPasos:\n- Abre Reportes.\n- Entra en Reporte financiero.\n- Define el rango y filtros.\n- Revisa la clínica y los totales.\n\nFormas alternativas de preguntar:\n- reporte de pagos\n- filtros financieros\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "financial-report",
+        "role": "caja_finanzas",
+        "modules": [
+          "reports",
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "medical-records-create-update:administrador:v1",
+      "content": "Título: Crear o actualizar historia clínica\n\nPregunta: ¿Cómo creo o actualizo un registro médico?\n\nRespuesta: Cada paciente puede tener una historia clínica. El formulario permite antecedentes personales, familiares y quirúrgicos, alergias, hábitos, medicamentos actuales, enfermedades crónicas y observaciones.\n\nPasos:\n- Abre Historial clínico.\n- Crea un registro para un paciente sin historia o abre Editar.\n- Completa solo información autorizada.\n- Revisa y guarda.\n\nRestricciones en línea:\n- Sin conexión solo se conserva un borrador local.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "medical-records-create-update",
+        "role": "administrador",
+        "modules": [
+          "medical_records"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "medical-records-create-update:medico:v1",
+      "content": "Título: Crear o actualizar historia clínica\n\nPregunta: ¿Cómo creo o actualizo un registro médico?\n\nRespuesta: Cada paciente puede tener una historia clínica. El formulario permite antecedentes personales, familiares y quirúrgicos, alergias, hábitos, medicamentos actuales, enfermedades crónicas y observaciones.\n\nPasos:\n- Abre Historial clínico.\n- Crea un registro para un paciente sin historia o abre Editar.\n- Completa solo información autorizada.\n- Revisa y guarda.\n\nRestricciones en línea:\n- Sin conexión solo se conserva un borrador local.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "medical-records-create-update",
+        "role": "medico",
+        "modules": [
+          "medical_records"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "medical-records-draft:administrador:v1",
+      "content": "Título: Borrador de historia clínica\n\nPregunta: ¿Puedo guardar una historia clínica sin conexión?\n\nRespuesta: El formulario admite borrador local separado por usuario y clínica. No crea ni actualiza la historia en el servidor hasta que lo restaures y envíes manualmente.\n\nPasos:\n- Restaura en el mismo formulario.\n- Revisa alergias, hábitos y demás campos.\n- Envía con conexión.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "medical-records-draft",
+        "role": "administrador",
+        "modules": [
+          "medical_records",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "medical-records-draft:medico:v1",
+      "content": "Título: Borrador de historia clínica\n\nPregunta: ¿Puedo guardar una historia clínica sin conexión?\n\nRespuesta: El formulario admite borrador local separado por usuario y clínica. No crea ni actualiza la historia en el servidor hasta que lo restaures y envíes manualmente.\n\nPasos:\n- Restaura en el mismo formulario.\n- Revisa alergias, hábitos y demás campos.\n- Envía con conexión.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "medical-records-draft",
+        "role": "medico",
+        "modules": [
+          "medical_records",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "medical-records-view:administrador:v1",
+      "content": "Título: Ver historia clínica\n\nPregunta: ¿Cómo consulto una historia clínica?\n\nRespuesta: Abre Historial clínico, busca el registro permitido y entra en su ficha. La vista reúne el registro y actividad reciente del paciente dentro de la clínica activa.\n\nFormas alternativas de preguntar:\n- ver historial clínico\n- abrir historia clínica\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "medical-records-view",
+        "role": "administrador",
+        "modules": [
+          "medical_records"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "medical-records-view:medico:v1",
+      "content": "Título: Ver historia clínica\n\nPregunta: ¿Cómo consulto una historia clínica?\n\nRespuesta: Abre Historial clínico, busca el registro permitido y entra en su ficha. La vista reúne el registro y actividad reciente del paciente dentro de la clínica activa.\n\nFormas alternativas de preguntar:\n- ver historial clínico\n- abrir historia clínica\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "medical-records-view",
+        "role": "medico",
+        "modules": [
+          "medical_records"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-blood-type:administrador:v1",
+      "content": "Título: Tipo de sangre\n\nPregunta: ¿Cómo registro el tipo de sangre?\n\nRespuesta: El tipo de sangre es opcional y se selecciona entre A+, A-, B+, B-, AB+, AB-, O+ u O-. No escribas un valor distinto a las opciones del formulario.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-blood-type",
+        "role": "administrador",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-blood-type:recepcionista:v1",
+      "content": "Título: Tipo de sangre\n\nPregunta: ¿Cómo registro el tipo de sangre?\n\nRespuesta: El tipo de sangre es opcional y se selecciona entre A+, A-, B+, B-, AB+, AB-, O+ u O-. No escribas un valor distinto a las opciones del formulario.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-blood-type",
+        "role": "recepcionista",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-create:administrador:v1",
+      "content": "Título: Registrar paciente\n\nPregunta: ¿Cómo registro un paciente?\n\nRespuesta: Para registrar un paciente sigue estos pasos:\n\nPasos:\n- Abre Pacientes.\n- Pulsa Nuevo paciente.\n- Completa los datos solicitados.\n- Revisa y guarda el registro.\n\nRestricciones en línea:\n- Sin conexión el formulario se conserva como borrador local y no se registra en el servidor.\n\nFormas alternativas de preguntar:\n- como creo un paciente\n- quiero registrar un paciente\n- donde creo un paciente\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-create",
+        "role": "administrador",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-create:recepcionista:v1",
+      "content": "Título: Registrar paciente\n\nPregunta: ¿Cómo registro un paciente?\n\nRespuesta: Para registrar un paciente sigue estos pasos:\n\nPasos:\n- Abre Pacientes.\n- Pulsa Nuevo paciente.\n- Completa los datos solicitados.\n- Revisa y guarda el registro.\n\nRestricciones en línea:\n- Sin conexión el formulario se conserva como borrador local y no se registra en el servidor.\n\nFormas alternativas de preguntar:\n- como creo un paciente\n- quiero registrar un paciente\n- donde creo un paciente\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-create",
+        "role": "recepcionista",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-draft:administrador:v1",
+      "content": "Título: Borrador offline de paciente\n\nPregunta: ¿Cómo guardo y recupero un borrador de paciente?\n\nRespuesta: El formulario de paciente admite borrador local. Sin conexión se guarda en el navegador; al volver debes abrir el mismo formulario, restaurarlo, revisarlo y enviarlo manualmente.\n\nPasos:\n- Completa el formulario.\n- Si no hay conexión, deja que MediFlow guarde el borrador.\n- Vuelve al mismo formulario.\n- Elige Restaurar o Descartar.\n\nFormas alternativas de preguntar:\n- paciente offline\n- restaurar borrador de paciente\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-draft",
+        "role": "administrador",
+        "modules": [
+          "patients",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-draft:recepcionista:v1",
+      "content": "Título: Borrador offline de paciente\n\nPregunta: ¿Cómo guardo y recupero un borrador de paciente?\n\nRespuesta: El formulario de paciente admite borrador local. Sin conexión se guarda en el navegador; al volver debes abrir el mismo formulario, restaurarlo, revisarlo y enviarlo manualmente.\n\nPasos:\n- Completa el formulario.\n- Si no hay conexión, deja que MediFlow guarde el borrador.\n- Vuelve al mismo formulario.\n- Elige Restaurar o Descartar.\n\nFormas alternativas de preguntar:\n- paciente offline\n- restaurar borrador de paciente\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-draft",
+        "role": "recepcionista",
+        "modules": [
+          "patients",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-duplicate-identification:administrador:v1",
+      "content": "Título: Identificación duplicada\n\nPregunta: ¿Por qué indica identificación duplicada?\n\nRespuesta: La identificación debe ser única. Busca primero al paciente existente y evita crear un segundo registro.\n\nPasos:\n- Copia solo el valor de identificación necesario para la búsqueda.\n- Busca al paciente en el listado.\n- Si parece un error, contacta al administrador sin compartir la identificación completa.\n\nEscalado:\n- Permitido: sí. Solicita una revisión administrativa sin enviar la identificación completa por canales inseguros.",
+      "metadata": {
+        "entry_id": "patients-duplicate-identification",
+        "role": "administrador",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-duplicate-identification:recepcionista:v1",
+      "content": "Título: Identificación duplicada\n\nPregunta: ¿Por qué indica identificación duplicada?\n\nRespuesta: La identificación debe ser única. Busca primero al paciente existente y evita crear un segundo registro.\n\nPasos:\n- Copia solo el valor de identificación necesario para la búsqueda.\n- Busca al paciente en el listado.\n- Si parece un error, contacta al administrador sin compartir la identificación completa.\n\nEscalado:\n- Permitido: sí. Solicita una revisión administrativa sin enviar la identificación completa por canales inseguros.",
+      "metadata": {
+        "entry_id": "patients-duplicate-identification",
+        "role": "recepcionista",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-edit-search:administrador:v1",
+      "content": "Título: Buscar y editar paciente\n\nPregunta: ¿Cómo busco o edito un paciente?\n\nRespuesta: En Pacientes puedes buscar por nombre, identificación, teléfono o correo. Abre la ficha y usa Editar si tienes permiso.\n\nPasos:\n- Abre Pacientes.\n- Usa el buscador.\n- Abre el registro correcto.\n- Pulsa Editar, revisa y guarda.\n\nRestricciones en línea:\n- La actualización requiere conexión.\n\nFormas alternativas de preguntar:\n- buscar paciente\n- corregir datos de paciente\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-edit-search",
+        "role": "administrador",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-edit-search:recepcionista:v1",
+      "content": "Título: Buscar y editar paciente\n\nPregunta: ¿Cómo busco o edito un paciente?\n\nRespuesta: En Pacientes puedes buscar por nombre, identificación, teléfono o correo. Abre la ficha y usa Editar si tienes permiso.\n\nPasos:\n- Abre Pacientes.\n- Usa el buscador.\n- Abre el registro correcto.\n- Pulsa Editar, revisa y guarda.\n\nRestricciones en línea:\n- La actualización requiere conexión.\n\nFormas alternativas de preguntar:\n- buscar paciente\n- corregir datos de paciente\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-edit-search",
+        "role": "recepcionista",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-required-fields:administrador:v1",
+      "content": "Título: Datos obligatorios del paciente\n\nPregunta: ¿Qué datos del paciente son obligatorios?\n\nRespuesta: Nombres, apellidos y estado son obligatorios. La identificación, fecha de nacimiento, género, contacto, dirección, tipo de sangre, alergias y contacto de emergencia son opcionales, pero se validan si se completan.\n\nFormas alternativas de preguntar:\n- campos obligatorios del paciente\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-required-fields",
+        "role": "administrador",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-required-fields:recepcionista:v1",
+      "content": "Título: Datos obligatorios del paciente\n\nPregunta: ¿Qué datos del paciente son obligatorios?\n\nRespuesta: Nombres, apellidos y estado son obligatorios. La identificación, fecha de nacimiento, género, contacto, dirección, tipo de sangre, alergias y contacto de emergencia son opcionales, pero se validan si se completan.\n\nFormas alternativas de preguntar:\n- campos obligatorios del paciente\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "patients-required-fields",
+        "role": "recepcionista",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-save-error:administrador:v1",
+      "content": "Título: Paciente no guardado\n\nPregunta: ¿Qué hago si el paciente no se guarda?\n\nRespuesta: Revisa los mensajes de validación, la identificación duplicada y el estado de conexión. Sin conexión restaura el borrador y vuelve a enviarlo manualmente.\n\nPasos:\n- Corrige los campos marcados.\n- Confirma que MediFlow esté Conectado.\n- Busca posibles duplicados.\n- Contacta al administrador si el error continúa.\n\nFormas alternativas de preguntar:\n- no me deja guardar el paciente\n\nEscalado:\n- Permitido: sí. Indica el mensaje mostrado y la ruta; no compartas datos del paciente.",
+      "metadata": {
+        "entry_id": "patients-save-error",
+        "role": "administrador",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "patients-save-error:recepcionista:v1",
+      "content": "Título: Paciente no guardado\n\nPregunta: ¿Qué hago si el paciente no se guarda?\n\nRespuesta: Revisa los mensajes de validación, la identificación duplicada y el estado de conexión. Sin conexión restaura el borrador y vuelve a enviarlo manualmente.\n\nPasos:\n- Corrige los campos marcados.\n- Confirma que MediFlow esté Conectado.\n- Busca posibles duplicados.\n- Contacta al administrador si el error continúa.\n\nFormas alternativas de preguntar:\n- no me deja guardar el paciente\n\nEscalado:\n- Permitido: sí. Indica el mensaje mostrado y la ruta; no compartas datos del paciente.",
+      "metadata": {
+        "entry_id": "patients-save-error",
+        "role": "recepcionista",
+        "modules": [
+          "patients"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-charge:administrador:v1",
+      "content": "Título: Registrar cobro\n\nPregunta: ¿Cómo registro un cobro?\n\nRespuesta: Para registrar un cobro sigue estos pasos:\n\nPasos:\n- Abre Pagos y Finanzas.\n- Localiza el pago pendiente o pulsa Nuevo pago.\n- Verifica paciente, cita, servicio y monto.\n- Selecciona método y estado Pagado.\n- Confirma la fecha y guarda.\n\nRestricciones en línea:\n- Los pagos no se pueden registrar ni modificar sin conexión para evitar duplicaciones o inconsistencias.\n\nFormas alternativas de preguntar:\n- como cobro un pago\n- quiero registrar un pago\n- donde confirmo un pago\n- como hago un cobro\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-charge",
+        "role": "administrador",
+        "modules": [
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-charge:caja_finanzas:v1",
+      "content": "Título: Registrar cobro\n\nPregunta: ¿Cómo registro un cobro?\n\nRespuesta: Para registrar un cobro sigue estos pasos:\n\nPasos:\n- Abre Pagos y Finanzas.\n- Localiza el pago pendiente o pulsa Nuevo pago.\n- Verifica paciente, cita, servicio y monto.\n- Selecciona método y estado Pagado.\n- Confirma la fecha y guarda.\n\nRestricciones en línea:\n- Los pagos no se pueden registrar ni modificar sin conexión para evitar duplicaciones o inconsistencias.\n\nFormas alternativas de preguntar:\n- como cobro un pago\n- quiero registrar un pago\n- donde confirmo un pago\n- como hago un cobro\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-charge",
+        "role": "caja_finanzas",
+        "modules": [
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-method-date-status:administrador:v1",
+      "content": "Título: Método, fecha y estado del pago\n\nPregunta: ¿Qué métodos, fecha y estados admite un pago?\n\nRespuesta: Los métodos son efectivo, tarjeta, transferencia u otro. Los estados son pendiente, pagado, cancelado y reembolsado. Al marcar Pagado sin fecha, MediFlow asigna la fecha y hora local actual.\n\nFormas alternativas de preguntar:\n- métodos de pago\n- fecha de pago\n- pago pagado cancelado reembolsado\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-method-date-status",
+        "role": "administrador",
+        "modules": [
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-method-date-status:caja_finanzas:v1",
+      "content": "Título: Método, fecha y estado del pago\n\nPregunta: ¿Qué métodos, fecha y estados admite un pago?\n\nRespuesta: Los métodos son efectivo, tarjeta, transferencia u otro. Los estados son pendiente, pagado, cancelado y reembolsado. Al marcar Pagado sin fecha, MediFlow asigna la fecha y hora local actual.\n\nFormas alternativas de preguntar:\n- métodos de pago\n- fecha de pago\n- pago pagado cancelado reembolsado\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-method-date-status",
+        "role": "caja_finanzas",
+        "modules": [
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-offline:administrador:v1",
+      "content": "Título: Pagos sin conexión\n\nPregunta: ¿Por qué no puedo cobrar sin Internet?\n\nRespuesta: Los pagos no se pueden registrar ni modificar sin conexión para evitar duplicaciones o inconsistencias.\n\nPasos:\n- Conserva la pantalla ya cargada solo para consulta.\n- Espera a que el indicador muestre Conectado.\n- Vuelve a verificar el estado del pago antes de cobrar.\n\nFormas alternativas de preguntar:\n- por que no puedo cobrar\n- por que no puedo guardar\n- por que no puedo guardar el pago\n- no me deja registrar el pago\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-offline",
+        "role": "administrador",
+        "modules": [
+          "payments",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-offline:caja_finanzas:v1",
+      "content": "Título: Pagos sin conexión\n\nPregunta: ¿Por qué no puedo cobrar sin Internet?\n\nRespuesta: Los pagos no se pueden registrar ni modificar sin conexión para evitar duplicaciones o inconsistencias.\n\nPasos:\n- Conserva la pantalla ya cargada solo para consulta.\n- Espera a que el indicador muestre Conectado.\n- Vuelve a verificar el estado del pago antes de cobrar.\n\nFormas alternativas de preguntar:\n- por que no puedo cobrar\n- por que no puedo guardar\n- por que no puedo guardar el pago\n- no me deja registrar el pago\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-offline",
+        "role": "caja_finanzas",
+        "modules": [
+          "payments",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-pending:administrador:v1",
+      "content": "Título: Pagos pendientes\n\nPregunta: ¿Cómo veo los pagos pendientes?\n\nRespuesta: Abre Pagos y Finanzas. Sin filtros, MediFlow muestra una cola de pagos pendientes; también puedes filtrar por estado Pendiente.\n\nPasos:\n- Abre Pagos y Finanzas.\n- Usa el filtro Estado: Pendiente.\n- Abre el pago que vas a revisar.\n\nFormas alternativas de preguntar:\n- cola de cobros\n- deudas pendientes\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-pending",
+        "role": "administrador",
+        "modules": [
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-pending:caja_finanzas:v1",
+      "content": "Título: Pagos pendientes\n\nPregunta: ¿Cómo veo los pagos pendientes?\n\nRespuesta: Abre Pagos y Finanzas. Sin filtros, MediFlow muestra una cola de pagos pendientes; también puedes filtrar por estado Pendiente.\n\nPasos:\n- Abre Pagos y Finanzas.\n- Usa el filtro Estado: Pendiente.\n- Abre el pago que vas a revisar.\n\nFormas alternativas de preguntar:\n- cola de cobros\n- deudas pendientes\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-pending",
+        "role": "caja_finanzas",
+        "modules": [
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-show:administrador:v1",
+      "content": "Título: Ficha del pago\n\nPregunta: ¿Cómo veo la ficha de un pago?\n\nRespuesta: Abre el pago desde el listado. La ficha muestra la información autorizada y las opciones de recibo; el backend verifica que pertenezca a la clínica activa.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-show",
+        "role": "administrador",
+        "modules": [
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "payments-show:caja_finanzas:v1",
+      "content": "Título: Ficha del pago\n\nPregunta: ¿Cómo veo la ficha de un pago?\n\nRespuesta: Abre el pago desde el listado. La ficha muestra la información autorizada y las opciones de recibo; el backend verifica que pertenezca a la clínica activa.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "payments-show",
+        "role": "caja_finanzas",
+        "modules": [
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-403:administrador:v1",
+      "content": "Título: Acceso 403\n\nPregunta: ¿Por qué una ruta muestra 403?\n\nRespuesta: Un 403 indica que el backend rechazó el acceso por permiso, clínica activa, alcance del registro o estado de la clínica. No intentes acceder mediante otra URL.\n\nPasos:\n- Vuelve al menú autorizado.\n- Confirma la clínica activa.\n- Contacta al administrador si consideras que necesitas ese permiso.\n\nFormas alternativas de preguntar:\n- acceso denegado\n- no puedo entrar a un módulo\n\nEscalado:\n- Permitido: sí. Comparte con el administrador el módulo y la ruta, nunca información clínica o financiera.",
+      "metadata": {
+        "entry_id": "permissions-403",
+        "role": "administrador",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-403:caja_finanzas:v1",
+      "content": "Título: Acceso 403\n\nPregunta: ¿Por qué una ruta muestra 403?\n\nRespuesta: Un 403 indica que el backend rechazó el acceso por permiso, clínica activa, alcance del registro o estado de la clínica. No intentes acceder mediante otra URL.\n\nPasos:\n- Vuelve al menú autorizado.\n- Confirma la clínica activa.\n- Contacta al administrador si consideras que necesitas ese permiso.\n\nFormas alternativas de preguntar:\n- acceso denegado\n- no puedo entrar a un módulo\n\nEscalado:\n- Permitido: sí. Comparte con el administrador el módulo y la ruta, nunca información clínica o financiera.",
+      "metadata": {
+        "entry_id": "permissions-403",
+        "role": "caja_finanzas",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-403:medico:v1",
+      "content": "Título: Acceso 403\n\nPregunta: ¿Por qué una ruta muestra 403?\n\nRespuesta: Un 403 indica que el backend rechazó el acceso por permiso, clínica activa, alcance del registro o estado de la clínica. No intentes acceder mediante otra URL.\n\nPasos:\n- Vuelve al menú autorizado.\n- Confirma la clínica activa.\n- Contacta al administrador si consideras que necesitas ese permiso.\n\nFormas alternativas de preguntar:\n- acceso denegado\n- no puedo entrar a un módulo\n\nEscalado:\n- Permitido: sí. Comparte con el administrador el módulo y la ruta, nunca información clínica o financiera.",
+      "metadata": {
+        "entry_id": "permissions-403",
+        "role": "medico",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-403:recepcionista:v1",
+      "content": "Título: Acceso 403\n\nPregunta: ¿Por qué una ruta muestra 403?\n\nRespuesta: Un 403 indica que el backend rechazó el acceso por permiso, clínica activa, alcance del registro o estado de la clínica. No intentes acceder mediante otra URL.\n\nPasos:\n- Vuelve al menú autorizado.\n- Confirma la clínica activa.\n- Contacta al administrador si consideras que necesitas ese permiso.\n\nFormas alternativas de preguntar:\n- acceso denegado\n- no puedo entrar a un módulo\n\nEscalado:\n- Permitido: sí. Comparte con el administrador el módulo y la ruta, nunca información clínica o financiera.",
+      "metadata": {
+        "entry_id": "permissions-403",
+        "role": "recepcionista",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-403:super_admin:v1",
+      "content": "Título: Acceso 403\n\nPregunta: ¿Por qué una ruta muestra 403?\n\nRespuesta: Un 403 indica que el backend rechazó el acceso por permiso, clínica activa, alcance del registro o estado de la clínica. No intentes acceder mediante otra URL.\n\nPasos:\n- Vuelve al menú autorizado.\n- Confirma la clínica activa.\n- Contacta al administrador si consideras que necesitas ese permiso.\n\nFormas alternativas de preguntar:\n- acceso denegado\n- no puedo entrar a un módulo\n\nEscalado:\n- Permitido: sí. Comparte con el administrador el módulo y la ruta, nunca información clínica o financiera.",
+      "metadata": {
+        "entry_id": "permissions-403",
+        "role": "super_admin",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-button:administrador:v1",
+      "content": "Título: Botón no visible\n\nPregunta: ¿Por qué no aparece un botón o módulo?\n\nRespuesta: Las opciones se muestran según el rol, el permiso efectivo, el estado del registro y la clínica activa. El asistente no puede ampliar permisos.\n\nPasos:\n- Confirma que estás en la clínica correcta.\n- Revisa si el registro cumple el estado requerido.\n- Contacta al administrador si la función corresponde a tu trabajo.\n\nFormas alternativas de preguntar:\n- no aparece el botón\n- no veo el módulo\n\nEscalado:\n- Permitido: sí. Contacta al administrador e indica el módulo y la acción que necesitas, sin compartir datos sensibles.",
+      "metadata": {
+        "entry_id": "permissions-button",
+        "role": "administrador",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-button:caja_finanzas:v1",
+      "content": "Título: Botón no visible\n\nPregunta: ¿Por qué no aparece un botón o módulo?\n\nRespuesta: Las opciones se muestran según el rol, el permiso efectivo, el estado del registro y la clínica activa. El asistente no puede ampliar permisos.\n\nPasos:\n- Confirma que estás en la clínica correcta.\n- Revisa si el registro cumple el estado requerido.\n- Contacta al administrador si la función corresponde a tu trabajo.\n\nFormas alternativas de preguntar:\n- no aparece el botón\n- no veo el módulo\n\nEscalado:\n- Permitido: sí. Contacta al administrador e indica el módulo y la acción que necesitas, sin compartir datos sensibles.",
+      "metadata": {
+        "entry_id": "permissions-button",
+        "role": "caja_finanzas",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-button:medico:v1",
+      "content": "Título: Botón no visible\n\nPregunta: ¿Por qué no aparece un botón o módulo?\n\nRespuesta: Las opciones se muestran según el rol, el permiso efectivo, el estado del registro y la clínica activa. El asistente no puede ampliar permisos.\n\nPasos:\n- Confirma que estás en la clínica correcta.\n- Revisa si el registro cumple el estado requerido.\n- Contacta al administrador si la función corresponde a tu trabajo.\n\nFormas alternativas de preguntar:\n- no aparece el botón\n- no veo el módulo\n\nEscalado:\n- Permitido: sí. Contacta al administrador e indica el módulo y la acción que necesitas, sin compartir datos sensibles.",
+      "metadata": {
+        "entry_id": "permissions-button",
+        "role": "medico",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-button:recepcionista:v1",
+      "content": "Título: Botón no visible\n\nPregunta: ¿Por qué no aparece un botón o módulo?\n\nRespuesta: Las opciones se muestran según el rol, el permiso efectivo, el estado del registro y la clínica activa. El asistente no puede ampliar permisos.\n\nPasos:\n- Confirma que estás en la clínica correcta.\n- Revisa si el registro cumple el estado requerido.\n- Contacta al administrador si la función corresponde a tu trabajo.\n\nFormas alternativas de preguntar:\n- no aparece el botón\n- no veo el módulo\n\nEscalado:\n- Permitido: sí. Contacta al administrador e indica el módulo y la acción que necesitas, sin compartir datos sensibles.",
+      "metadata": {
+        "entry_id": "permissions-button",
+        "role": "recepcionista",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "permissions-button:super_admin:v1",
+      "content": "Título: Botón no visible\n\nPregunta: ¿Por qué no aparece un botón o módulo?\n\nRespuesta: Las opciones se muestran según el rol, el permiso efectivo, el estado del registro y la clínica activa. El asistente no puede ampliar permisos.\n\nPasos:\n- Confirma que estás en la clínica correcta.\n- Revisa si el registro cumple el estado requerido.\n- Contacta al administrador si la función corresponde a tu trabajo.\n\nFormas alternativas de preguntar:\n- no aparece el botón\n- no veo el módulo\n\nEscalado:\n- Permitido: sí. Contacta al administrador e indica el módulo y la acción que necesitas, sin compartir datos sensibles.",
+      "metadata": {
+        "entry_id": "permissions-button",
+        "role": "super_admin",
+        "modules": [
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-create:administrador:v1",
+      "content": "Título: Crear receta\n\nPregunta: ¿Cómo creo una receta médica?\n\nRespuesta: Abre Recetas médicas y pulsa Nueva receta. También puede iniciarse con una consulta preseleccionada. Completa medicamentos e indicaciones, revisa y guarda.\n\nPasos:\n- Abre Recetas médicas.\n- Pulsa Nueva receta.\n- Selecciona consulta, paciente y médico coherentes.\n- Añade medicamentos e indicaciones.\n- Guarda la receta.\n\nRestricciones en línea:\n- Sin conexión se conserva un borrador; firmar y enviar por correo siempre requieren conexión.\n\nFormas alternativas de preguntar:\n- como creo una receta medica\n- como hago una receta\n- quiero hacer una receta\n- quiero generar una prescripcion\n- donde genero una prescripcion\n- donde creo una receta\n- como emitir una receta\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-create",
+        "role": "administrador",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-create:medico:v1",
+      "content": "Título: Crear receta\n\nPregunta: ¿Cómo creo una receta médica?\n\nRespuesta: Abre Recetas médicas y pulsa Nueva receta. También puede iniciarse con una consulta preseleccionada. Completa medicamentos e indicaciones, revisa y guarda.\n\nPasos:\n- Abre Recetas médicas.\n- Pulsa Nueva receta.\n- Selecciona consulta, paciente y médico coherentes.\n- Añade medicamentos e indicaciones.\n- Guarda la receta.\n\nRestricciones en línea:\n- Sin conexión se conserva un borrador; firmar y enviar por correo siempre requieren conexión.\n\nFormas alternativas de preguntar:\n- como creo una receta medica\n- como hago una receta\n- quiero hacer una receta\n- quiero generar una prescripcion\n- donde genero una prescripcion\n- donde creo una receta\n- como emitir una receta\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-create",
+        "role": "medico",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-edit:administrador:v1",
+      "content": "Título: Editar receta\n\nPregunta: ¿Puedo editar una receta?\n\nRespuesta: Sí, mientras no esté firmada. Una receta firmada no puede editarse; debe anularse o crearse una nueva según corresponda.\n\nPasos:\n- Abre la receta.\n- Si no está firmada, pulsa Editar.\n- Revisa y guarda los cambios.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-edit",
+        "role": "administrador",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-edit:medico:v1",
+      "content": "Título: Editar receta\n\nPregunta: ¿Puedo editar una receta?\n\nRespuesta: Sí, mientras no esté firmada. Una receta firmada no puede editarse; debe anularse o crearse una nueva según corresponda.\n\nPasos:\n- Abre la receta.\n- Si no está firmada, pulsa Editar.\n- Revisa y guarda los cambios.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-edit",
+        "role": "medico",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-offline:administrador:v1",
+      "content": "Título: Recetas sin conexión\n\nPregunta: ¿Por qué no puedo firmar o enviar una receta sin conexión?\n\nRespuesta: MediFlow bloquea la firma y el envío por correo sin conexión porque son acciones oficiales. Puedes conservar un borrador local y completarlas cuando se restablezca la conexión.\n\nPasos:\n- Guarda o conserva el borrador.\n- Espera el estado Conectado.\n- Restaura y revisa.\n- Firma o envía manualmente.\n\nFormas alternativas de preguntar:\n- no me deja firmar la receta\n- firma bloqueada sin internet\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-offline",
+        "role": "administrador",
+        "modules": [
+          "prescriptions",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-offline:medico:v1",
+      "content": "Título: Recetas sin conexión\n\nPregunta: ¿Por qué no puedo firmar o enviar una receta sin conexión?\n\nRespuesta: MediFlow bloquea la firma y el envío por correo sin conexión porque son acciones oficiales. Puedes conservar un borrador local y completarlas cuando se restablezca la conexión.\n\nPasos:\n- Guarda o conserva el borrador.\n- Espera el estado Conectado.\n- Restaura y revisa.\n- Firma o envía manualmente.\n\nFormas alternativas de preguntar:\n- no me deja firmar la receta\n- firma bloqueada sin internet\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-offline",
+        "role": "medico",
+        "modules": [
+          "prescriptions",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-pdf-print:administrador:v1",
+      "content": "Título: PDF e impresión de receta\n\nPregunta: ¿Cómo descargo o imprimo una receta?\n\nRespuesta: Desde el detalle usa Descargar PDF o Imprimir. MediFlow registra la entrega y muestra la firma interna y QR cuando la receta está firmada.\n\nPasos:\n- Abre la receta.\n- Elige PDF o Imprimir.\n- Revisa el documento generado.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-pdf-print",
+        "role": "administrador",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-pdf-print:medico:v1",
+      "content": "Título: PDF e impresión de receta\n\nPregunta: ¿Cómo descargo o imprimo una receta?\n\nRespuesta: Desde el detalle usa Descargar PDF o Imprimir. MediFlow registra la entrega y muestra la firma interna y QR cuando la receta está firmada.\n\nPasos:\n- Abre la receta.\n- Elige PDF o Imprimir.\n- Revisa el documento generado.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-pdf-print",
+        "role": "medico",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-send:administrador:v1",
+      "content": "Título: Enviar receta por correo\n\nPregunta: ¿Cómo envío una receta por correo?\n\nRespuesta: Abre la receta, revisa el correo del paciente o ingresa uno válido y usa Enviar. MediFlow adjunta el PDF y registra el último envío.\n\nPasos:\n- Abre el detalle.\n- Confirma el destinatario.\n- Pulsa Enviar por correo.\n- Revisa el mensaje de resultado.\n\nRestricciones en línea:\n- El envío requiere conexión y una configuración de correo funcional.\n\nFormas alternativas de preguntar:\n- quiero enviar una receta\n- como mando la receta por correo\n- donde envio la prescripcion\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-send",
+        "role": "administrador",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-send:medico:v1",
+      "content": "Título: Enviar receta por correo\n\nPregunta: ¿Cómo envío una receta por correo?\n\nRespuesta: Abre la receta, revisa el correo del paciente o ingresa uno válido y usa Enviar. MediFlow adjunta el PDF y registra el último envío.\n\nPasos:\n- Abre el detalle.\n- Confirma el destinatario.\n- Pulsa Enviar por correo.\n- Revisa el mensaje de resultado.\n\nRestricciones en línea:\n- El envío requiere conexión y una configuración de correo funcional.\n\nFormas alternativas de preguntar:\n- quiero enviar una receta\n- como mando la receta por correo\n- donde envio la prescripcion\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-send",
+        "role": "medico",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-sign:administrador:v1",
+      "content": "Título: Firmar receta\n\nPregunta: ¿Cómo firmo una receta?\n\nRespuesta: Abre una receta activa y sin firma, revisa su contenido y pulsa Firmar. Es una firma electrónica interna verificable de MediFlow; después de firmar no puede editarse.\n\nPasos:\n- Abre el detalle.\n- Revisa receta e ítems.\n- Pulsa Firmar.\n- Confirma la acción.\n\nRestricciones en línea:\n- La firma requiere conexión y se bloquea para recetas canceladas o ya firmadas.\n\nFormas alternativas de preguntar:\n- quiero firmar una receta\n- donde firmo la receta\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-sign",
+        "role": "administrador",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-sign:medico:v1",
+      "content": "Título: Firmar receta\n\nPregunta: ¿Cómo firmo una receta?\n\nRespuesta: Abre una receta activa y sin firma, revisa su contenido y pulsa Firmar. Es una firma electrónica interna verificable de MediFlow; después de firmar no puede editarse.\n\nPasos:\n- Abre el detalle.\n- Revisa receta e ítems.\n- Pulsa Firmar.\n- Confirma la acción.\n\nRestricciones en línea:\n- La firma requiere conexión y se bloquea para recetas canceladas o ya firmadas.\n\nFormas alternativas de preguntar:\n- quiero firmar una receta\n- donde firmo la receta\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-sign",
+        "role": "medico",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-verification:administrador:v1",
+      "content": "Título: Verificación y QR de receta\n\nPregunta: ¿Cómo funciona el código de verificación y el QR?\n\nRespuesta: Al firmar, MediFlow genera un código y una huella interna. El PDF o impresión puede incluir un QR hacia la ruta pública de verificación, que indica si la firma es válida, fue alterada o no existe.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-verification",
+        "role": "administrador",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "prescriptions-verification:medico:v1",
+      "content": "Título: Verificación y QR de receta\n\nPregunta: ¿Cómo funciona el código de verificación y el QR?\n\nRespuesta: Al firmar, MediFlow genera un código y una huella interna. El PDF o impresión puede incluir un QR hacia la ruta pública de verificación, que indica si la firma es válida, fue alterada o no existe.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "prescriptions-verification",
+        "role": "medico",
+        "modules": [
+          "prescriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "receipts-download-print:administrador:v1",
+      "content": "Título: Descargar o imprimir recibo\n\nPregunta: ¿Cómo descargo o imprimo un recibo?\n\nRespuesta: Abre el detalle del pago y utiliza la opción Recibo o Imprimir. Verifica que el pago y la clínica sean correctos antes de generar el documento.\n\nPasos:\n- Abre la ficha del pago.\n- Selecciona Descargar recibo PDF o Imprimir.\n- Revisa el número REC y la clínica.\n\nFormas alternativas de preguntar:\n- donde descargo el recibo\n- como bajo un recibo\n- quiero exportar el comprobante\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "receipts-download-print",
+        "role": "administrador",
+        "modules": [
+          "receipts",
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "receipts-download-print:caja_finanzas:v1",
+      "content": "Título: Descargar o imprimir recibo\n\nPregunta: ¿Cómo descargo o imprimo un recibo?\n\nRespuesta: Abre el detalle del pago y utiliza la opción Recibo o Imprimir. Verifica que el pago y la clínica sean correctos antes de generar el documento.\n\nPasos:\n- Abre la ficha del pago.\n- Selecciona Descargar recibo PDF o Imprimir.\n- Revisa el número REC y la clínica.\n\nFormas alternativas de preguntar:\n- donde descargo el recibo\n- como bajo un recibo\n- quiero exportar el comprobante\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "receipts-download-print",
+        "role": "caja_finanzas",
+        "modules": [
+          "receipts",
+          "payments"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "super-admin-create-clinic:super_admin:v1",
+      "content": "Título: Crear clínica y administrador principal\n\nPregunta: ¿Cómo creo una clínica y su administrador principal?\n\nRespuesta: Nueva clínica crea la organización y, en la misma transacción, un usuario administrador asociado y activo. Debes completar nombre, estado y credenciales del administrador; los demás datos son opcionales según el formulario.\n\nPasos:\n- Abre Clínicas.\n- Pulsa Nueva clínica.\n- Completa datos generales, suscripción y estado.\n- Completa nombre, correo y contraseña del administrador.\n- Revisa y guarda.\n\nRestricciones en línea:\n- La creación global se bloquea sin conexión.\n\nFormas alternativas de preguntar:\n- nueva clínica\n- crear administrador principal\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "super-admin-create-clinic",
+        "role": "super_admin",
+        "modules": [
+          "super_admin_clinics",
+          "onboarding"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "super-admin-difference:super_admin:v1",
+      "content": "Título: SuperAdmin y administrador de clínica\n\nPregunta: ¿Cuál es la diferencia entre SuperAdmin y administrador de clínica?\n\nRespuesta: SuperAdmin gestiona organizaciones, estado, datos de suscripción y alta del administrador principal. El administrador de clínica gestiona la operación de sus clínicas. SuperAdmin no recibe permisos clínicos o financieros por su rol global.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "super-admin-difference",
+        "role": "super_admin",
+        "modules": [
+          "super_admin_clinics",
+          "permissions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "super-admin-notes:super_admin:v1",
+      "content": "Título: Notas internas\n\nPregunta: ¿Dónde registro notas internas de una clínica?\n\nRespuesta: El formulario global de clínica incluye internal_notes. Son notas administrativas internas; evita incluir datos clínicos, identificaciones o credenciales.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "super-admin-notes",
+        "role": "super_admin",
+        "modules": [
+          "super_admin_clinics"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "super-admin-offline:super_admin:v1",
+      "content": "Título: Panel global sin conexión\n\nPregunta: ¿Qué acciones de SuperAdmin se bloquean sin conexión?\n\nRespuesta: Crear o editar clínicas, cambiar estado, configurar suscripción y completar onboarding requieren conexión. El asistente solo explica estas funciones y no ejecuta cambios.\n\nFormas alternativas de preguntar:\n- super admin offline\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "super-admin-offline",
+        "role": "super_admin",
+        "modules": [
+          "super_admin_clinics",
+          "subscriptions",
+          "onboarding",
+          "offline"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "super-admin-onboarding:super_admin:v1",
+      "content": "Título: Onboarding SaaS\n\nPregunta: ¿Cómo funciona el onboarding de una clínica?\n\nRespuesta: El onboarding implementado consiste en registrar datos de la clínica, estado, datos de suscripción y crear su administrador principal. No existe un asistente de pasos posterior separado.\n\nPasos:\n- Completa el formulario Nueva clínica.\n- Revisa administrador, plan, fecha de corte y estado.\n- Guarda para crear ambos registros.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "super-admin-onboarding",
+        "role": "super_admin",
+        "modules": [
+          "onboarding"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "super-admin-panel:super_admin:v1",
+      "content": "Título: Panel global\n\nPregunta: ¿Cómo accedo al panel global?\n\nRespuesta: El rol super_admin accede al listado global de clínicas. Su único permiso operativo es super_admin.access y no incluye módulos clínicos o financieros de una clínica.\n\nFormas alternativas de preguntar:\n- administración global\n- ver clínicas\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "super-admin-panel",
+        "role": "super_admin",
+        "modules": [
+          "super_admin_clinics"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "super-admin-status:super_admin:v1",
+      "content": "Título: Activar o inactivar clínica\n\nPregunta: ¿Cómo activo o inactivo una clínica?\n\nRespuesta: Abre Editar clínica y cambia el estado entre active e inactive. Una clínica inactiva queda fuera de selectores y sus rutas privadas por clínica responden 403.\n\nPasos:\n- Abre el listado global.\n- Entra en Editar.\n- Revisa la clínica.\n- Cambia el estado y guarda.\n\nRestricciones en línea:\n- El cambio global se bloquea sin conexión.\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "super-admin-status",
+        "role": "super_admin",
+        "modules": [
+          "super_admin_clinics"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "super-admin-subscription:super_admin:v1",
+      "content": "Título: Plan y fecha de corte\n\nPregunta: ¿Cómo configuro el plan de suscripción y la fecha de corte?\n\nRespuesta: En crear o editar clínica puedes indicar subscription_plan y subscription_end_date. Si el plan queda vacío, MediFlow guarda basic. No hay catálogo global de planes ni cobro automático implementado.\n\nFormas alternativas de preguntar:\n- fecha de fin de suscripción\n- plan de clínica\n\nEscalado:\n- Permitido: no.",
+      "metadata": {
+        "entry_id": "super-admin-subscription",
+        "role": "super_admin",
+        "modules": [
+          "subscriptions"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": true,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "support-safe:administrador:v1",
+      "content": "Título: Soporte seguro\n\nPregunta: ¿Qué hago si el asistente no encuentra una respuesta?\n\nRespuesta: Usa Copiar detalles para soporte o Contactar administrador. Los detalles incluyen rol, módulo, ruta, conexión y una pregunta segura; revísalos antes de compartirlos.\n\nPasos:\n- Elimina nombres, identificaciones, diagnósticos, montos y credenciales.\n- Copia los detalles seguros.\n- Compártelos con el administrador.\n\nFormas alternativas de preguntar:\n- pregunta desconocida\n- copiar detalles para soporte\n\nEscalado:\n- Permitido: sí. No incluyas datos sensibles al solicitar soporte.",
+      "metadata": {
+        "entry_id": "support-safe",
+        "role": "administrador",
+        "modules": [
+          "support"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "support-safe:caja_finanzas:v1",
+      "content": "Título: Soporte seguro\n\nPregunta: ¿Qué hago si el asistente no encuentra una respuesta?\n\nRespuesta: Usa Copiar detalles para soporte o Contactar administrador. Los detalles incluyen rol, módulo, ruta, conexión y una pregunta segura; revísalos antes de compartirlos.\n\nPasos:\n- Elimina nombres, identificaciones, diagnósticos, montos y credenciales.\n- Copia los detalles seguros.\n- Compártelos con el administrador.\n\nFormas alternativas de preguntar:\n- pregunta desconocida\n- copiar detalles para soporte\n\nEscalado:\n- Permitido: sí. No incluyas datos sensibles al solicitar soporte.",
+      "metadata": {
+        "entry_id": "support-safe",
+        "role": "caja_finanzas",
+        "modules": [
+          "support"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "support-safe:medico:v1",
+      "content": "Título: Soporte seguro\n\nPregunta: ¿Qué hago si el asistente no encuentra una respuesta?\n\nRespuesta: Usa Copiar detalles para soporte o Contactar administrador. Los detalles incluyen rol, módulo, ruta, conexión y una pregunta segura; revísalos antes de compartirlos.\n\nPasos:\n- Elimina nombres, identificaciones, diagnósticos, montos y credenciales.\n- Copia los detalles seguros.\n- Compártelos con el administrador.\n\nFormas alternativas de preguntar:\n- pregunta desconocida\n- copiar detalles para soporte\n\nEscalado:\n- Permitido: sí. No incluyas datos sensibles al solicitar soporte.",
+      "metadata": {
+        "entry_id": "support-safe",
+        "role": "medico",
+        "modules": [
+          "support"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "support-safe:recepcionista:v1",
+      "content": "Título: Soporte seguro\n\nPregunta: ¿Qué hago si el asistente no encuentra una respuesta?\n\nRespuesta: Usa Copiar detalles para soporte o Contactar administrador. Los detalles incluyen rol, módulo, ruta, conexión y una pregunta segura; revísalos antes de compartirlos.\n\nPasos:\n- Elimina nombres, identificaciones, diagnósticos, montos y credenciales.\n- Copia los detalles seguros.\n- Compártelos con el administrador.\n\nFormas alternativas de preguntar:\n- pregunta desconocida\n- copiar detalles para soporte\n\nEscalado:\n- Permitido: sí. No incluyas datos sensibles al solicitar soporte.",
+      "metadata": {
+        "entry_id": "support-safe",
+        "role": "recepcionista",
+        "modules": [
+          "support"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    },
+    {
+      "document_id": "support-safe:super_admin:v1",
+      "content": "Título: Soporte seguro\n\nPregunta: ¿Qué hago si el asistente no encuentra una respuesta?\n\nRespuesta: Usa Copiar detalles para soporte o Contactar administrador. Los detalles incluyen rol, módulo, ruta, conexión y una pregunta segura; revísalos antes de compartirlos.\n\nPasos:\n- Elimina nombres, identificaciones, diagnósticos, montos y credenciales.\n- Copia los detalles seguros.\n- Compártelos con el administrador.\n\nFormas alternativas de preguntar:\n- pregunta desconocida\n- copiar detalles para soporte\n\nEscalado:\n- Permitido: sí. No incluyas datos sensibles al solicitar soporte.",
+      "metadata": {
+        "entry_id": "support-safe",
+        "role": "super_admin",
+        "modules": [
+          "support"
+        ],
+        "locale": "es-EC",
+        "status": "active",
+        "knowledge_version": 1,
+        "requires_online": false,
+        "source": "knowledge-base.json"
+      }
+    }
+  ]
+}

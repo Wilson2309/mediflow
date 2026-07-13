@@ -13,5 +13,8 @@ return [
     'n8n' => [
         'webhook_url' => trim((string) env('ASSISTANT_N8N_WEBHOOK_URL', '')),
         'secret' => (string) env('ASSISTANT_N8N_SECRET', ''),
+        'ingest_webhook_url' => trim((string) env('ASSISTANT_N8N_INGEST_WEBHOOK_URL', '')),
+        'ingest_secret' => (string) env('ASSISTANT_N8N_INGEST_SECRET', ''),
+        'ingest_timeout_seconds' => min(max((int) env('ASSISTANT_N8N_INGEST_TIMEOUT_SECONDS', 30), 5), 60),
     ],
 ];

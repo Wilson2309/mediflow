@@ -1,0 +1,1315 @@
+{
+  "name": "MediFlow Assistant Ingest - Simple Dev OpenAI",
+  "nodes": [
+    {
+      "id": "note-ingest",
+      "name": "Ingest security and credentials setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1240,
+        -440
+      ],
+      "parameters": {
+        "content": "Solo desarrollo: almacenamiento no persistente. Configure MEDIFLOW_HMAC_INGEST_SECRET, MEDIFLOW_EMBEDDINGS y Data Table MEDIFLOW_ASSISTANT_NONCES_DEV. No usar en producción.",
+        "width": 720,
+        "height": 220
+      }
+    },
+    {
+      "id": "webhook-ingest",
+      "name": "Webhook Ingest",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1120,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mediflow-assistant-ingest",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      }
+    },
+    {
+      "id": "security-config-ingest",
+      "name": "Security Configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1010,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const securityConfig = {\"max_request_age_seconds\":300,\"max_clock_skew_seconds\":30,\"max_batch_documents\":100,\"max_raw_bytes\":524288};\nreturn $input.all().map((item, index) => ({ json: { ...item.json, security_config: securityConfig }, binary: item.binary, pairedItem: { item: index } }));"
+      }
+    },
+    {
+      "id": "validate-ingest",
+      "name": "Validate Raw Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -900,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const input = $input.first().json ?? {};\nconst securityConfig = input.security_config ?? {};\nconst MAX_REQUEST_AGE_SECONDS = Math.max(60, Math.min(600, Number(securityConfig.max_request_age_seconds ?? 300)));\nconst MAX_CLOCK_SKEW_SECONDS = Math.max(0, Math.min(60, Number(securityConfig.max_clock_skew_seconds ?? 30)));\nconst MAX_BATCH_DOCUMENTS = Math.max(1, Math.min(100, Number(securityConfig.max_batch_documents ?? 100)));\nconst MAX_RAW_BYTES = Math.max(65536, Math.min(1048576, Number(securityConfig.max_raw_bytes ?? 524288)));\nconst expectedProvider = \"simple\";\nconst roles = [\"administrador\",\"caja_finanzas\",\"medico\",\"recepcionista\",\"super_admin\"];\nconst modules = [\"appointments\",\"audit\",\"clinic_settings\",\"clinic_switch\",\"consultations\",\"daily_agenda\",\"dashboard\",\"doctors\",\"financial_audit\",\"medical_records\",\"offline\",\"onboarding\",\"patients\",\"payments\",\"permissions\",\"prescriptions\",\"receipts\",\"reports\",\"services\",\"subscriptions\",\"super_admin_clinics\",\"support\",\"users\"];\nconst roleModules = {\"administrador\":[\"appointments\",\"audit\",\"clinic_settings\",\"clinic_switch\",\"consultations\",\"daily_agenda\",\"dashboard\",\"doctors\",\"financial_audit\",\"medical_records\",\"offline\",\"patients\",\"payments\",\"permissions\",\"prescriptions\",\"receipts\",\"reports\",\"services\",\"support\",\"users\"],\"recepcionista\":[\"appointments\",\"clinic_switch\",\"daily_agenda\",\"dashboard\",\"doctors\",\"offline\",\"patients\",\"payments\",\"permissions\",\"services\",\"support\"],\"caja_finanzas\":[\"appointments\",\"clinic_switch\",\"daily_agenda\",\"dashboard\",\"financial_audit\",\"offline\",\"payments\",\"permissions\",\"receipts\",\"reports\",\"services\",\"support\"],\"medico\":[\"appointments\",\"clinic_switch\",\"consultations\",\"daily_agenda\",\"dashboard\",\"medical_records\",\"offline\",\"payments\",\"permissions\",\"prescriptions\",\"reports\",\"support\"],\"super_admin\":[\"offline\",\"onboarding\",\"permissions\",\"subscriptions\",\"super_admin_clinics\",\"support\"]};\nconst allowedKeys = ['request_id','provider','batch_index','batch_count','full_manifest','checksum','knowledge_version','document_count','documents','timestamp'];\nconst metadataKeys = ['entry_id','role','modules','locale','status','knowledge_version','requires_online','source'];\nconst fail = (statusCode) => ({ valid: false, status_code: statusCode, response: { ok: false, request_id: null, accepted: 0, rejected: 0 } });\nlet rawBody;\ntry { rawBody = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8'); } catch { return [{ json: fail(422) }]; }\nif (Buffer.byteLength(rawBody, 'utf8') > MAX_RAW_BYTES) return [{ json: fail(422) }];\nconst headers = Object.fromEntries(Object.entries(input.headers ?? {}).map(([key, value]) => [key.toLowerCase(), String(value)]));\nconst requestIdHeader = headers['x-mediflow-request-id'];\nconst timestampHeader = headers['x-mediflow-timestamp'];\nconst signature = (headers['x-mediflow-signature'] ?? '').toLowerCase();\nconst assistantVersion = headers['x-mediflow-assistant-version'];\nif (!String(headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) return [{ json: fail(422) }];\nif (!requestIdHeader || !timestampHeader || !assistantVersion || !/^[a-f0-9]{64}$/.test(signature)) return [{ json: fail(401) }];\nlet body;\ntry { body = JSON.parse(rawBody); } catch { return [{ json: fail(422) }]; }\nif (!body || Array.isArray(body) || typeof body !== 'object' || Object.keys(body).length !== allowedKeys.length || Object.keys(body).some((key) => !allowedKeys.includes(key)) || allowedKeys.some((key) => !Object.hasOwn(body, key))) return [{ json: fail(422) }];\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst timestampPattern = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:Z|[+-]\\d{2}:\\d{2})$/;\nconst parsedTimestamp = Date.parse(body.timestamp);\nconst ageSeconds = (Date.now() - parsedTimestamp) / 1000;\nif (body.timestamp !== timestampHeader || !timestampPattern.test(body.timestamp) || !Number.isFinite(parsedTimestamp) || ageSeconds > MAX_REQUEST_AGE_SECONDS || ageSeconds < -MAX_CLOCK_SKEW_SECONDS) return [{ json: fail(401) }];\nconst scalarValid = uuid.test(body.request_id) && body.request_id === requestIdHeader && body.provider === expectedProvider && Number.isInteger(body.batch_index) && body.batch_index >= 0 && Number.isInteger(body.batch_count) && body.batch_count > 0 && body.batch_index < body.batch_count && typeof body.full_manifest === 'boolean' && /^[a-f0-9]{64}$/.test(body.checksum) && (Number.isInteger(body.knowledge_version) || typeof body.knowledge_version === 'string') && String(body.knowledge_version) === assistantVersion && Number.isInteger(body.document_count) && body.document_count > 0 && Array.isArray(body.documents) && body.documents.length > 0 && body.documents.length <= MAX_BATCH_DOCUMENTS;\nif (!scalarValid) return [{ json: fail(422) }];\nconst seen = new Set();\nfor (const document of body.documents) {\n  if (!document || Array.isArray(document) || Object.keys(document).length !== 3 || !Object.hasOwn(document, 'document_id') || !Object.hasOwn(document, 'content') || !Object.hasOwn(document, 'metadata')) return [{ json: fail(422) }];\n  if (typeof document.document_id !== 'string' || document.document_id.length > 180 || seen.has(document.document_id) || typeof document.content !== 'string' || document.content.length < 1 || document.content.length > 12000) return [{ json: fail(422) }];\n  seen.add(document.document_id);\n  const metadata = document.metadata;\n  if (!metadata || Array.isArray(metadata) || Object.keys(metadata).length !== metadataKeys.length || Object.keys(metadata).some((key) => !metadataKeys.includes(key)) || metadataKeys.some((key) => !Object.hasOwn(metadata, key))) return [{ json: fail(422) }];\n  if (!roles.includes(metadata.role) || !Array.isArray(metadata.modules) || metadata.modules.length < 1 || metadata.modules.some((module) => !modules.includes(module) || !roleModules[metadata.role]?.includes(module)) || metadata.locale !== 'es-EC' || metadata.status !== 'active' || typeof metadata.requires_online !== 'boolean' || metadata.source !== 'knowledge-base.json' || typeof metadata.entry_id !== 'string' || !metadata.entry_id || (!Number.isInteger(metadata.knowledge_version) && typeof metadata.knowledge_version !== 'string')) return [{ json: fail(422) }];\n}\nreturn [{ json: {\n  valid: true,\n  signature_input: timestampHeader + '.' + rawBody,\n  received_signature: signature,\n  payload: body,\n  config: { max_request_age_seconds: MAX_REQUEST_AGE_SECONDS, max_clock_skew_seconds: MAX_CLOCK_SKEW_SECONDS, max_batch_documents: MAX_BATCH_DOCUMENTS, max_raw_bytes: MAX_RAW_BYTES },\n} }];"
+      }
+    },
+    {
+      "id": "if-valid-ingest",
+      "name": "Payload Is Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -680,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "respond-invalid-ingest",
+      "name": "Respond Invalid Payload",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -440,
+        280
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.response) }}",
+        "options": {
+          "responseCode": "={{ $json.status_code || 422 }}"
+        }
+      }
+    },
+    {
+      "id": "crypto-ingest",
+      "name": "Verify HMAC",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [
+        -440,
+        -40
+      ],
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{ $json.signature_input }}",
+        "dataPropertyName": "expected_signature",
+        "encoding": "hex"
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "compare-ingest",
+      "name": "Constant Time Signature Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -220,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "const crypto = require('crypto');\nconst original = $('Validate Raw Request').first().json;\nconst expected = String($input.first().json.expected_signature ?? '').toLowerCase();\nconst received = String(original.received_signature ?? '').toLowerCase();\nlet signatureValid = false;\nif (/^[a-f0-9]{64}$/.test(expected) && /^[a-f0-9]{64}$/.test(received)) {\n  signatureValid = crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(received, 'hex'));\n}\nconst { signature_input, received_signature, ...safe } = original;\nreturn [{ json: { ...safe, signature_valid: signatureValid, status_code: signatureValid ? 200 : 401, response: signatureValid ? undefined : {\"answer\":\"Solicitud no autorizada.\",\"confidence\":0,\"steps\":[],\"suggestions\":[],\"can_escalate\":false} } }];"
+      }
+    },
+    {
+      "id": "if-signature-ingest",
+      "name": "Signature Is Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        -40
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.signature_valid }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "respond-unauthorized-ingest",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        220,
+        280
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.response) }}",
+        "options": {
+          "responseCode": "={{ $json.status_code || 401 }}"
+        }
+      }
+    },
+    {
+      "id": "nonce-table-get-ingest",
+      "name": "Anti-Replay Data Table Get",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        -120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "MEDIFLOW_ASSISTANT_NONCES_DEV",
+          "mode": "list",
+          "cachedResultName": "MEDIFLOW_ASSISTANT_NONCES_DEV"
+        },
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "request_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.payload.request_id }}"
+            },
+            {
+              "keyName": "workflow_type",
+              "condition": "eq",
+              "keyValue": "ingest"
+            }
+          ]
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "nonce-classify-ingest-dev",
+      "name": "Classify Anti-Replay Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        -120
+      ],
+      "parameters": {
+        "jsCode": "const original = $('Constant Time Signature Check').first().json;\nconst items = $input.all().map((item) => item.json ?? {});\nconst failed = items.length === 0 || items.some((item) => item.error);\nconst rows = items.filter((row) => row.request_id);\nconst replay = rows.length > 0;\nconst accepted = !failed && !replay;\nreturn [{ json: { ...original, nonce_accepted: accepted, status_code: failed ? 200 : (replay ? 409 : 200), response: failed ? { ok: false, request_id: original.payload.request_id, accepted: 0, rejected: Array.isArray(original.payload.documents) ? original.payload.documents.length : 0, checksum: original.payload.checksum, knowledge_version: original.payload.knowledge_version, activated: false } : (replay ? {\"answer\":\"Solicitud no autorizada.\",\"confidence\":0,\"steps\":[],\"suggestions\":[],\"can_escalate\":false} : undefined), safe_error_code: failed ? 'NONCE_STORE_ERROR' : (replay ? 'REPLAY' : null) } }];"
+      }
+    },
+    {
+      "id": "if-nonce-ingest",
+      "name": "Nonce Is Fresh",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.nonce_accepted }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "respond-replay-ingest",
+      "name": "Respond Replay Or Rate Limit",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        280
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.response) }}",
+        "options": {
+          "responseCode": "={{ $json.status_code || 409 }}"
+        }
+      }
+    },
+    {
+      "id": "nonce-table-insert-ingest",
+      "name": "Record Nonce Data Table",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        -120
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "MEDIFLOW_ASSISTANT_NONCES_DEV",
+          "mode": "list",
+          "cachedResultName": "MEDIFLOW_ASSISTANT_NONCES_DEV"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "request_id": "={{ $json.payload.request_id }}",
+            "received_at": "={{ new Date().toISOString() }}",
+            "expires_at": "={{ new Date(Date.now() + 600000).toISOString() }}",
+            "workflow_type": "ingest",
+            "status": "accepted"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "nonce-table-confirm-ingest",
+      "name": "Confirm Nonce Recorded",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1020,
+        -120
+      ],
+      "parameters": {
+        "jsCode": "const original = $('Classify Anti-Replay Result').first().json;\nconst items = $input.all().map((item) => item.json ?? {});\nconst errorText = JSON.stringify(items).toUpperCase();\nconst conflict = errorText.includes('DUPLICATE') || errorText.includes('23505') || errorText.includes('CONFLICT') || errorText.includes('ALREADY EXISTS');\nconst recorded = items.some((item) => item.request_id === original.payload.request_id && !item.error) && !conflict;\nreturn [{ json: { ...original, nonce_recorded: recorded, status_code: recorded ? 200 : (conflict ? 409 : 200), response: recorded ? undefined : (conflict ? {\"answer\":\"Solicitud no autorizada.\",\"confidence\":0,\"steps\":[],\"suggestions\":[],\"can_escalate\":false} : { ok: false, request_id: original.payload.request_id, accepted: 0, rejected: Array.isArray(original.payload.documents) ? original.payload.documents.length : 0, checksum: original.payload.checksum, knowledge_version: original.payload.knowledge_version, activated: false }), safe_error_code: recorded ? null : (conflict ? 'REPLAY' : 'NONCE_STORE_ERROR') } }];"
+      }
+    },
+    {
+      "id": "if-nonce-recorded-ingest",
+      "name": "Nonce Was Recorded",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.nonce_recorded }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "if-reset-simple",
+      "name": "Reset Simple Stores For Full Manifest",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1180,
+        -260
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.payload.full_manifest && $json.payload.batch_index === 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "build-reset-simple",
+      "name": "Build Simple Store Reset Markers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        -360
+      ],
+      "parameters": {
+        "jsCode": "const request = $('Constant Time Signature Check').first().json;\nconst roles = [\"administrador\",\"caja_finanzas\",\"medico\",\"recepcionista\",\"super_admin\"];\nreturn roles.map((role) => ({ json: { content: 'MediFlow reset marker', metadata: { document_id: '__reset__:' + role + ':' + request.payload.checksum, entry_id: '__reset__', role, modules: ['support'], locale: 'es-EC', status: 'reset', knowledge_version: request.payload.knowledge_version, requires_online: false, source: 'knowledge-base.json', checksum: request.payload.checksum } } }));"
+      }
+    },
+    {
+      "id": "loop-reset-simple",
+      "name": "Loop Over Simple Store Resets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3.4,
+      "position": [
+        1420,
+        -360
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "reset-vector-simple",
+      "name": "Simple Vector Store Reset",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        1580,
+        -360
+      ],
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ 'mediflow-assistant-phase4-' + $json.metadata.role }}"
+        },
+        "clearStore": true
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "loader-reset",
+      "name": "Reset Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        780
+      ],
+      "parameters": {
+        "dataType": "json",
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.content }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "document_id",
+                "value": "={{ $json.metadata.document_id }}"
+              },
+              {
+                "name": "entry_id",
+                "value": "={{ $json.metadata.entry_id }}"
+              },
+              {
+                "name": "role",
+                "value": "={{ $json.metadata.role }}"
+              },
+              {
+                "name": "modules",
+                "value": "={{ JSON.stringify($json.metadata.modules) }}"
+              },
+              {
+                "name": "locale",
+                "value": "={{ $json.metadata.locale }}"
+              },
+              {
+                "name": "status",
+                "value": "={{ $json.metadata.status }}"
+              },
+              {
+                "name": "knowledge_version",
+                "value": "={{ String($json.metadata.knowledge_version) }}"
+              },
+              {
+                "name": "requires_online",
+                "value": "={{ String($json.metadata.requires_online) }}"
+              },
+              {
+                "name": "source",
+                "value": "={{ $json.metadata.source }}"
+              },
+              {
+                "name": "checksum",
+                "value": "={{ $json.metadata.checksum }}"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "splitter-reset",
+      "name": "Reset Marker Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        -560
+      ],
+      "parameters": {
+        "chunkSize": 12000,
+        "chunkOverlap": 0,
+        "options": {}
+      }
+    },
+    {
+      "id": "check-reset-simple",
+      "name": "Check Simple Store Reset",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        -360
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $('Constant Time Signature Check').first().json; const results = $input.all(); const ok = results.length === 5 && !results.some((item) => item.json?.error); return [{ json: { ...request, simple_reset_ok: ok } }];"
+      }
+    },
+    {
+      "id": "if-reset-ok-simple",
+      "name": "Simple Store Reset Succeeded",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1900,
+        -360
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.simple_reset_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "convert-docs",
+      "name": "Convert Documents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $('Constant Time Signature Check').first().json;\nreturn request.payload.documents.map((document) => ({ json: { content: document.content, metadata: { ...document.metadata, document_id: document.document_id, checksum: request.payload.checksum } } }));"
+      }
+    },
+    {
+      "id": "loop-documents",
+      "name": "Loop Over Documents",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3.4,
+      "position": [
+        1240,
+        -120
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "insert-vector-simple",
+      "name": "Simple Vector Store Insert",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        1420,
+        -120
+      ],
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ 'mediflow-assistant-phase4-' + $json.metadata.role }}"
+        },
+        "clearStore": false
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "emb-ingest",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        1260,
+        120
+      ],
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {
+          "timeout": 5
+        }
+      }
+    },
+    {
+      "id": "loader-ingest",
+      "name": "Default Data Loader",
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        1500,
+        780
+      ],
+      "parameters": {
+        "dataType": "json",
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.content }}",
+        "textSplittingMode": "custom",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "document_id",
+                "value": "={{ $json.metadata.document_id }}"
+              },
+              {
+                "name": "entry_id",
+                "value": "={{ $json.metadata.entry_id }}"
+              },
+              {
+                "name": "role",
+                "value": "={{ $json.metadata.role }}"
+              },
+              {
+                "name": "modules",
+                "value": "={{ JSON.stringify($json.metadata.modules) }}"
+              },
+              {
+                "name": "locale",
+                "value": "={{ $json.metadata.locale }}"
+              },
+              {
+                "name": "status",
+                "value": "={{ $json.metadata.status }}"
+              },
+              {
+                "name": "knowledge_version",
+                "value": "={{ String($json.metadata.knowledge_version) }}"
+              },
+              {
+                "name": "requires_online",
+                "value": "={{ String($json.metadata.requires_online) }}"
+              },
+              {
+                "name": "source",
+                "value": "={{ $json.metadata.source }}"
+              },
+              {
+                "name": "checksum",
+                "value": "={{ $json.metadata.checksum }}"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "check-ingest",
+      "name": "Check Ingest Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1660,
+        -120
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $('Constant Time Signature Check').first().json;\nconst results = $input.all();\nconst errors = results.filter((item) => item.json?.error).length;\nconst completed = errors === 0 && results.length === request.payload.documents.length;\nreturn [{ json: { ...request, ingest_ok: completed, accepted: completed ? request.payload.documents.length : 0, rejected: completed ? 0 : request.payload.documents.length, is_final_batch: request.payload.batch_index === request.payload.batch_count - 1 } }];"
+      }
+    },
+    {
+      "id": "if-ingest-ok",
+      "name": "Ingest Batch Succeeded",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1800,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.ingest_ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "build-ingest-error",
+      "name": "Build Ingest Safe Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        280
+      ],
+      "parameters": {
+        "jsCode": "const request = $json; return [{ json: { status_code: 200, response: { ok: false, request_id: request.payload.request_id, accepted: 0, rejected: request.payload.documents.length } } }];"
+      }
+    },
+    {
+      "id": "respond-ingest-error",
+      "name": "Respond Ingest Safe Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2240,
+        280
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.response) }}",
+        "options": {
+          "responseCode": "={{ $json.status_code || 200 }}"
+        }
+      }
+    },
+    {
+      "id": "if-final",
+      "name": "Final Batch",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2020,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.is_final_batch }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "splitter-ingest",
+      "name": "Document Unit Splitter",
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        960
+      ],
+      "parameters": {
+        "chunkSize": 12000,
+        "chunkOverlap": 0,
+        "options": {}
+      }
+    },
+    {
+      "id": "build-ingest-summary",
+      "name": "Build Ingest Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2460,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "const request = $('Check Ingest Result').first().json;\nconst activated = request.is_final_batch ? true : false; return [{ json: { status_code: 200, response: { ok: true, request_id: request.payload.request_id, accepted: request.accepted, rejected: request.rejected, checksum: request.payload.checksum, knowledge_version: request.payload.knowledge_version, activated } } }];"
+      }
+    },
+    {
+      "id": "respond-ingest-summary",
+      "name": "Respond Ingest Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        2680,
+        -40
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.response) }}",
+        "options": {
+          "responseCode": "={{ $json.status_code || 200 }}"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Ingest": {
+      "main": [
+        [
+          {
+            "node": "Security Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Security Configuration": {
+      "main": [
+        [
+          {
+            "node": "Validate Raw Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Raw Request": {
+      "main": [
+        [
+          {
+            "node": "Payload Is Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payload Is Valid": {
+      "main": [
+        [
+          {
+            "node": "Verify HMAC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Invalid Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify HMAC": {
+      "main": [
+        [
+          {
+            "node": "Constant Time Signature Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Constant Time Signature Check": {
+      "main": [
+        [
+          {
+            "node": "Signature Is Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Signature Is Valid": {
+      "main": [
+        [
+          {
+            "node": "Anti-Replay Data Table Get",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anti-Replay Data Table Get": {
+      "main": [
+        [
+          {
+            "node": "Classify Anti-Replay Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Anti-Replay Result": {
+      "main": [
+        [
+          {
+            "node": "Nonce Is Fresh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nonce Is Fresh": {
+      "main": [
+        [
+          {
+            "node": "Record Nonce Data Table",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Replay Or Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Nonce Data Table": {
+      "main": [
+        [
+          {
+            "node": "Confirm Nonce Recorded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Nonce Recorded": {
+      "main": [
+        [
+          {
+            "node": "Nonce Was Recorded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nonce Was Recorded": {
+      "main": [
+        [
+          {
+            "node": "Reset Simple Stores For Full Manifest",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Replay Or Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert Documents": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Documents": {
+      "main": [
+        [
+          {
+            "node": "Check Ingest Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Simple Vector Store Insert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Vector Store Insert": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Ingest Result": {
+      "main": [
+        [
+          {
+            "node": "Ingest Batch Succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Batch Succeeded": {
+      "main": [
+        [
+          {
+            "node": "Final Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Ingest Safe Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Ingest Safe Error": {
+      "main": [
+        [
+          {
+            "node": "Respond Ingest Safe Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Simple Vector Store Insert",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Simple Vector Store Reset",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Simple Vector Store Insert",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Unit Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset Simple Stores For Full Manifest": {
+      "main": [
+        [
+          {
+            "node": "Build Simple Store Reset Markers",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Convert Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Simple Store Reset Markers": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Simple Store Resets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Simple Store Resets": {
+      "main": [
+        [
+          {
+            "node": "Check Simple Store Reset",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Simple Vector Store Reset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Vector Store Reset": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Simple Store Resets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Simple Store Reset": {
+      "main": [
+        [
+          {
+            "node": "Simple Store Reset Succeeded",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Store Reset Succeeded": {
+      "main": [
+        [
+          {
+            "node": "Convert Documents",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Ingest Safe Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Simple Vector Store Reset",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reset Marker Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Reset Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final Batch": {
+      "main": [
+        [
+          {
+            "node": "Build Ingest Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Ingest Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Ingest Summary": {
+      "main": [
+        [
+          {
+            "node": "Respond Ingest Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  },
+  "tags": []
+}

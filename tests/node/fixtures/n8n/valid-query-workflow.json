@@ -1,0 +1,180 @@
+{
+  "name": "MediFlow Assistant Query Fixture",
+  "active": false,
+  "nodes": [
+    {
+      "id": "webhook",
+      "name": "Webhook Query",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mediflow-assistant-query-fixture",
+        "responseMode": "responseNode",
+        "options": { "rawBody": true }
+      }
+    },
+    {
+      "id": "validate-request",
+      "name": "Validate Raw Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 0],
+      "parameters": {
+        "jsCode": "// x-mediflow-timestamp x-mediflow-request-id x-mediflow-signature\nconst max_age = 300; const future = 30; const parsed = Date.parse($json.timestamp); if (!parsed) return [{json: {status_code: 401}}]; return [{json: {...$json, signature_input: $json.timestamp + '.' + $json.raw_body, request_id: $json.request_id, timestamp_expired: max_age < 0 || future < 0}}];"
+      }
+    },
+    {
+      "id": "hmac",
+      "name": "Verify HMAC",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "position": [440, 0],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "action": "hmac",
+        "type": "SHA256",
+        "value": "={{$json.signature_input}}",
+        "dataPropertyName": "expected_signature",
+        "encoding": "hex"
+      }
+    },
+    {
+      "id": "signature-check",
+      "name": "Constant Time Signature Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 0],
+      "parameters": {
+        "jsCode": "// constant_time XOR comparison\nlet xor = 0; for (let i = 0; i < $json.signature.length; i++) xor |= $json.signature.charCodeAt(i) ^ $json.expected_signature.charCodeAt(i); return [{json: {...$json, signature_valid: xor === 0}}];"
+      }
+    },
+    {
+      "id": "anti-replay",
+      "name": "Anti-Replay Nonce",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 0],
+      "parameters": {
+        "jsCode": "// replay protection: persist nonce/request_id before retrieval\nreturn [{json: {...$json, nonce: $json.request_id, replay: false}}];"
+      }
+    },
+    {
+      "id": "vector-store",
+      "name": "Supabase Vector Store",
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [1100, 0],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "mode": "load",
+        "prompt": "={{$json.question}}",
+        "memoryKey": { "__rl": true, "mode": "id", "value": "mediflow-validator-fixture" },
+        "metadata": {
+          "role": "={{$json.role}}",
+          "status": "published",
+          "locale": "={{$json.locale}}"
+        }
+      }
+    },
+    {
+      "id": "filter-context",
+      "name": "Filter Role Module Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 0],
+      "parameters": {
+        "jsCode": "// filter retrieved metadata by role, status, locale and module before model\nconst allowed = $input.all().filter(({json}) => json.metadata.role === $('Validate Raw Request').item.json.role && json.metadata.status === 'published' && json.metadata.locale === $('Validate Raw Request').item.json.locale && json.metadata.modules.includes($('Validate Raw Request').item.json.module)); return allowed;"
+      }
+    },
+    {
+      "id": "chain",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.7,
+      "position": [1540, 0],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "promptType": "define",
+        "text": "={{$json.context}}",
+        "hasOutputParser": true
+      }
+    },
+    {
+      "id": "model",
+      "name": "Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [1540, 240],
+      "parameters": { "options": {} }
+    },
+    {
+      "id": "embeddings",
+      "name": "Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [1100, 240],
+      "parameters": { "options": {} }
+    },
+    {
+      "id": "parser",
+      "name": "Structured Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [1760, 240],
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["answer", "confidence", "steps", "suggestions", "can_escalate"],
+          "properties": {
+            "answer": { "type": "string", "minLength": 1, "maxLength": 2000 },
+            "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+            "steps": { "type": "array", "maxItems": 10, "items": { "type": "string", "minLength": 1, "maxLength": 300 } },
+            "suggestions": { "type": "array", "maxItems": 5, "items": { "type": "string", "minLength": 1, "maxLength": 150 } },
+            "can_escalate": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    {
+      "id": "final-validator",
+      "name": "Validate Final Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 0],
+      "parameters": {
+        "jsCode": "// validate final answer independently\nif (typeof $json.answer !== 'string' || !$json.answer.trim()) throw new Error('invalid'); return [{json: $json}];"
+      }
+    },
+    {
+      "id": "respond",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1980, 0],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": { "responseCode": 200 }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Query": { "main": [[{ "node": "Validate Raw Request", "type": "main", "index": 0 }]] },
+    "Validate Raw Request": { "main": [[{ "node": "Verify HMAC", "type": "main", "index": 0 }]] },
+    "Verify HMAC": { "main": [[{ "node": "Constant Time Signature Check", "type": "main", "index": 0 }]] },
+    "Constant Time Signature Check": { "main": [[{ "node": "Anti-Replay Nonce", "type": "main", "index": 0 }]] },
+    "Anti-Replay Nonce": { "main": [[{ "node": "Supabase Vector Store", "type": "main", "index": 0 }]] },
+    "Supabase Vector Store": { "main": [[{ "node": "Filter Role Module Context", "type": "main", "index": 0 }]] },
+    "Filter Role Module Context": { "main": [[{ "node": "Basic LLM Chain", "type": "main", "index": 0 }]] },
+    "Basic LLM Chain": { "main": [[{ "node": "Validate Final Response", "type": "main", "index": 0 }]] },
+    "Validate Final Response": { "main": [[{ "node": "Respond Success", "type": "main", "index": 0 }]] },
+    "Chat Model": { "ai_languageModel": [[{ "node": "Basic LLM Chain", "type": "ai_languageModel", "index": 0 }]] },
+    "Embeddings": { "ai_embedding": [[{ "node": "Supabase Vector Store", "type": "ai_embedding", "index": 0 }]] },
+    "Structured Output Parser": { "ai_outputParser": [[{ "node": "Basic LLM Chain", "type": "ai_outputParser", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "saveDataSuccessExecution": "none", "saveDataErrorExecution": "none" }
+}

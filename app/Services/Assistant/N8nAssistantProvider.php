@@ -14,6 +14,7 @@ final class N8nAssistantProvider implements AssistantProvider
 {
     public function __construct(
         private readonly AssistantRemoteResponseValidator $responseValidator,
+        private readonly AssistantHmacSigner $signer,
     ) {
     }
 
@@ -27,21 +28,18 @@ final class N8nAssistantProvider implements AssistantProvider
         }
 
         $startedAt = microtime(true);
-        $body = json_encode(
-            $context->toRemotePayload(),
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
-        );
-        $signature = hash_hmac('sha256', $context->timestamp.'.'.$body, $secret);
 
         try {
+            $body = $this->signer->encode($context->toRemotePayload());
             $response = Http::timeout((int) config('assistant.timeout_seconds', 8))
                 ->acceptJson()
-                ->withHeaders([
-                    'X-MediFlow-Request-Id' => $context->requestId,
-                    'X-MediFlow-Timestamp' => $context->timestamp,
-                    'X-MediFlow-Signature' => $signature,
-                    'X-MediFlow-Assistant-Version' => (string) ($context->knowledgeVersion ?? 'unknown'),
-                ])
+                ->withHeaders($this->signer->headers(
+                    $context->requestId,
+                    $context->timestamp,
+                    $body,
+                    $secret,
+                    $context->knowledgeVersion,
+                ))
                 ->withBody($body, 'application/json')
                 ->post($url);
 
@@ -70,6 +68,10 @@ final class N8nAssistantProvider implements AssistantProvider
                 $this->logFailure($context, 'INVALID_REMOTE_RESPONSE', $startedAt, $response->status());
 
                 return AssistantResult::fallback($context->requestId, 'INVALID_REMOTE_RESPONSE');
+            }
+
+            if ($result->answer === AssistantResult::FALLBACK_ANSWER) {
+                return AssistantResult::fallback($context->requestId, 'REMOTE_FALLBACK');
             }
 
             return $result;

@@ -26,6 +26,7 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 *.sql
+!/n8n/supabase/assistant-rag-schema.sql
 # Playwright
 test-results/
 playwright-report/

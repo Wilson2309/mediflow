@@ -13,18 +13,29 @@ final class AssistantRemoteResponseValidator
     /** @param array<string, mixed> $payload */
     public function validate(array $payload, AssistantContext $context): ?AssistantResult
     {
-        if (array_diff(array_keys($payload), self::ALLOWED_FIELDS) !== []) {
+        if (count($payload) !== count(self::ALLOWED_FIELDS)
+            || array_diff(array_keys($payload), self::ALLOWED_FIELDS) !== []) {
+            return null;
+        }
+
+        if (! is_string($payload['answer'] ?? null)
+            || (! is_int($payload['confidence'] ?? null) && ! is_float($payload['confidence'] ?? null))
+            || ! is_array($payload['steps'] ?? null)
+            || collect($payload['steps'])->contains(fn (mixed $step): bool => ! is_string($step))
+            || ! is_array($payload['suggestions'] ?? null)
+            || collect($payload['suggestions'])->contains(fn (mixed $suggestion): bool => ! is_string($suggestion))
+            || ! is_bool($payload['can_escalate'] ?? null)) {
             return null;
         }
 
         $validator = Validator::make($payload, [
             'answer' => ['required', 'string', 'max:'.(int) config('assistant.max_answer_length', 2000)],
-            'confidence' => ['nullable', 'numeric', 'between:0,1'],
-            'steps' => ['sometimes', 'array', 'max:10'],
-            'steps.*' => ['string', 'max:300'],
-            'suggestions' => ['sometimes', 'array', 'max:5'],
-            'suggestions.*' => ['string', 'max:150'],
-            'can_escalate' => ['sometimes', 'boolean'],
+            'confidence' => ['required', 'numeric', 'between:0,1'],
+            'steps' => ['required', 'array', 'max:10'],
+            'steps.*' => ['required', 'string', 'min:1', 'max:300'],
+            'suggestions' => ['required', 'array', 'max:5'],
+            'suggestions.*' => ['required', 'string', 'min:1', 'max:150'],
+            'can_escalate' => ['required', 'boolean'],
         ]);
 
         if ($validator->fails()) {
@@ -36,7 +47,9 @@ final class AssistantRemoteResponseValidator
         $suggestions = array_map(fn (mixed $suggestion): string => $this->cleanText((string) $suggestion), $payload['suggestions'] ?? []);
         $allText = [$answer, ...$steps, ...$suggestions];
 
-        if ($answer === '' || collect($allText)->contains(fn (string $text): bool => $this->isUnsafe($text))) {
+        if (collect($allText)->contains(
+            fn (string $text): bool => $text === '' || $this->isUnsafe($text),
+        )) {
             return null;
         }
 
@@ -44,10 +57,10 @@ final class AssistantRemoteResponseValidator
             success: true,
             answer: $answer,
             source: 'remote',
-            confidence: isset($payload['confidence']) ? (float) $payload['confidence'] : null,
+            confidence: (float) $payload['confidence'],
             steps: $steps,
             suggestions: $suggestions,
-            canEscalate: (bool) ($payload['can_escalate'] ?? false),
+            canEscalate: $payload['can_escalate'],
             fallbackUsed: false,
             requestId: $context->requestId,
         );
