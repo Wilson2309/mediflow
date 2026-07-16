@@ -318,8 +318,12 @@ function validateLoopOverItemsCompatibility(workflow, nodes, kind, errors) {
             if (embeddingRequest?.type !== 'n8n-nodes-base.httpRequest'
                 || embeddingRequest.parameters?.authentication !== 'predefinedCredentialType'
                 || !['googlePalmApi', 'openAiApi'].includes(embeddingRequest.parameters?.nodeCredentialType)
+                || embeddingRequest.parameters?.contentType !== 'json'
+                || embeddingRequest.parameters?.specifyBody !== 'json'
+                || !String(embeddingRequest.parameters?.jsonBody ?? '').includes('={{ {')
+                || embeddingRequest.parameters?.options?.response?.response?.responseFormat !== 'json'
                 || embeddingRequest.credentials) {
-                errors.push('La generación de embeddings debe usar una credencial predefinida sin ID versionado.');
+                errors.push('La generación de embeddings debe usar una credencial predefinida sin ID versionado y forzar cuerpo/respuesta JSON.');
             }
             const documentLookups = ['Check Existing Document', 'Confirm Stored Document']
                 .map((name) => nodes.find((node) => node.name === name));
@@ -374,7 +378,7 @@ function validateLoopOverItemsCompatibility(workflow, nodes, kind, errors) {
                 errors.push('El embedding debe validar array, dimensión exacta y números finitos antes de la RPC.');
             }
             const rpcEndpointIsSafe = ['/rest/v1/rpc/upsert_assistant_document_openai', '/rest/v1/rpc/upsert_assistant_document_gemini'].some((path) => usesConfiguredSupabaseEndpoint(deterministicRpc.parameters?.url, path));
-            const rpcBody = String(deterministicRpc.parameters?.body ?? '');
+            const rpcBody = String(deterministicRpc.parameters?.jsonBody ?? deterministicRpc.parameters?.body ?? '');
             if (deterministicRpc.type !== 'n8n-nodes-base.httpRequest'
                 || deterministicRpc.onError !== 'continueErrorOutput'
                 || deterministicRpc.parameters?.nodeCredentialType !== 'supabaseApi'
@@ -398,16 +402,17 @@ function validateLoopOverItemsCompatibility(workflow, nodes, kind, errors) {
 
             const receipt = nodes.find((node) => node.name === 'Record Ingest Batch Receipt');
             const receiptValidator = nodes.find((node) => node.name === 'Validate Batch Receipt');
-            const receiptBody = String(receipt?.parameters?.body ?? '');
+            const receiptBody = String(receipt?.parameters?.jsonBody ?? receipt?.parameters?.body ?? '');
             const receiptContract = receipt?.type === 'n8n-nodes-base.httpRequest'
                 && receipt?.parameters?.method === 'POST'
                 && receipt?.parameters?.authentication === 'predefinedCredentialType'
                 && receipt?.parameters?.nodeCredentialType === 'supabaseApi'
                 && usesConfiguredSupabaseEndpoint(receipt?.parameters?.url, '/rest/v1/rpc/record_assistant_ingest_batch_receipt')
                 && !receipt?.credentials
-                && ['request_id', 'provider', 'checksum', 'knowledge_version', 'batch_index', 'batch_count', 'document_count', 'accepted_count', 'full_manifest'].every((token) => receiptBody.includes(token))
+                && ['input_request_id', 'input_provider', 'input_checksum', 'input_knowledge_version', 'input_batch_index', 'input_batch_count', 'input_document_count', 'input_accepted_count', 'input_full_manifest'].every((token) => receiptBody.includes(token))
                 && receiptValidator?.type === 'n8n-nodes-base.code'
-                && String(receiptValidator?.parameters?.jsCode ?? '').includes('receipt_valid')
+                && String(receiptValidator?.parameters?.jsCode ?? '').includes('const INGEST_RECEIPT_KEYS =')
+                && String(receiptValidator?.parameters?.jsCode ?? '').includes('batch_receipt_stored')
                 && String(receiptValidator?.parameters?.jsCode ?? '').includes('manifest_activated');
             if (!receiptContract) {
                 errors.push('El recibo debe usar la RPC idempotente autenticada y validar únicamente su contrato seguro.');

@@ -240,14 +240,15 @@ function inline(functionReference) {
 
 export function validateIngestReceiptCode(provider) {
     return [
+        `const INGEST_RECEIPT_KEYS = ${JSON.stringify(INGEST_RECEIPT_KEYS)};`,
         `const validateIngestReceipt = ${inline(validateIngestReceipt)};`,
         `const outcome = $('Check Ingest Result').first().json;`,
         `const rawResponses = $input.all().map((item) => item.json ?? {});`,
         `const responses = rawResponses.flatMap((value) => Array.isArray(value) ? value : (Array.isArray(value?.data) ? value.data : [value]));`,
         `const response = responses.length === 1 ? responses[0] : null;`,
         `const receiptValid = validateIngestReceipt(response, outcome, ${JSON.stringify(provider)});`,
-        `return [{ json: { ...outcome, receipt_valid: receiptValid, manifest_activated: receiptValid && response.manifest_activated === true } }];`,
-    ].join('\\n');
+        `return [{ json: { ...outcome, batch_receipt_stored: receiptValid, manifest_activated: receiptValid && response.manifest_activated === true } }];`,
+    ].join('\n');
 }
 
 export function convertDocumentsCode(provider) {

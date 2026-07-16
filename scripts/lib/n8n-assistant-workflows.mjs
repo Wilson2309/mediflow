@@ -570,8 +570,8 @@ return [{ json: { status_code: 200, response: valid ? candidate : ${JSON.stringi
 
 function embeddingHttpParameters(vector) {
   const body = vector.manifestProvider === 'gemini'
-    ? "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.document.content }] }, taskType: 'RETRIEVAL_DOCUMENT', outputDimensionality: 3072 }) }}"
-    : "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.document.content, dimensions: 1536, encoding_format: 'float' }) }}";
+    ? "={{ { model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.document.content }] }, taskType: 'RETRIEVAL_DOCUMENT', outputDimensionality: 3072 } }}"
+    : "={{ { model: 'text-embedding-3-small', input: $json.document.content, dimensions: 1536, encoding_format: 'float' } }}";
 
   return {
     method: 'POST',
@@ -579,9 +579,9 @@ function embeddingHttpParameters(vector) {
     authentication: 'predefinedCredentialType',
     nodeCredentialType: vector.embeddingCredential,
     sendBody: true,
-    contentType: 'raw',
-    rawContentType: 'application/json',
-    body,
+    contentType: 'json',
+    specifyBody: 'json',
+    jsonBody: body,
     options: { timeout: 10000, response: { response: { responseFormat: 'json' } } },
   };
 }
@@ -593,7 +593,7 @@ function ingestEndpointConfigurationCode() {
     "  throw new Error('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED');",
     "}",
     'return [{ json: { ...$json, supabase_base_url: supabaseBaseUrl } }];',
-  ].join('\\n');
+  ].join('\n');
 }
 
 function supabaseEndpointExpression(path) {
@@ -607,9 +607,9 @@ function rpcHttpParameters(vector) {
     authentication: 'predefinedCredentialType',
     nodeCredentialType: 'supabaseApi',
     sendBody: true,
-    contentType: 'raw',
-    rawContentType: 'application/json',
-    body: "={{ JSON.stringify({ content: $json.document.content, metadata: { ...$json.document.metadata, document_id: $json.document.document_id, checksum: $json.request.checksum }, embedding: $json.embedding }) }}",
+    contentType: 'json',
+    specifyBody: 'json',
+    jsonBody: "={{ { content: $json.document.content, metadata: { ...$json.document.metadata, document_id: $json.document.document_id, checksum: $json.request.checksum }, embedding: $json.embedding } }}",
     options: { timeout: 10000, response: { response: { responseFormat: 'json' } } },
   };
 }
@@ -621,9 +621,9 @@ function receiptRpcHttpParameters(vector) {
     authentication: 'predefinedCredentialType',
     nodeCredentialType: 'supabaseApi',
     sendBody: true,
-    contentType: 'raw',
-    rawContentType: 'application/json',
-    body: "={{ JSON.stringify({ request_id: $json.request.request_id, provider: " + JSON.stringify(vector.manifestProvider) + ", checksum: $json.request.checksum, knowledge_version: String($json.request.knowledge_version), batch_index: $json.request.batch_index, batch_count: $json.request.batch_count, document_count: $json.request.document_count, accepted_count: $json.accepted, full_manifest: $json.request.full_manifest }) }}",
+    contentType: 'json',
+    specifyBody: 'json',
+    jsonBody: "={{ { input_request_id: $json.request.request_id, input_provider: " + JSON.stringify(vector.manifestProvider) + ", input_checksum: $json.request.checksum, input_knowledge_version: String($json.request.knowledge_version), input_batch_index: $json.request.batch_index, input_batch_count: $json.request.batch_count, input_document_count: $json.request.document_count, input_accepted_count: $json.accepted, input_full_manifest: $json.request.full_manifest } }}",
     options: { timeout: 10000, response: { response: { responseFormat: 'json' } } },
   };
 }

@@ -133,3 +133,53 @@ test('the same generated code produces Laravel\'s seven-field success contract w
     });
 });
 
+test('generated receipt validation declares its contract and emits batch_receipt_stored', () => {
+    const outcome = {
+        request: {
+            checksum: 'a'.repeat(64),
+            knowledge_version: 2,
+            batch_index: 0,
+            batch_count: 17,
+            document_count: 161,
+            full_manifest: true,
+        },
+        accepted: 10,
+    };
+    const receipt = {
+        provider: 'gemini',
+        checksum: outcome.request.checksum,
+        knowledge_version: '2',
+        batch_index: 0,
+        batch_count: 17,
+        document_count: 161,
+        accepted_count: 10,
+        full_manifest: true,
+        receipt_status: 'inserted',
+        manifest_activated: false,
+    };
+    const result = executeCode(node('Validate Batch Receipt').parameters.jsCode, {
+        sources: { 'Check Ingest Result': [outcome] },
+        input: [receipt],
+    })[0].json;
+
+    assert.equal(result.batch_receipt_stored, true);
+    assert.equal(result.manifest_activated, false);
+    assert.doesNotMatch(node('Validate Batch Receipt').parameters.jsCode, /receipt_valid/);
+});
+
+test('generated HTTP contracts send object JSON and use receipt input arguments', () => {
+    const embedding = node('Generate Document Embedding').parameters;
+    assert.equal(embedding.contentType, 'json');
+    assert.equal(embedding.specifyBody, 'json');
+    assert.match(embedding.jsonBody, /=\{\{ \{/);
+    assert.equal(embedding.options.response.response.responseFormat, 'json');
+
+    const receiptBody = node('Record Ingest Batch Receipt').parameters.jsonBody;
+    for (const key of [
+        'input_request_id', 'input_provider', 'input_checksum', 'input_knowledge_version',
+        'input_batch_index', 'input_batch_count', 'input_document_count',
+        'input_accepted_count', 'input_full_manifest',
+    ]) {
+        assert.match(receiptBody, new RegExp(`\\b${key}\\b`));
+    }
+});

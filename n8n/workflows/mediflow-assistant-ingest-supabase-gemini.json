@@ -593,9 +593,9 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googlePalmApi",
         "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.document.content }] }, taskType: 'RETRIEVAL_DOCUMENT', outputDimensionality: 3072 }) }}",
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.document.content }] }, taskType: 'RETRIEVAL_DOCUMENT', outputDimensionality: 3072 } }}",
         "options": {
           "timeout": 10000,
           "response": {
@@ -669,9 +669,9 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ content: $json.document.content, metadata: { ...$json.document.metadata, document_id: $json.document.document_id, checksum: $json.request.checksum }, embedding: $json.embedding }) }}",
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { content: $json.document.content, metadata: { ...$json.document.metadata, document_id: $json.document.document_id, checksum: $json.request.checksum }, embedding: $json.embedding } }}",
         "options": {
           "timeout": 10000,
           "response": {
@@ -802,7 +802,7 @@
         -120
       ],
       "parameters": {
-        "jsCode": "const supabaseBaseUrl = 'https://your-project.supabase.co';\\nif (supabaseBaseUrl === 'https://your-project.supabase.co' || !/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/i.test(supabaseBaseUrl)) {\\n  throw new Error('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED');\\n}\\nreturn [{ json: { ...$json, supabase_base_url: supabaseBaseUrl } }];"
+        "jsCode": "const supabaseBaseUrl = 'https://your-project.supabase.co';\nif (supabaseBaseUrl === 'https://your-project.supabase.co' || !/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/i.test(supabaseBaseUrl)) {\n  throw new Error('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED');\n}\nreturn [{ json: { ...$json, supabase_base_url: supabaseBaseUrl } }];"
       }
     },
     {
@@ -867,9 +867,9 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendBody": true,
-        "contentType": "raw",
-        "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ request_id: $json.request.request_id, provider: \"gemini\", checksum: $json.request.checksum, knowledge_version: String($json.request.knowledge_version), batch_index: $json.request.batch_index, batch_count: $json.request.batch_count, document_count: $json.request.document_count, accepted_count: $json.accepted, full_manifest: $json.request.full_manifest }) }}",
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ { input_request_id: $json.request.request_id, input_provider: \"gemini\", input_checksum: $json.request.checksum, input_knowledge_version: String($json.request.knowledge_version), input_batch_index: $json.request.batch_index, input_batch_count: $json.request.batch_count, input_document_count: $json.request.document_count, input_accepted_count: $json.accepted, input_full_manifest: $json.request.full_manifest } }}",
         "options": {
           "timeout": 10000,
           "response": {
@@ -893,7 +893,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const validateIngestReceipt = function validateIngestReceipt(response, outcome, provider) {\n    const request = outcome?.request;\n\n    return Boolean(\n        response\n        && !Array.isArray(response)\n        && Object.keys(response).length === INGEST_RECEIPT_KEYS.length\n        && INGEST_RECEIPT_KEYS.every((key) => Object.hasOwn(response, key))\n        && response.provider === provider\n        && response.checksum === request?.checksum\n        && String(response.knowledge_version) === String(request?.knowledge_version)\n        && Number.isInteger(response.batch_index)\n        && response.batch_index === request?.batch_index\n        && Number.isInteger(response.batch_count)\n        && response.batch_count === request?.batch_count\n        && Number.isInteger(response.document_count)\n        && response.document_count === request?.document_count\n        && Number.isInteger(response.accepted_count)\n        && response.accepted_count === outcome?.accepted\n        && response.full_manifest === request?.full_manifest\n        && ['inserted', 'already_present'].includes(response.receipt_status)\n        && typeof response.manifest_activated === 'boolean'\n        && (!response.manifest_activated || request?.batch_index === request?.batch_count - 1)\n    );\n};\\nconst outcome = $('Check Ingest Result').first().json;\\nconst rawResponses = $input.all().map((item) => item.json ?? {});\\nconst responses = rawResponses.flatMap((value) => Array.isArray(value) ? value : (Array.isArray(value?.data) ? value.data : [value]));\\nconst response = responses.length === 1 ? responses[0] : null;\\nconst receiptValid = validateIngestReceipt(response, outcome, \"gemini\");\\nreturn [{ json: { ...outcome, receipt_valid: receiptValid, manifest_activated: receiptValid && response.manifest_activated === true } }];"
+        "jsCode": "const INGEST_RECEIPT_KEYS = [\"provider\",\"checksum\",\"knowledge_version\",\"batch_index\",\"batch_count\",\"document_count\",\"accepted_count\",\"full_manifest\",\"receipt_status\",\"manifest_activated\"];\nconst validateIngestReceipt = function validateIngestReceipt(response, outcome, provider) {\n    const request = outcome?.request;\n\n    return Boolean(\n        response\n        && !Array.isArray(response)\n        && Object.keys(response).length === INGEST_RECEIPT_KEYS.length\n        && INGEST_RECEIPT_KEYS.every((key) => Object.hasOwn(response, key))\n        && response.provider === provider\n        && response.checksum === request?.checksum\n        && String(response.knowledge_version) === String(request?.knowledge_version)\n        && Number.isInteger(response.batch_index)\n        && response.batch_index === request?.batch_index\n        && Number.isInteger(response.batch_count)\n        && response.batch_count === request?.batch_count\n        && Number.isInteger(response.document_count)\n        && response.document_count === request?.document_count\n        && Number.isInteger(response.accepted_count)\n        && response.accepted_count === outcome?.accepted\n        && response.full_manifest === request?.full_manifest\n        && ['inserted', 'already_present'].includes(response.receipt_status)\n        && typeof response.manifest_activated === 'boolean'\n        && (!response.manifest_activated || request?.batch_index === request?.batch_count - 1)\n    );\n};\nconst outcome = $('Check Ingest Result').first().json;\nconst rawResponses = $input.all().map((item) => item.json ?? {});\nconst responses = rawResponses.flatMap((value) => Array.isArray(value) ? value : (Array.isArray(value?.data) ? value.data : [value]));\nconst response = responses.length === 1 ? responses[0] : null;\nconst receiptValid = validateIngestReceipt(response, outcome, \"gemini\");\nreturn [{ json: { ...outcome, batch_receipt_stored: receiptValid, manifest_activated: receiptValid && response.manifest_activated === true } }];"
       }
     },
     {
