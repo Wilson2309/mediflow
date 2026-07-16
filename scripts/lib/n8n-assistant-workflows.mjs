@@ -53,6 +53,14 @@ function respondParameters(defaultStatus = 200) {
   };
 }
 
+function queryRespondParameters(defaultStatus = 200) {
+  return {
+    respondWith: 'json',
+    responseBody: '={{ $json.response }}',
+    options: { responseCode: `={{ $json.status_code || ${defaultStatus} }}` },
+  };
+}
+
 function cryptoParameters() {
   return {
     action: 'hmac',
@@ -372,6 +380,7 @@ function workflowBase(name, nodes, connections) {
 
 function createQueryWorkflow({ persistent, modelProvider, systemPrompt, roleModules }) {
   const vector = vectorConfig(modelProvider);
+  const explicitGeminiQuery = persistent && modelProvider === 'gemini';
   const suffix = persistent ? `Supabase ${modelProvider === 'gemini' ? 'Gemini' : 'OpenAI'}` : 'Simple Dev OpenAI';
   const nodes = [
     workflowNode('note-security', 'Security and credentials setup', 'n8n-nodes-base.stickyNote', 1, [-1240, -420], {
@@ -384,11 +393,11 @@ function createQueryWorkflow({ persistent, modelProvider, systemPrompt, roleModu
     workflowNode('security-config', 'Security Configuration', 'n8n-nodes-base.code', 2, [-1010, 0], { mode: 'runOnceForAllItems', jsCode: securityConfigurationCode('query') }),
     workflowNode('validate', 'Validate Raw Request', 'n8n-nodes-base.code', 2, [-900, 0], { mode: 'runOnceForAllItems', jsCode: queryValidationCode(roleModules) }),
     workflowNode('if-valid', 'Payload Is Valid', 'n8n-nodes-base.if', 2.2, [-680, 0], ifParameters('={{ $json.valid }}')),
-    workflowNode('respond-invalid', 'Respond Invalid Payload', 'n8n-nodes-base.respondToWebhook', 1.5, [-440, 260], respondParameters(422)),
+    workflowNode('respond-invalid', 'Respond Invalid Payload', 'n8n-nodes-base.respondToWebhook', 1.5, [-440, 260], queryRespondParameters(422)),
     workflowNode('crypto', 'Verify HMAC', 'n8n-nodes-base.crypto', 2, [-440, -40], cryptoParameters(), { alwaysOutputData: true, onError: 'continueRegularOutput' }),
     workflowNode('compare', 'Constant Time Signature Check', 'n8n-nodes-base.code', 2, [-220, -40], { jsCode: compareSignatureCode }),
     workflowNode('if-signature', 'Signature Is Valid', 'n8n-nodes-base.if', 2.2, [0, -40], ifParameters('={{ $json.signature_valid }}')),
-    workflowNode('respond-unauthorized', 'Respond Unauthorized', 'n8n-nodes-base.respondToWebhook', 1.5, [220, 260], respondParameters(401)),
+    workflowNode('respond-unauthorized', 'Respond Unauthorized', 'n8n-nodes-base.respondToWebhook', 1.5, [220, 260], queryRespondParameters(401)),
   ];
   const connections = {};
   addConnection(connections, 'Webhook Query', 'Security Configuration');
@@ -417,7 +426,7 @@ function createQueryWorkflow({ persistent, modelProvider, systemPrompt, roleModu
 
   nodes.push(
     workflowNode('if-nonce', 'Nonce Is Fresh', 'n8n-nodes-base.if', 2.2, [660, -120], ifParameters('={{ $json.nonce_accepted }}')),
-    workflowNode('respond-replay', 'Respond Replay Or Rate Limit', 'n8n-nodes-base.respondToWebhook', 1.5, [880, 260], respondParameters(409)),
+    workflowNode('respond-replay', 'Respond Replay Or Rate Limit', 'n8n-nodes-base.respondToWebhook', 1.5, [880, 260], queryRespondParameters(409)),
   );
   addConnection(connections, 'Classify Anti-Replay Result', 'Nonce Is Fresh');
   addConnection(connections, 'Nonce Is Fresh', persistent ? 'Prompt Injection Guard' : 'Record Nonce Data Table', 0);
@@ -439,28 +448,65 @@ function createQueryWorkflow({ persistent, modelProvider, systemPrompt, roleModu
     workflowNode('if-injection', 'Prompt Injection Guard', 'n8n-nodes-base.if', 2.2, [1100, -120], ifParameters('={{ $json.blocked_by_guardrail }}')),
     workflowNode('build-denied', 'Build Role Guardrail Response', 'n8n-nodes-base.code', 2, [1320, 220], { jsCode: `const answer = typeof $json.blocked_answer === 'string' ? $json.blocked_answer : ${JSON.stringify(ROLE_DENIED)};
 return [{ json: { status_code: 200, response: { answer, confidence: 0, steps: [], suggestions: [], can_escalate: false } } }];` }),
-    workflowNode('respond-denied', 'Respond Role Guardrail', 'n8n-nodes-base.respondToWebhook', 1.5, [1540, 220], respondParameters()),
+    workflowNode('respond-denied', 'Respond Role Guardrail', 'n8n-nodes-base.respondToWebhook', 1.5, [1540, 220], queryRespondParameters()),
   );
   addConnection(connections, 'Prompt Injection Guard', 'Build Role Guardrail Response', 0);
   addConnection(connections, 'Build Role Guardrail Response', 'Respond Role Guardrail');
 
   if (persistent) {
+    if (explicitGeminiQuery) {
+      nodes.push(
+        workflowNode('query-endpoint-config', 'Query Endpoint Configuration', 'n8n-nodes-base.code', 2, [1260, -160], { mode: 'runOnceForAllItems', jsCode: queryEndpointConfigurationCode() }),
+      );
+    }
     nodes.push(
-      workflowNode('manifest', 'Get Active Knowledge Manifest', 'n8n-nodes-base.supabase', 1, [1320, -160], {
+      workflowNode('manifest', 'Get Active Knowledge Manifest', 'n8n-nodes-base.supabase', 1, [explicitGeminiQuery ? 1400 : 1320, -160], {
       operation: 'getAll', tableId: 'assistant_knowledge_manifests', returnAll: false, limit: 1,
       filterType: 'manual', matchType: 'allFilters', filters: { conditions: [{ keyName: 'provider', condition: 'eq', keyValue: vector.manifestProvider }] },
       }, { alwaysOutputData: true, onError: 'continueRegularOutput' }),
-      workflowNode('validate-manifest', 'Validate Active Knowledge Manifest', 'n8n-nodes-base.code', 2, [1460, -160], { mode: 'runOnceForAllItems', jsCode: `const request = $('Constant Time Signature Check').first().json;
+      workflowNode('validate-manifest', 'Validate Active Knowledge Manifest', 'n8n-nodes-base.code', 2, [explicitGeminiQuery ? 1540 : 1460, -160], { mode: 'runOnceForAllItems', jsCode: `const request = $('Constant Time Signature Check').first().json;
 const rows = $input.all().map((item) => item.json ?? {});
 const manifest = rows.find((row) => row.provider === ${JSON.stringify(vector.manifestProvider)} && /^[a-f0-9]{64}$/.test(String(row.active_checksum ?? '')) && Number(row.document_count) > 0 && String(row.knowledge_version) === String(request.payload.knowledge_version) && !row.error);
 return [{ json: { ...request, manifest_valid: Boolean(manifest), active_checksum: manifest?.active_checksum ?? null } }];` }),
-      workflowNode('if-manifest-valid', 'Active Manifest Is Valid', 'n8n-nodes-base.if', 2.2, [1600, -160], ifParameters('={{ $json.manifest_valid }}')),
+      workflowNode('if-manifest-valid', 'Active Manifest Is Valid', 'n8n-nodes-base.if', 2.2, [explicitGeminiQuery ? 1680 : 1600, -160], ifParameters('={{ $json.manifest_valid }}')),
     );
   }
 
   const vectorStoreName = persistent ? 'Supabase Vector Store' : 'Simple Vector Store';
-  nodes.push(
-    persistent
+  if (explicitGeminiQuery) {
+    nodes.push(
+      workflowNode('query-embedding', 'Generate Query Embedding', 'n8n-nodes-base.httpRequest', 4.2, [1840, -160], {
+        method: 'POST',
+        url: vector.embeddingEndpoint,
+        authentication: 'predefinedCredentialType',
+        nodeCredentialType: vector.embeddingCredential,
+        sendBody: true,
+        contentType: 'json',
+        specifyBody: 'json',
+        jsonBody: "={{ { model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.payload.question }] }, taskType: 'RETRIEVAL_QUERY', outputDimensionality: 3072 } }}",
+        options: { timeout: 10000, response: { response: { responseFormat: 'json' } } },
+      }, { onError: 'continueErrorOutput' }),
+      workflowNode('validate-query-embedding', 'Validate Query Embedding', 'n8n-nodes-base.code', 2, [2000, -160], { jsCode: `const original = $('Validate Active Knowledge Manifest').first().json;
+const response = $input.first().json ?? {};
+const values = response.embedding?.values;
+const valid = Array.isArray(values) && values.length === 3072 && values.every((value) => typeof value === 'number' && Number.isFinite(value));
+return [{ json: { ...original, query_embedding_valid: valid, query_embedding: valid ? values : null } }];` }),
+      workflowNode('if-query-embedding-valid', 'Query Embedding Is Valid', 'n8n-nodes-base.if', 2.2, [2160, -160], ifParameters('={{ $json.query_embedding_valid }}')),
+      workflowNode('query-rpc', 'Call Gemini Vector RPC', 'n8n-nodes-base.httpRequest', 4.2, [2320, -160], {
+        method: 'POST',
+        url: supabaseEndpointExpression('/rest/v1/rpc/match_assistant_documents_gemini', 'Query Endpoint Configuration'),
+        authentication: 'predefinedCredentialType',
+        nodeCredentialType: 'supabaseApi',
+        sendBody: true,
+        contentType: 'json',
+        specifyBody: 'json',
+        jsonBody: "={{ { query_embedding: $json.query_embedding, match_count: 30, filter: { role: $json.payload.role, status: 'active', locale: $json.payload.locale, checksum: $json.active_checksum } } }}",
+        options: { timeout: 10000, response: { response: { responseFormat: 'json' } } },
+      }, { onError: 'continueErrorOutput' }),
+    );
+  } else {
+    nodes.push(
+      persistent
       ? workflowNode('vector-supabase', vectorStoreName, '@n8n/n8n-nodes-langchain.vectorStoreSupabase', 1.3, [1540, -160], {
         mode: 'load',
         tableName: { __rl: true, value: vector.table, mode: 'list', cachedResultName: vector.table },
@@ -480,13 +526,19 @@ return [{ json: { ...request, manifest_valid: Boolean(manifest), active_checksum
         prompt: "={{ $('Constant Time Signature Check').first().json.payload.question + ' | módulo: ' + $('Constant Time Signature Check').first().json.payload.module + ' | ruta: ' + ($('Constant Time Signature Check').first().json.payload.route || '') }}",
         topK: 30,
       }, { alwaysOutputData: true, onError: 'continueRegularOutput' }),
-    vector.embeddings,
+      vector.embeddings,
+    );
+  }
+  nodes.push(
     workflowNode('filter-context', 'Filter Role Module Context', 'n8n-nodes-base.code', 2, [1760, -160], { mode: 'runOnceForAllItems', jsCode: `const request = $('Constant Time Signature Check').first().json;
 const allowedGeneralModules = ['offline','permissions','support'];
 const activeChecksum = ${persistent ? "$('Validate Active Knowledge Manifest').first().json.active_checksum" : 'null'};
 const selected = [];
-for (const item of $input.all()) {
-  const json = item.json ?? {};
+const rows = $input.all().flatMap((item) => {
+  const value = item.json ?? {};
+  return Array.isArray(value) ? value : (Array.isArray(value.data) ? value.data : [value]);
+});
+for (const json of rows) {
   const document = json.document ?? json;
   const metadata = document.metadata ?? json.metadata ?? {};
   let modules = metadata.modules ?? [];
@@ -510,7 +562,7 @@ for (const entry of top) {
 return [{ json: { ...request, context, context_sufficient: top.length > 0 && context.length > 0, retrieved_document_count: top.length } }];` }),
     workflowNode('if-context', 'Context Is Sufficient', 'n8n-nodes-base.if', 2.2, [1980, -160], ifParameters('={{ $json.context_sufficient }}')),
     workflowNode('build-fallback', 'Build Context Fallback', 'n8n-nodes-base.code', 2, [2200, 220], { jsCode: `return [{ json: { status_code: 200, response: ${JSON.stringify(responseObject(FALLBACK, 0, true))}, fallback_used: true, safe_error_code: 'NO_CONTEXT' } }];` }),
-    workflowNode('respond-fallback', 'Respond Context Fallback', 'n8n-nodes-base.respondToWebhook', 1.5, [2420, 220], respondParameters()),
+    workflowNode('respond-fallback', 'Respond Context Fallback', 'n8n-nodes-base.respondToWebhook', 1.5, [2420, 220], queryRespondParameters()),
     workflowNode('chain', 'Basic LLM Chain', '@n8n/n8n-nodes-langchain.chainLlm', 1.9, [2200, -180], {
       promptType: 'define',
       text: `=ROL AUTORIZADO: {{$json.payload.role}}\nMÓDULO: {{$json.payload.module}}\nRUTA (solo contexto, no autorización): {{$json.payload.route || ''}}\nESTADO: {{$json.payload.connection_state}}\n\n<documentos_autorizados>\n{{$json.context}}\n</documentos_autorizados>\n\n<pregunta_no_confiable>\n{{$json.payload.question}}\n</pregunta_no_confiable>`,
@@ -544,24 +596,39 @@ const forbiddenByRole = {
 const safeDenial = (text) => /(?:\bno (?:puedes|debes|está permitido|tienes permiso)|\btu rol no|\bno está disponible para tu rol)/i.test(decode(text));
 const valid = candidate && !Array.isArray(candidate) && Object.keys(candidate).length === allowedKeys.length && Object.keys(candidate).every((key) => allowedKeys.includes(key)) && allowedKeys.every((key) => Object.hasOwn(candidate, key)) && typeof candidate.answer === 'string' && candidate.answer.trim().length >= 1 && candidate.answer.length <= 2000 && typeof candidate.confidence === 'number' && candidate.confidence >= 0 && candidate.confidence <= 1 && Array.isArray(candidate.steps) && candidate.steps.length <= 10 && candidate.steps.every((step) => typeof step === 'string' && step.length >= 1 && step.length <= 300) && Array.isArray(candidate.suggestions) && candidate.suggestions.length <= 5 && candidate.suggestions.every((suggestion) => typeof suggestion === 'string' && suggestion.length >= 1 && suggestion.length <= 150) && typeof candidate.can_escalate === 'boolean' && textValues.every((text) => typeof text === 'string' && !unsafe.test(decode(text)) && !unsafeExpanded(text)) && textValues.every((text) => !forbiddenByRole[request.payload.role]?.test(decode(text)));
 return [{ json: { status_code: 200, response: valid ? candidate : ${JSON.stringify(responseObject(FALLBACK, 0, true))}, fallback_used: !valid, safe_error_code: valid ? null : 'INVALID_MODEL_RESPONSE', telemetry: { request_id: request.payload.request_id, timestamp: request.payload.timestamp, workflow_version: '4.0', role: request.payload.role, module: request.payload.module, status: valid ? 'success' : 'fallback', latency_ms: Math.max(0, Date.now() - Number(request.started_at_ms || Date.now())), retrieved_document_count: request.retrieved_document_count, confidence: valid ? candidate.confidence : 0, fallback_used: !valid } } }];` }),
-    workflowNode('respond-success', 'Respond Success Or Safe Fallback', 'n8n-nodes-base.respondToWebhook', 1.5, [2660, -180], respondParameters()),
+    workflowNode('respond-success', 'Respond Success Or Safe Fallback', 'n8n-nodes-base.respondToWebhook', 1.5, [2660, -180], queryRespondParameters()),
   );
 
-  addConnection(connections, 'Prompt Injection Guard', persistent ? 'Get Active Knowledge Manifest' : vectorStoreName, 1);
+  addConnection(connections, 'Prompt Injection Guard', persistent ? (explicitGeminiQuery ? 'Query Endpoint Configuration' : 'Get Active Knowledge Manifest') : vectorStoreName, 1);
   if (persistent) {
+    if (explicitGeminiQuery) {
+      addConnection(connections, 'Query Endpoint Configuration', 'Get Active Knowledge Manifest');
+    }
     addConnection(connections, 'Get Active Knowledge Manifest', 'Validate Active Knowledge Manifest');
     addConnection(connections, 'Validate Active Knowledge Manifest', 'Active Manifest Is Valid');
-    addConnection(connections, 'Active Manifest Is Valid', vectorStoreName, 0);
+    addConnection(connections, 'Active Manifest Is Valid', explicitGeminiQuery ? 'Generate Query Embedding' : vectorStoreName, 0);
     addConnection(connections, 'Active Manifest Is Valid', 'Build Context Fallback', 1);
   }
-  addConnection(connections, vectorStoreName, 'Filter Role Module Context');
+  if (explicitGeminiQuery) {
+    addConnection(connections, 'Generate Query Embedding', 'Validate Query Embedding', 0);
+    addConnection(connections, 'Generate Query Embedding', 'Build Context Fallback', 1);
+    addConnection(connections, 'Validate Query Embedding', 'Query Embedding Is Valid');
+    addConnection(connections, 'Query Embedding Is Valid', 'Call Gemini Vector RPC', 0);
+    addConnection(connections, 'Query Embedding Is Valid', 'Build Context Fallback', 1);
+    addConnection(connections, 'Call Gemini Vector RPC', 'Filter Role Module Context', 0);
+    addConnection(connections, 'Call Gemini Vector RPC', 'Build Context Fallback', 1);
+  } else {
+    addConnection(connections, vectorStoreName, 'Filter Role Module Context');
+  }
   addConnection(connections, 'Filter Role Module Context', 'Context Is Sufficient');
   addConnection(connections, 'Context Is Sufficient', 'Basic LLM Chain', 0);
   addConnection(connections, 'Context Is Sufficient', 'Build Context Fallback', 1);
   addConnection(connections, 'Build Context Fallback', 'Respond Context Fallback');
   addConnection(connections, 'Basic LLM Chain', 'Validate Final Response');
   addConnection(connections, 'Validate Final Response', 'Respond Success Or Safe Fallback');
-  addConnection(connections, vector.embeddings.name, vectorStoreName, 0, 'ai_embedding');
+  if (!explicitGeminiQuery) {
+    addConnection(connections, vector.embeddings.name, vectorStoreName, 0, 'ai_embedding');
+  }
   addConnection(connections, vector.model.name, 'Basic LLM Chain', 0, 'ai_languageModel');
   addConnection(connections, 'Structured Output Parser', 'Basic LLM Chain', 0, 'ai_outputParser');
 
@@ -596,8 +663,18 @@ function ingestEndpointConfigurationCode() {
   ].join('\n');
 }
 
-function supabaseEndpointExpression(path) {
-  return "={{ $('Ingest Endpoint Configuration').first().json.supabase_base_url + " + JSON.stringify(path) + " }}";
+function queryEndpointConfigurationCode() {
+  return [
+    "const supabaseBaseUrl = 'https://your-project.supabase.co';",
+    "if (!/^https:\/\/[a-z0-9-]+\\.supabase\\.co$/i.test(supabaseBaseUrl) || supabaseBaseUrl.includes('your-project')) {",
+    "  throw new Error('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED');",
+    '}',
+    'return [{ json: { ...$json, supabase_base_url: supabaseBaseUrl } }];',
+  ].join('\n');
+}
+
+function supabaseEndpointExpression(path, configurationNode = 'Ingest Endpoint Configuration') {
+  return "={{ $('" + configurationNode + "').first().json.supabase_base_url + " + JSON.stringify(path) + " }}";
 }
 
 function rpcHttpParameters(vector) {

@@ -66,9 +66,9 @@ function normalizeText(value) {
         .toLowerCase();
 }
 
-function usesConfiguredSupabaseEndpoint(value, path) {
+function usesConfiguredSupabaseEndpoint(value, path, configurationNode = 'Ingest Endpoint Configuration') {
     const url = String(value ?? '');
-    return url.includes("$('Ingest Endpoint Configuration').first().json.supabase_base_url")
+    return url.includes(`$('${configurationNode}').first().json.supabase_base_url`)
         && url.includes(path);
 }
 
@@ -865,10 +865,11 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
     const vectorNodes = nodes.filter((node) => normalizeText(node.type).includes('vectorstore'));
     const embeddingNodes = nodes.filter((node) => normalizeText(node.type).includes('embeddings'));
     const explicitPersistentIngest = kind === 'ingest' && nodes.some((node) => node.name === 'Call Idempotent Supabase RPC');
-    if (vectorNodes.length === 0 && !explicitPersistentIngest) {
+    const explicitGeminiQuery = kind === 'query' && nodes.some((node) => node.name === 'Call Gemini Vector RPC');
+    if (vectorNodes.length === 0 && !explicitPersistentIngest && !explicitGeminiQuery) {
         errors.push('Falta un Vector Store.');
     }
-    if (embeddingNodes.length === 0 && !explicitPersistentIngest) {
+    if (embeddingNodes.length === 0 && !explicitPersistentIngest && !explicitGeminiQuery) {
         errors.push('Falta un nodo de embeddings.');
     }
     for (const node of vectorNodes) {
@@ -947,6 +948,7 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
         ));
         const retrievalFilterText = JSON.stringify([
             ...vectorNodes.map((node) => node.parameters ?? {}),
+            ...nodes.filter((node) => node.name === 'Call Gemini Vector RPC').map((node) => node.parameters ?? {}),
             ...filterNodes.map((node) => node.parameters ?? {}),
         ]);
 
@@ -956,18 +958,18 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
             }
         }
 
-        const persistentQuery = vectorNodes.some((node) => normalizeText(node.type).includes('vectorstoresupabase'));
+        const persistentQuery = vectorNodes.some((node) => normalizeText(node.type).includes('vectorstoresupabase')) || explicitGeminiQuery;
         if (persistentQuery) {
             const manifestGet = nodeMap.get('Get Active Knowledge Manifest');
             const manifestValidator = nodeMap.get('Validate Active Knowledge Manifest');
             const manifestGate = nodeMap.get('Active Manifest Is Valid');
             const contextFilterCode = filterNodes.map((node) => String(node.parameters?.jsCode ?? '')).join('\n');
-            const vectorNames = new Set(vectorNodes.map((node) => node.name));
+            const retrievalNames = new Set(explicitGeminiQuery ? ['Generate Query Embedding'] : vectorNodes.map((node) => node.name));
 
             const validManifestFlow = manifestGet && manifestValidator && manifestGate
                 && mainDestinations(workflow, manifestGet.name).includes(manifestValidator.name)
                 && mainDestinations(workflow, manifestValidator.name).includes(manifestGate.name)
-                && mainOutputGroups(workflow, manifestGate.name)[0]?.some((connection) => vectorNames.has(connection.node))
+                && mainOutputGroups(workflow, manifestGate.name)[0]?.some((connection) => retrievalNames.has(connection.node))
                 && mainOutputGroups(workflow, manifestGate.name)[1]?.some((connection) => connection.node === 'Build Context Fallback');
 
             if (!manifestGet || !manifestValidator || !manifestGate) {
@@ -981,8 +983,51 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
             if (!includesAll(contextFilterCode, ['metadata.checksum', 'activechecksum', 'modules.every', 'purelygeneral'])) {
                 errors.push('El postfiltro debe volver a comprobar checksum y aceptar globalmente solo módulos puramente generales.');
             }
-            if (!vectorNodes.filter((node) => normalizeText(node.type).includes('vectorstoresupabase')).every((node) => Number(node.parameters?.topK) >= 20)) {
+            if (!explicitGeminiQuery && !vectorNodes.filter((node) => normalizeText(node.type).includes('vectorstoresupabase')).every((node) => Number(node.parameters?.topK) >= 20)) {
                 errors.push('La recuperación Supabase debe obtener un conjunto candidato suficiente antes del Top K final por módulo.');
+            }
+            if (explicitGeminiQuery) {
+                const endpoint = nodeMap.get('Query Endpoint Configuration');
+                const embedding = nodeMap.get('Generate Query Embedding');
+                const embeddingValidator = nodeMap.get('Validate Query Embedding');
+                const embeddingGate = nodeMap.get('Query Embedding Is Valid');
+                const rpc = nodeMap.get('Call Gemini Vector RPC');
+                const embeddingBody = String(embedding?.parameters?.jsonBody ?? '');
+                const rpcBody = String(rpc?.parameters?.jsonBody ?? '');
+                const explicitFlow = endpoint?.type === 'n8n-nodes-base.code'
+                    && String(endpoint.parameters?.jsCode ?? '').includes("const supabaseBaseUrl = 'https://your-project.supabase.co';")
+                    && String(endpoint.parameters?.jsCode ?? '').includes('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED')
+                    && mainDestinations(workflow, endpoint.name).includes(manifestGet?.name)
+                    && embedding?.type === 'n8n-nodes-base.httpRequest'
+                    && embedding?.parameters?.method === 'POST'
+                    && embedding?.parameters?.authentication === 'predefinedCredentialType'
+                    && embedding?.parameters?.nodeCredentialType === 'googlePalmApi'
+                    && embedding?.parameters?.contentType === 'json'
+                    && embedding?.parameters?.specifyBody === 'json'
+                    && includesAll(embeddingBody, ['RETRIEVAL_QUERY', 'outputDimensionality', '3072', 'payload.question'])
+                    && embedding?.parameters?.options?.response?.response?.responseFormat === 'json'
+                    && embeddingValidator?.type === 'n8n-nodes-base.code'
+                    && includesAll(embeddingValidator.parameters?.jsCode ?? '', ['embedding?.values', 'Array.isArray', '3072', 'Number.isFinite'])
+                    && embeddingGate?.type === 'n8n-nodes-base.if'
+                    && hasMainOutputConnection(workflow, embedding.name, 0, embeddingValidator.name)
+                    && hasMainOutputConnection(workflow, embedding.name, 1, 'Build Context Fallback')
+                    && hasMainOutputConnection(workflow, embeddingValidator.name, 0, embeddingGate.name)
+                    && hasMainOutputConnection(workflow, embeddingGate.name, 0, rpc?.name)
+                    && hasMainOutputConnection(workflow, embeddingGate.name, 1, 'Build Context Fallback')
+                    && rpc?.type === 'n8n-nodes-base.httpRequest'
+                    && rpc?.parameters?.method === 'POST'
+                    && rpc?.parameters?.authentication === 'predefinedCredentialType'
+                    && rpc?.parameters?.nodeCredentialType === 'supabaseApi'
+                    && rpc?.parameters?.contentType === 'json'
+                    && rpc?.parameters?.specifyBody === 'json'
+                    && rpc?.parameters?.options?.response?.response?.responseFormat === 'json'
+                    && usesConfiguredSupabaseEndpoint(rpc?.parameters?.url, '/rest/v1/rpc/match_assistant_documents_gemini', 'Query Endpoint Configuration')
+                    && includesAll(rpcBody, ['query_embedding', 'match_count', '30', 'filter', 'role', 'status', 'locale', 'checksum', 'active_checksum'])
+                    && hasMainOutputConnection(workflow, rpc.name, 0, 'Filter Role Module Context')
+                    && hasMainOutputConnection(workflow, rpc.name, 1, 'Build Context Fallback');
+                if (!explicitFlow) {
+                    errors.push('La consulta Gemini persistente debe usar embedding y RPC HTTP JSON nativos con salidas seguras.');
+                }
             }
         }
 
