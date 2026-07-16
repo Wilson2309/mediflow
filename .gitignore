@@ -27,6 +27,7 @@ Homestead.yaml
 Thumbs.db
 *.sql
 !/n8n/supabase/assistant-rag-schema.sql
+!/n8n/supabase/repair-empty-gemini-rag.sql
 # Playwright
 test-results/
 playwright-report/

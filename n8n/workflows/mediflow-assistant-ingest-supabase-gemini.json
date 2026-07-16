@@ -11,7 +11,7 @@
         -440
       ],
       "parameters": {
-        "content": "Asignación manual obligatoria: Crypto=MEDIFLOW_HMAC_INGEST_SECRET, Supabase=MEDIFLOW_SUPABASE y embeddings=MEDIFLOW_EMBEDDINGS. La activación del checksum ocurre solo después del último lote válido.",
+        "content": "Asignación manual obligatoria: Crypto=MEDIFLOW_HMAC_INGEST_SECRET, Supabase=MEDIFLOW_SUPABASE y embeddings=MEDIFLOW_EMBEDDINGS. Antes de publicar, edita el único nodo Ingest Endpoint Configuration con el host privado autorizado. La activación ocurre solo desde el lote final completo.",
         "width": 720,
         "height": 220
       }
@@ -59,7 +59,7 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const input = $input.first().json ?? {};\nconst securityConfig = input.security_config ?? {};\nconst MAX_REQUEST_AGE_SECONDS = Math.max(60, Math.min(600, Number(securityConfig.max_request_age_seconds ?? 300)));\nconst MAX_CLOCK_SKEW_SECONDS = Math.max(0, Math.min(60, Number(securityConfig.max_clock_skew_seconds ?? 30)));\nconst MAX_BATCH_DOCUMENTS = Math.max(1, Math.min(100, Number(securityConfig.max_batch_documents ?? 100)));\nconst MAX_RAW_BYTES = Math.max(65536, Math.min(1048576, Number(securityConfig.max_raw_bytes ?? 524288)));\nconst expectedProvider = \"supabase\";\nconst roles = [\"administrador\",\"caja_finanzas\",\"medico\",\"recepcionista\",\"super_admin\"];\nconst modules = [\"appointments\",\"audit\",\"clinic_settings\",\"clinic_switch\",\"consultations\",\"daily_agenda\",\"dashboard\",\"doctors\",\"financial_audit\",\"medical_records\",\"offline\",\"onboarding\",\"patients\",\"payments\",\"permissions\",\"prescriptions\",\"receipts\",\"reports\",\"services\",\"subscriptions\",\"super_admin_clinics\",\"support\",\"users\"];\nconst roleModules = {\"administrador\":[\"appointments\",\"audit\",\"clinic_settings\",\"clinic_switch\",\"consultations\",\"daily_agenda\",\"dashboard\",\"doctors\",\"financial_audit\",\"medical_records\",\"offline\",\"patients\",\"payments\",\"permissions\",\"prescriptions\",\"receipts\",\"reports\",\"services\",\"support\",\"users\"],\"recepcionista\":[\"appointments\",\"clinic_switch\",\"daily_agenda\",\"dashboard\",\"doctors\",\"offline\",\"patients\",\"payments\",\"permissions\",\"services\",\"support\"],\"caja_finanzas\":[\"appointments\",\"clinic_switch\",\"daily_agenda\",\"dashboard\",\"financial_audit\",\"offline\",\"payments\",\"permissions\",\"receipts\",\"reports\",\"services\",\"support\"],\"medico\":[\"appointments\",\"clinic_switch\",\"consultations\",\"daily_agenda\",\"dashboard\",\"medical_records\",\"offline\",\"payments\",\"permissions\",\"prescriptions\",\"reports\",\"support\"],\"super_admin\":[\"offline\",\"onboarding\",\"permissions\",\"subscriptions\",\"super_admin_clinics\",\"support\"]};\nconst allowedKeys = ['request_id','provider','batch_index','batch_count','full_manifest','checksum','knowledge_version','document_count','documents','timestamp'];\nconst metadataKeys = ['entry_id','role','modules','locale','status','knowledge_version','requires_online','source'];\nconst fail = (statusCode) => ({ valid: false, status_code: statusCode, response: { ok: false, request_id: null, accepted: 0, rejected: 0 } });\nlet rawBody;\ntry { rawBody = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8'); } catch { return [{ json: fail(422) }]; }\nif (Buffer.byteLength(rawBody, 'utf8') > MAX_RAW_BYTES) return [{ json: fail(422) }];\nconst headers = Object.fromEntries(Object.entries(input.headers ?? {}).map(([key, value]) => [key.toLowerCase(), String(value)]));\nconst requestIdHeader = headers['x-mediflow-request-id'];\nconst timestampHeader = headers['x-mediflow-timestamp'];\nconst signature = (headers['x-mediflow-signature'] ?? '').toLowerCase();\nconst assistantVersion = headers['x-mediflow-assistant-version'];\nif (!String(headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) return [{ json: fail(422) }];\nif (!requestIdHeader || !timestampHeader || !assistantVersion || !/^[a-f0-9]{64}$/.test(signature)) return [{ json: fail(401) }];\nlet body;\ntry { body = JSON.parse(rawBody); } catch { return [{ json: fail(422) }]; }\nif (!body || Array.isArray(body) || typeof body !== 'object' || Object.keys(body).length !== allowedKeys.length || Object.keys(body).some((key) => !allowedKeys.includes(key)) || allowedKeys.some((key) => !Object.hasOwn(body, key))) return [{ json: fail(422) }];\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst timestampPattern = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:Z|[+-]\\d{2}:\\d{2})$/;\nconst parsedTimestamp = Date.parse(body.timestamp);\nconst ageSeconds = (Date.now() - parsedTimestamp) / 1000;\nif (body.timestamp !== timestampHeader || !timestampPattern.test(body.timestamp) || !Number.isFinite(parsedTimestamp) || ageSeconds > MAX_REQUEST_AGE_SECONDS || ageSeconds < -MAX_CLOCK_SKEW_SECONDS) return [{ json: fail(401) }];\nconst scalarValid = uuid.test(body.request_id) && body.request_id === requestIdHeader && body.provider === expectedProvider && Number.isInteger(body.batch_index) && body.batch_index >= 0 && Number.isInteger(body.batch_count) && body.batch_count > 0 && body.batch_index < body.batch_count && typeof body.full_manifest === 'boolean' && /^[a-f0-9]{64}$/.test(body.checksum) && (Number.isInteger(body.knowledge_version) || typeof body.knowledge_version === 'string') && String(body.knowledge_version) === assistantVersion && Number.isInteger(body.document_count) && body.document_count > 0 && Array.isArray(body.documents) && body.documents.length > 0 && body.documents.length <= MAX_BATCH_DOCUMENTS;\nif (!scalarValid) return [{ json: fail(422) }];\nconst seen = new Set();\nfor (const document of body.documents) {\n  if (!document || Array.isArray(document) || Object.keys(document).length !== 3 || !Object.hasOwn(document, 'document_id') || !Object.hasOwn(document, 'content') || !Object.hasOwn(document, 'metadata')) return [{ json: fail(422) }];\n  if (typeof document.document_id !== 'string' || document.document_id.length > 180 || seen.has(document.document_id) || typeof document.content !== 'string' || document.content.length < 1 || document.content.length > 12000) return [{ json: fail(422) }];\n  seen.add(document.document_id);\n  const metadata = document.metadata;\n  if (!metadata || Array.isArray(metadata) || Object.keys(metadata).length !== metadataKeys.length || Object.keys(metadata).some((key) => !metadataKeys.includes(key)) || metadataKeys.some((key) => !Object.hasOwn(metadata, key))) return [{ json: fail(422) }];\n  if (!roles.includes(metadata.role) || !Array.isArray(metadata.modules) || metadata.modules.length < 1 || metadata.modules.some((module) => !modules.includes(module) || !roleModules[metadata.role]?.includes(module)) || metadata.locale !== 'es-EC' || metadata.status !== 'active' || typeof metadata.requires_online !== 'boolean' || metadata.source !== 'knowledge-base.json' || typeof metadata.entry_id !== 'string' || !metadata.entry_id || (!Number.isInteger(metadata.knowledge_version) && typeof metadata.knowledge_version !== 'string')) return [{ json: fail(422) }];\n}\nreturn [{ json: {\n  valid: true,\n  signature_input: timestampHeader + '.' + rawBody,\n  received_signature: signature,\n  payload: body,\n  config: { max_request_age_seconds: MAX_REQUEST_AGE_SECONDS, max_clock_skew_seconds: MAX_CLOCK_SKEW_SECONDS, max_batch_documents: MAX_BATCH_DOCUMENTS, max_raw_bytes: MAX_RAW_BYTES },\n} }];"
+        "jsCode": "const input = $input.first().json ?? {};\nconst securityConfig = input.security_config ?? {};\nconst MAX_REQUEST_AGE_SECONDS = Math.max(60, Math.min(600, Number(securityConfig.max_request_age_seconds ?? 300)));\nconst MAX_CLOCK_SKEW_SECONDS = Math.max(0, Math.min(60, Number(securityConfig.max_clock_skew_seconds ?? 30)));\nconst MAX_BATCH_DOCUMENTS = Math.max(1, Math.min(100, Number(securityConfig.max_batch_documents ?? 100)));\nconst MAX_RAW_BYTES = Math.max(65536, Math.min(1048576, Number(securityConfig.max_raw_bytes ?? 524288)));\nconst expectedProvider = \"supabase\";\nconst roles = [\"administrador\",\"caja_finanzas\",\"medico\",\"recepcionista\",\"super_admin\"];\nconst modules = [\"appointments\",\"audit\",\"clinic_settings\",\"clinic_switch\",\"consultations\",\"daily_agenda\",\"dashboard\",\"doctors\",\"financial_audit\",\"medical_records\",\"offline\",\"onboarding\",\"patients\",\"payments\",\"permissions\",\"prescriptions\",\"receipts\",\"reports\",\"services\",\"subscriptions\",\"super_admin_clinics\",\"support\",\"users\"];\nconst roleModules = {\"administrador\":[\"appointments\",\"audit\",\"clinic_settings\",\"clinic_switch\",\"consultations\",\"daily_agenda\",\"dashboard\",\"doctors\",\"financial_audit\",\"medical_records\",\"offline\",\"patients\",\"payments\",\"permissions\",\"prescriptions\",\"receipts\",\"reports\",\"services\",\"support\",\"users\"],\"recepcionista\":[\"appointments\",\"clinic_switch\",\"daily_agenda\",\"dashboard\",\"doctors\",\"offline\",\"patients\",\"payments\",\"permissions\",\"services\",\"support\"],\"caja_finanzas\":[\"appointments\",\"clinic_switch\",\"daily_agenda\",\"dashboard\",\"financial_audit\",\"offline\",\"payments\",\"permissions\",\"receipts\",\"reports\",\"services\",\"support\"],\"medico\":[\"appointments\",\"clinic_switch\",\"consultations\",\"daily_agenda\",\"dashboard\",\"medical_records\",\"offline\",\"payments\",\"permissions\",\"prescriptions\",\"reports\",\"support\"],\"super_admin\":[\"offline\",\"onboarding\",\"permissions\",\"subscriptions\",\"super_admin_clinics\",\"support\"]};\nconst allowedKeys = ['request_id','provider','batch_index','batch_count','full_manifest','checksum','knowledge_version','document_count','documents','timestamp'];\nconst metadataKeys = ['entry_id','role','modules','locale','status','knowledge_version','requires_online','source'];\nconst fail = (statusCode) => ({ valid: false, status_code: statusCode, response: { ok: false, request_id: null, accepted: 0, rejected: 0, checksum: null, knowledge_version: null, activated: false } });\nlet rawBody;\ntry { rawBody = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8'); } catch { return [{ json: fail(422) }]; }\nif (Buffer.byteLength(rawBody, 'utf8') > MAX_RAW_BYTES) return [{ json: fail(422) }];\nconst headers = Object.fromEntries(Object.entries(input.headers ?? {}).map(([key, value]) => [key.toLowerCase(), String(value)]));\nconst requestIdHeader = headers['x-mediflow-request-id'];\nconst timestampHeader = headers['x-mediflow-timestamp'];\nconst signature = (headers['x-mediflow-signature'] ?? '').toLowerCase();\nconst assistantVersion = headers['x-mediflow-assistant-version'];\nif (!String(headers['content-type'] ?? '').toLowerCase().startsWith('application/json')) return [{ json: fail(422) }];\nif (!requestIdHeader || !timestampHeader || !assistantVersion || !/^[a-f0-9]{64}$/.test(signature)) return [{ json: fail(401) }];\nlet body;\ntry { body = JSON.parse(rawBody); } catch { return [{ json: fail(422) }]; }\nif (!body || Array.isArray(body) || typeof body !== 'object' || Object.keys(body).length !== allowedKeys.length || Object.keys(body).some((key) => !allowedKeys.includes(key)) || allowedKeys.some((key) => !Object.hasOwn(body, key))) return [{ json: fail(422) }];\nconst uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;\nconst timestampPattern = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:Z|[+-]\\d{2}:\\d{2})$/;\nconst parsedTimestamp = Date.parse(body.timestamp);\nconst ageSeconds = (Date.now() - parsedTimestamp) / 1000;\nif (body.timestamp !== timestampHeader || !timestampPattern.test(body.timestamp) || !Number.isFinite(parsedTimestamp) || ageSeconds > MAX_REQUEST_AGE_SECONDS || ageSeconds < -MAX_CLOCK_SKEW_SECONDS) return [{ json: fail(401) }];\nconst scalarValid = uuid.test(body.request_id) && body.request_id === requestIdHeader && body.provider === expectedProvider && Number.isInteger(body.batch_index) && body.batch_index >= 0 && Number.isInteger(body.batch_count) && body.batch_count > 0 && body.batch_index < body.batch_count && typeof body.full_manifest === 'boolean' && /^[a-f0-9]{64}$/.test(body.checksum) && (Number.isInteger(body.knowledge_version) || typeof body.knowledge_version === 'string') && String(body.knowledge_version) === assistantVersion && Number.isInteger(body.document_count) && body.document_count > 0 && Array.isArray(body.documents) && body.documents.length > 0 && body.documents.length <= MAX_BATCH_DOCUMENTS;\nif (!scalarValid) return [{ json: fail(422) }];\nconst seen = new Set();\nfor (const document of body.documents) {\n  if (!document || Array.isArray(document) || Object.keys(document).length !== 3 || !Object.hasOwn(document, 'document_id') || !Object.hasOwn(document, 'content') || !Object.hasOwn(document, 'metadata')) return [{ json: fail(422) }];\n  if (typeof document.document_id !== 'string' || document.document_id.length > 180 || seen.has(document.document_id) || typeof document.content !== 'string' || document.content.length < 1 || document.content.length > 12000) return [{ json: fail(422) }];\n  seen.add(document.document_id);\n  const metadata = document.metadata;\n  if (!metadata || Array.isArray(metadata) || Object.keys(metadata).length !== metadataKeys.length || Object.keys(metadata).some((key) => !metadataKeys.includes(key)) || metadataKeys.some((key) => !Object.hasOwn(metadata, key))) return [{ json: fail(422) }];\n  if (!roles.includes(metadata.role) || !Array.isArray(metadata.modules) || metadata.modules.length < 1 || metadata.modules.some((module) => !modules.includes(module) || !roleModules[metadata.role]?.includes(module)) || metadata.locale !== 'es-EC' || metadata.status !== 'active' || typeof metadata.requires_online !== 'boolean' || metadata.source !== 'knowledge-base.json' || typeof metadata.entry_id !== 'string' || !metadata.entry_id || (!Number.isInteger(metadata.knowledge_version) && typeof metadata.knowledge_version !== 'string')) return [{ json: fail(422) }];\n}\nreturn [{ json: {\n  valid: true,\n  signature_input: timestampHeader + '.' + rawBody,\n  received_signature: signature,\n  payload: body,\n  config: { max_request_age_seconds: MAX_REQUEST_AGE_SECONDS, max_clock_skew_seconds: MAX_CLOCK_SKEW_SECONDS, max_batch_documents: MAX_BATCH_DOCUMENTS, max_raw_bytes: MAX_RAW_BYTES },\n} }];"
       }
     },
     {
@@ -142,7 +142,7 @@
         -40
       ],
       "parameters": {
-        "jsCode": "const crypto = require('crypto');\nconst original = $('Validate Raw Request').first().json;\nconst expected = String($input.first().json.expected_signature ?? '').toLowerCase();\nconst received = String(original.received_signature ?? '').toLowerCase();\nlet signatureValid = false;\nif (/^[a-f0-9]{64}$/.test(expected) && /^[a-f0-9]{64}$/.test(received)) {\n  signatureValid = crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(received, 'hex'));\n}\nconst { signature_input, received_signature, ...safe } = original;\nreturn [{ json: { ...safe, signature_valid: signatureValid, status_code: signatureValid ? 200 : 401, response: signatureValid ? undefined : {\"answer\":\"Solicitud no autorizada.\",\"confidence\":0,\"steps\":[],\"suggestions\":[],\"can_escalate\":false} } }];"
+        "jsCode": "const crypto = require('crypto');\nconst original = $('Validate Raw Request').first().json;\nconst expected = String($input.first().json.expected_signature ?? '').toLowerCase();\nconst received = String(original.received_signature ?? '').toLowerCase();\nlet signatureValid = false;\nif (/^[a-f0-9]{64}$/.test(expected) && /^[a-f0-9]{64}$/.test(received)) {\n  signatureValid = crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(received, 'hex'));\n}\nconst { signature_input, received_signature, ...safe } = original;\nreturn [{ json: { ...safe, signature_valid: signatureValid, status_code: signatureValid ? 200 : 401, response: signatureValid ? undefined : { ok: false, request_id: original.payload?.request_id ?? null, accepted: 0, rejected: Array.isArray(original.payload?.documents) ? original.payload.documents.length : 0, checksum: original.payload?.checksum ?? null, knowledge_version: original.payload?.knowledge_version ?? null, activated: false } } }];"
       }
     },
     {
@@ -246,7 +246,7 @@
         -120
       ],
       "parameters": {
-        "jsCode": "const original = $('Constant Time Signature Check').first().json;\nconst current = $input.first().json ?? {};\nconst errorText = JSON.stringify(current.error ?? current).toUpperCase();\nconst rateLimited = errorText.includes('MEDIFLOW_RATE_LIMITED');\nconst conflict = errorText.includes('DUPLICATE') || errorText.includes('23505') || errorText.includes('CONFLICT') || errorText.includes('ALREADY EXISTS');\nconst stored = current.request_id === original.payload.request_id;\nconst hasError = !stored || Boolean(current.error) || rateLimited || conflict;\nconst internalFailure = hasError && !rateLimited && !conflict;\nreturn [{ json: {\n  ...original,\n  nonce_accepted: !hasError,\n  status_code: rateLimited ? 429 : (conflict ? 409 : 200),\n  response: hasError ? (internalFailure ? { ok: false, request_id: original.payload.request_id, accepted: 0, rejected: Array.isArray(original.payload.documents) ? original.payload.documents.length : 0, checksum: original.payload.checksum, knowledge_version: original.payload.knowledge_version, activated: false } : {\"answer\":\"Solicitud no autorizada.\",\"confidence\":0,\"steps\":[],\"suggestions\":[],\"can_escalate\":false}) : undefined,\n  safe_error_code: rateLimited ? 'RATE_LIMITED' : (conflict ? 'REPLAY' : (hasError ? 'NONCE_ERROR' : null)),\n} }];"
+        "jsCode": "const original = $('Constant Time Signature Check').first().json;\nconst current = $input.first().json ?? {};\nconst errorText = JSON.stringify(current.error ?? current).toUpperCase();\nconst rateLimited = errorText.includes('MEDIFLOW_RATE_LIMITED');\nconst conflict = errorText.includes('DUPLICATE') || errorText.includes('23505') || errorText.includes('CONFLICT') || errorText.includes('ALREADY EXISTS');\nconst stored = current.request_id === original.payload.request_id;\nconst hasError = !stored || Boolean(current.error) || rateLimited || conflict;\nconst internalFailure = hasError && !rateLimited && !conflict;\nreturn [{ json: {\n  ...original,\n  nonce_accepted: !hasError,\n  status_code: rateLimited ? 429 : (conflict ? 409 : 200),\n  response: hasError ? (internalFailure ? { ok: false, request_id: original.payload.request_id, accepted: 0, rejected: Array.isArray(original.payload.documents) ? original.payload.documents.length : 0, checksum: original.payload.checksum, knowledge_version: original.payload.knowledge_version, activated: false } : { ok: false, request_id: original.payload.request_id, accepted: 0, rejected: Array.isArray(original.payload.documents) ? original.payload.documents.length : 0, checksum: original.payload.checksum, knowledge_version: original.payload.knowledge_version, activated: false }) : undefined,\n  safe_error_code: rateLimited ? 'RATE_LIMITED' : (conflict ? 'REPLAY' : (hasError ? 'NONCE_ERROR' : null)),\n} }];"
       }
     },
     {
@@ -311,14 +311,14 @@
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const request = $('Constant Time Signature Check').first().json;\nreturn request.payload.documents.map((document) => ({ json: { content: document.content, metadata: { ...document.metadata, document_id: document.document_id, checksum: request.payload.checksum } } }));"
+        "jsCode": "const createRequestContext = function createRequestContext(payload, provider) {\n    return {\n        request_id: payload?.request_id ?? null,\n        provider,\n        checksum: payload?.checksum ?? null,\n        knowledge_version: payload?.knowledge_version ?? null,\n        batch_index: payload?.batch_index ?? null,\n        batch_count: payload?.batch_count ?? null,\n        document_count: payload?.document_count ?? null,\n        batch_document_count: Array.isArray(payload?.documents) ? payload.documents.length : 0,\n        full_manifest: payload?.full_manifest === true,\n    };\n};\nconst buildLoopItems = function buildLoopItems(payload, provider) {\n    const request = createRequestContext(payload, provider);\n\n    return (Array.isArray(payload?.documents) ? payload.documents : []).map((document) => ({\n        // This per-item value is the minimum integrity evidence that lets the\n        // done output reject a foreign result without copying the whole batch.\n        request: { ...request, expected_document_id: document.document_id },\n        document: {\n            document_id: document.document_id,\n            content: document.content,\n            metadata: { ...document.metadata },\n        },\n    }));\n};\nconst initial = $('Constant Time Signature Check').first().json;\nreturn buildLoopItems(initial.payload, \"gemini\").map((json, index) => ({ json, pairedItem: { item: index } }));"
       }
     },
     {
       "id": "loop-documents",
       "name": "Loop Over Documents",
       "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3.4,
+      "typeVersion": 3,
       "position": [
         1240,
         -120
@@ -329,117 +329,17 @@
       }
     },
     {
-      "id": "insert-vector-supabase",
-      "name": "Supabase Vector Store Insert",
-      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
-      "typeVersion": 1.3,
-      "position": [
-        1420,
-        -120
-      ],
-      "parameters": {
-        "mode": "insert",
-        "tableName": {
-          "__rl": true,
-          "value": "assistant_documents_gemini_3072",
-          "mode": "list",
-          "cachedResultName": "assistant_documents_gemini_3072"
-        },
-        "options": {
-          "queryName": "match_assistant_documents_gemini"
-        }
-      },
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "emb-ingest",
-      "name": "Embeddings Gemini",
-      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
-      "typeVersion": 1,
-      "position": [
-        1260,
-        120
-      ],
-      "parameters": {
-        "modelName": "models/gemini-embedding-001",
-        "options": {}
-      }
-    },
-    {
-      "id": "loader-ingest",
-      "name": "Default Data Loader",
-      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
-      "typeVersion": 1.1,
-      "position": [
-        1500,
-        780
-      ],
-      "parameters": {
-        "dataType": "json",
-        "jsonMode": "expressionData",
-        "jsonData": "={{ $json.content }}",
-        "textSplittingMode": "custom",
-        "options": {
-          "metadata": {
-            "metadataValues": [
-              {
-                "name": "document_id",
-                "value": "={{ $json.metadata.document_id }}"
-              },
-              {
-                "name": "entry_id",
-                "value": "={{ $json.metadata.entry_id }}"
-              },
-              {
-                "name": "role",
-                "value": "={{ $json.metadata.role }}"
-              },
-              {
-                "name": "modules",
-                "value": "={{ JSON.stringify($json.metadata.modules) }}"
-              },
-              {
-                "name": "locale",
-                "value": "={{ $json.metadata.locale }}"
-              },
-              {
-                "name": "status",
-                "value": "={{ $json.metadata.status }}"
-              },
-              {
-                "name": "knowledge_version",
-                "value": "={{ String($json.metadata.knowledge_version) }}"
-              },
-              {
-                "name": "requires_online",
-                "value": "={{ String($json.metadata.requires_online) }}"
-              },
-              {
-                "name": "source",
-                "value": "={{ $json.metadata.source }}"
-              },
-              {
-                "name": "checksum",
-                "value": "={{ $json.metadata.checksum }}"
-              }
-            ]
-          }
-        }
-      }
-    },
-    {
       "id": "check-ingest",
       "name": "Check Ingest Result",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1660,
+        2100,
         -120
       ],
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const request = $('Constant Time Signature Check').first().json;\nconst results = $input.all();\nconst errors = results.filter((item) => item.json?.error).length;\nconst completed = errors === 0 && results.length === request.payload.documents.length;\nreturn [{ json: { ...request, ingest_ok: completed, accepted: completed ? request.payload.documents.length : 0, rejected: completed ? 0 : request.payload.documents.length, is_final_batch: request.payload.batch_index === request.payload.batch_count - 1 } }];"
+        "jsCode": "const DOCUMENT_RESULT_KEYS = [\"document_id\",\"checksum\",\"storage_status\",\"confirmed\"];\nconst BASE_REQUEST_CONTEXT_KEYS = [\"request_id\",\"provider\",\"checksum\",\"knowledge_version\",\"batch_index\",\"batch_count\",\"document_count\",\"batch_document_count\",\"full_manifest\"];\nconst REQUEST_CONTEXT_KEYS = [\"request_id\",\"provider\",\"checksum\",\"knowledge_version\",\"batch_index\",\"batch_count\",\"document_count\",\"batch_document_count\",\"full_manifest\",\"expected_document_id\"];\nconst CONFIRMED_STORAGE_STATUSES = new Set(['inserted', 'already_present']);\nconst sameRequest = function sameRequest(left, right) {\n    if (!left || !right) return false;\n\n    return BASE_REQUEST_CONTEXT_KEYS.every((key) => left[key] === right[key]);\n};\nconst evaluateIngestItems = function evaluateIngestItems(items) {\n    const values = Array.isArray(items) ? items : [];\n    const request = values[0]?.request ?? null;\n    const batchDocumentCount = Number.isInteger(request?.batch_document_count)\n        ? request.batch_document_count\n        : 0;\n    const expectedIds = values.map((item) => item?.request?.expected_document_id);\n    const expectedSet = new Set(expectedIds);\n    const seen = new Set();\n    let inserted = 0;\n    let alreadyPresent = 0;\n    let invalid = false;\n    const exactRequest = request\n        && !Array.isArray(request)\n        && Object.keys(request).length === REQUEST_CONTEXT_KEYS.length\n        && REQUEST_CONTEXT_KEYS.every((key) => Object.hasOwn(request, key));\n\n    if (!exactRequest\n        || batchDocumentCount < 1\n        || expectedIds.length !== batchDocumentCount\n        || expectedSet.size !== expectedIds.length\n        || values.length !== batchDocumentCount) {\n        invalid = true;\n    }\n\n    for (const item of values) {\n        const exactItem = item\n            && !Array.isArray(item)\n            && Object.keys(item).length === 2\n            && Object.hasOwn(item, 'request')\n            && Object.hasOwn(item, 'result');\n        const itemRequest = item?.request;\n        const exactItemRequest = itemRequest && Object.keys(itemRequest).length === REQUEST_CONTEXT_KEYS.length && REQUEST_CONTEXT_KEYS.every((key) => Object.hasOwn(itemRequest, key));\n        const result = item?.result;\n        const exactResult = result\n            && !Array.isArray(result)\n            && Object.keys(result).length === DOCUMENT_RESULT_KEYS.length\n            && DOCUMENT_RESULT_KEYS.every((key) => Object.hasOwn(result, key));\n        const documentId = result?.document_id;\n        const storageStatus = result?.storage_status;\n\n        if (!exactItem\n            || !exactItemRequest\n            || !sameRequest(request, itemRequest)\n            || !exactResult\n            || typeof itemRequest.expected_document_id !== 'string'\n            || itemRequest.expected_document_id.length === 0\n            || typeof documentId !== 'string'\n            || documentId.length === 0\n            || documentId !== itemRequest.expected_document_id\n            || seen.has(documentId)\n            || result.checksum !== request?.checksum\n            || result.confirmed !== true\n            || !CONFIRMED_STORAGE_STATUSES.has(storageStatus)) {\n            invalid = true;\n            continue;\n        }\n\n        seen.add(documentId);\n        if (storageStatus === 'inserted') inserted += 1;\n        if (storageStatus === 'already_present') alreadyPresent += 1;\n    }\n\n    if (seen.size !== expectedSet.size || expectedIds.some((documentId) => !seen.has(documentId))) {\n        invalid = true;\n    }\n\n    const ingestOk = !invalid;\n\n    return {\n        request,\n        ingest_ok: ingestOk,\n        inserted: ingestOk ? inserted : 0,\n        already_present: ingestOk ? alreadyPresent : 0,\n        failed: ingestOk ? 0 : batchDocumentCount,\n        accepted: ingestOk ? batchDocumentCount : 0,\n        rejected: ingestOk ? 0 : batchDocumentCount,\n        is_final_batch: Boolean(request && request.batch_index === request.batch_count - 1),\n    };\n};\nconst items = $input.all();\nreturn [{ json: evaluateIngestItems(items.map((item) => item.json)) }];"
       }
     },
     {
@@ -482,11 +382,11 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        2020,
+        2580,
         280
       ],
       "parameters": {
-        "jsCode": "const request = $json; return [{ json: { status_code: 200, response: { ok: false, request_id: request.payload.request_id, accepted: 0, rejected: request.payload.documents.length } } }];"
+        "jsCode": "const buildIngestResponse = function buildIngestResponse({ ok, request, accepted, rejected, activated = false }) {\n    return {\n        ok: ok === true,\n        request_id: request?.request_id ?? null,\n        accepted: Number.isInteger(accepted) ? accepted : 0,\n        rejected: Number.isInteger(rejected) ? rejected : 0,\n        checksum: request?.checksum ?? null,\n        knowledge_version: request?.knowledge_version ?? null,\n        activated: activated === true,\n    };\n};\nlet request = $json?.request ?? null;\nif (!request && $json?.payload) {\n  request = { request_id: $json.payload.request_id, checksum: $json.payload.checksum, knowledge_version: $json.payload.knowledge_version, batch_document_count: Array.isArray($json.payload.documents) ? $json.payload.documents.length : 0 };\n}\nif (!request) {\n  try { request = $('Loop Over Documents').item.json.request; } catch { request = null; }\n}\nif (!request) {\n  try {\n    const payload = $('Constant Time Signature Check').first().json.payload;\n    request = { request_id: payload.request_id, checksum: payload.checksum, knowledge_version: payload.knowledge_version, batch_document_count: Array.isArray(payload.documents) ? payload.documents.length : 0 };\n  } catch { request = null; }\n}\nconst rejected = Number.isInteger(request?.batch_document_count) ? request.batch_document_count : 0;\nreturn [{ json: { status_code: 200, response: buildIngestResponse({ ok: false, request, accepted: 0, rejected, activated: false }) } }];"
       }
     },
     {
@@ -541,21 +441,6 @@
       }
     },
     {
-      "id": "splitter-ingest",
-      "name": "Document Unit Splitter",
-      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
-      "typeVersion": 1,
-      "position": [
-        1500,
-        960
-      ],
-      "parameters": {
-        "chunkSize": 12000,
-        "chunkOverlap": 0,
-        "options": {}
-      }
-    },
-    {
       "id": "build-ingest-summary",
       "name": "Build Ingest Summary",
       "type": "n8n-nodes-base.code",
@@ -565,7 +450,7 @@
         -40
       ],
       "parameters": {
-        "jsCode": "const request = $('Check Ingest Result').first().json;\nconst activated = request.is_final_batch ? $json.manifest_activated === true : false; return [{ json: { status_code: 200, response: { ok: true, request_id: request.payload.request_id, accepted: request.accepted, rejected: request.rejected, checksum: request.payload.checksum, knowledge_version: request.payload.knowledge_version, activated } } }];"
+        "jsCode": "const buildIngestResponse = function buildIngestResponse({ ok, request, accepted, rejected, activated = false }) {\n    return {\n        ok: ok === true,\n        request_id: request?.request_id ?? null,\n        accepted: Number.isInteger(accepted) ? accepted : 0,\n        rejected: Number.isInteger(rejected) ? rejected : 0,\n        checksum: request?.checksum ?? null,\n        knowledge_version: request?.knowledge_version ?? null,\n        activated: activated === true,\n    };\n};\nconst outcome = $('Check Ingest Result').first().json;\nconst activated = outcome.is_final_batch ? $json.manifest_activated === true : false;\nreturn [{ json: { status_code: 200, response: buildIngestResponse({ ok: true, request: outcome.request, accepted: outcome.accepted, rejected: outcome.rejected, activated }) } }];"
       }
     },
     {
@@ -586,112 +471,429 @@
       }
     },
     {
+      "id": "check-existing-document",
+      "name": "Check Existing Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1380,
+        -300
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Ingest Endpoint Configuration').first().json.supabase_base_url + \"/rest/v1/assistant_documents_gemini_3072\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "document_id,knowledge_checksum"
+            },
+            {
+              "name": "document_id",
+              "value": "={{ \"eq.\" + $json.document.document_id }}"
+            },
+            {
+              "name": "knowledge_checksum",
+              "value": "={{ \"eq.\" + $json.request.checksum }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "classify-existing-document",
+      "name": "Classify Existing Document",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        -300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const context = $('Loop Over Documents').item.json; const rawRows = $input.all().map((item) => item.json ?? {}); const rows = rawRows.flatMap((value) => Array.isArray(value) ? value : (Array.isArray(value?.data) ? value.data : [value])); const row = rows.length === 1 ? rows[0] : {}; const alreadyPresent = rows.length === 1 && row.document_id === context.document.document_id && row.knowledge_checksum === context.request.checksum; return [{ json: { ...context, already_present: alreadyPresent } }];"
+      }
+    },
+    {
+      "id": "if-existing-document",
+      "name": "Document Is Already Present",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1700,
+        -300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.already_present === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "build-existing-result",
+      "name": "Build Already Present Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1860,
+        -380
+      ],
+      "parameters": {
+        "jsCode": "const buildDocumentResultItem = function buildDocumentResultItem(context, storageStatus, confirmed) {\n    return {\n        request: { ...context.request },\n        result: {\n            document_id: context.document.document_id,\n            checksum: context.request.checksum,\n            storage_status: storageStatus,\n            confirmed,\n        },\n    };\n};\nreturn [{ json: buildDocumentResultItem($json, \"already_present\", true) }];"
+      }
+    },
+    {
+      "id": "generate-embedding",
+      "name": "Generate Document Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1860,
+        -220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.document.content }] }, taskType: 'RETRIEVAL_DOCUMENT', outputDimensionality: 3072 }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "validate-embedding",
+      "name": "Validate Document Embedding",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        -220
+      ],
+      "parameters": {
+        "jsCode": "const validateEmbeddingValues = function validateEmbeddingValues(values, expectedDimensions) {\n    if (!Array.isArray(values)) {\n        return { valid: false, code: 'EMBEDDING_NOT_ARRAY' };\n    }\n    if (values.length !== expectedDimensions) {\n        return { valid: false, code: 'EMBEDDING_DIMENSIONS_INVALID' };\n    }\n    if (!values.every((value) => typeof value === 'number' && Number.isFinite(value))) {\n        return { valid: false, code: 'EMBEDDING_VALUES_INVALID' };\n    }\n\n    return { valid: true, code: null };\n};\nconst context = $('Classify Existing Document').item.json;\nconst values = $json?.embedding?.values;\nconst validation = validateEmbeddingValues(values, 3072);\nreturn [{ json: validation.valid\n  ? { ...context, embedding: values, embedding_valid: true }\n  : { ...context, embedding_valid: false, failure_code: validation.code }\n}];"
+      }
+    },
+    {
+      "id": "if-embedding-valid",
+      "name": "Embedding Is Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2180,
+        -220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.embedding_valid === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "call-rpc",
+      "name": "Call Idempotent Supabase RPC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2340,
+        -220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Ingest Endpoint Configuration').first().json.supabase_base_url + \"/rest/v1/rpc/upsert_assistant_document_gemini\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ content: $json.document.content, metadata: { ...$json.document.metadata, document_id: $json.document.document_id, checksum: $json.request.checksum }, embedding: $json.embedding }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "validate-rpc",
+      "name": "Validate RPC Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2500,
+        -220
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const context = $('Validate Document Embedding').item.json;\nconst responses = $input.all().map((item) => item.json);\nconst response = responses.length === 1 && Array.isArray(responses[0]) && responses[0].length === 1 ? responses[0][0] : responses[0];\nconst required = ['document_id', 'checksum', 'storage_status', 'confirmed'];\nconst exact = responses.length === 1 && response && !Array.isArray(response) && typeof response === 'object' && Object.keys(response).length === required.length && required.every((key) => Object.hasOwn(response, key));\nconst valid = exact\n  && response.document_id === context.document.document_id\n  && response.checksum === context.request.checksum\n  && ['inserted', 'already_present'].includes(response.storage_status)\n  && response.confirmed === true;\nconst { embedding, ...safeContext } = context;\nreturn [{ json: valid\n  ? { ...safeContext, rpc_valid: true, rpc_result: { document_id: response.document_id, checksum: response.checksum, storage_status: response.storage_status, confirmed: true } }\n  : { ...safeContext, rpc_valid: false }\n}];"
+      }
+    },
+    {
+      "id": "if-rpc-valid",
+      "name": "RPC Result Is Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2660,
+        -220
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ $json.rpc_valid === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "confirm-stored-document",
+      "name": "Confirm Stored Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2820,
+        -220
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Ingest Endpoint Configuration').first().json.supabase_base_url + \"/rest/v1/assistant_documents_gemini_3072\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "select",
+              "value": "document_id,knowledge_checksum"
+            },
+            {
+              "name": "document_id",
+              "value": "={{ \"eq.\" + $json.document.document_id }}"
+            },
+            {
+              "name": "knowledge_checksum",
+              "value": "={{ \"eq.\" + $json.request.checksum }}"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "build-inserted-result",
+      "name": "Build Inserted Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2980,
+        -220
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const buildDocumentResultItem = function buildDocumentResultItem(context, storageStatus, confirmed) {\n    return {\n        request: { ...context.request },\n        result: {\n            document_id: context.document.document_id,\n            checksum: context.request.checksum,\n            storage_status: storageStatus,\n            confirmed,\n        },\n    };\n};\nconst context = $('Validate RPC Result').item.json;\nconst rawRows = $input.all().map((item) => item.json ?? {});\nconst rows = rawRows.flatMap((value) => Array.isArray(value) ? value : (Array.isArray(value?.data) ? value.data : [value]));\nconst row = rows.length === 1 ? rows[0] : {};\nconst rpc = context.rpc_result ?? {};\nconst confirmed = rows.length === 1\n  && row.document_id === context.document.document_id\n  && row.knowledge_checksum === context.request.checksum\n  && rpc.document_id === context.document.document_id\n  && rpc.checksum === context.request.checksum\n  && ['inserted', 'already_present'].includes(rpc.storage_status)\n  && rpc.confirmed === true;\nreturn [{ json: buildDocumentResultItem(context, confirmed ? rpc.storage_status : 'failed', confirmed) }];"
+      }
+    },
+    {
+      "id": "ingest-endpoint-config",
+      "name": "Ingest Endpoint Configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        -120
+      ],
+      "parameters": {
+        "jsCode": "const supabaseBaseUrl = 'https://your-project.supabase.co';\\nif (supabaseBaseUrl === 'https://your-project.supabase.co' || !/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/i.test(supabaseBaseUrl)) {\\n  throw new Error('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED');\\n}\\nreturn [{ json: { ...$json, supabase_base_url: supabaseBaseUrl } }];"
+      }
+    },
+    {
+      "id": "build-failed-result",
+      "name": "Build Failed Document Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2820,
+        40
+      ],
+      "parameters": {
+        "jsCode": "const buildDocumentResultItem = function buildDocumentResultItem(context, storageStatus, confirmed) {\n    return {\n        request: { ...context.request },\n        result: {\n            document_id: context.document.document_id,\n            checksum: context.request.checksum,\n            storage_status: storageStatus,\n            confirmed,\n        },\n    };\n};\nlet context = $json?.request && $json?.document ? $json : null;\nif (!context) {\n  try { context = $('Loop Over Documents').item.json; } catch { context = null; }\n}\nif (!context?.request || !context?.document) throw new Error('MEDIFLOW_INGEST_CONTEXT_MISSING');\nreturn [{ json: buildDocumentResultItem(context, 'failed', false) }];"
+      }
+    },
+    {
+      "id": "if-document-result",
+      "name": "Document Result Confirmed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3140,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "condition",
+              "leftValue": "={{ ['inserted', 'already_present'].includes($json.result?.storage_status) && $json.result?.confirmed === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
       "id": "record-batch",
       "name": "Record Ingest Batch Receipt",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         1940,
         -180
       ],
       "parameters": {
-        "operation": "create",
-        "tableId": "assistant_ingest_batches",
-        "fieldsUi": {
-          "fieldValues": [
-            {
-              "fieldId": "request_id",
-              "fieldValue": "={{ $('Check Ingest Result').first().json.payload.request_id }}"
-            },
-            {
-              "fieldId": "provider",
-              "fieldValue": "gemini"
-            },
-            {
-              "fieldId": "checksum",
-              "fieldValue": "={{ $('Check Ingest Result').first().json.payload.checksum }}"
-            },
-            {
-              "fieldId": "knowledge_version",
-              "fieldValue": "={{ String($('Check Ingest Result').first().json.payload.knowledge_version) }}"
-            },
-            {
-              "fieldId": "batch_index",
-              "fieldValue": "={{ $('Check Ingest Result').first().json.payload.batch_index }}"
-            },
-            {
-              "fieldId": "batch_count",
-              "fieldValue": "={{ $('Check Ingest Result').first().json.payload.batch_count }}"
-            },
-            {
-              "fieldId": "document_count",
-              "fieldValue": "={{ $('Check Ingest Result').first().json.payload.document_count }}"
-            },
-            {
-              "fieldId": "accepted_count",
-              "fieldValue": "={{ $('Check Ingest Result').first().json.accepted }}"
-            },
-            {
-              "fieldId": "full_manifest",
-              "fieldValue": "={{ $('Check Ingest Result').first().json.payload.full_manifest }}"
+        "method": "POST",
+        "url": "={{ $('Ingest Endpoint Configuration').first().json.supabase_base_url + \"/rest/v1/rpc/record_assistant_ingest_batch_receipt\" }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ request_id: $json.request.request_id, provider: \"gemini\", checksum: $json.request.checksum, knowledge_version: String($json.request.knowledge_version), batch_index: $json.request.batch_index, batch_count: $json.request.batch_count, document_count: $json.request.document_count, accepted_count: $json.accepted, full_manifest: $json.request.full_manifest }) }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
             }
-          ]
+          }
         }
       },
       "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
+      "onError": "continueErrorOutput"
     },
     {
-      "id": "get-batch",
-      "name": "Get Stored Batch Receipt",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
+      "id": "validate-batch",
+      "name": "Validate Batch Receipt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
       "position": [
         2100,
         -180
       ],
       "parameters": {
-        "operation": "getAll",
-        "tableId": "assistant_ingest_batches",
-        "returnAll": false,
-        "limit": 1,
-        "filterType": "manual",
-        "matchType": "allFilters",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "provider",
-              "condition": "eq",
-              "keyValue": "gemini"
-            },
-            {
-              "keyName": "checksum",
-              "condition": "eq",
-              "keyValue": "={{ $('Check Ingest Result').first().json.payload.checksum }}"
-            },
-            {
-              "keyName": "batch_index",
-              "condition": "eq",
-              "keyValue": "={{ $('Check Ingest Result').first().json.payload.batch_index }}"
-            }
-          ]
-        }
-      },
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "confirm-batch",
-      "name": "Confirm Batch Receipt",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2260,
-        -180
-      ],
-      "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "const request = $('Check Ingest Result').first().json;\nconst rows = $input.all().map((item) => item.json ?? {});\nconst receipt = rows.find((row) => row.provider === \"gemini\" && row.checksum === request.payload.checksum && Number(row.batch_index) === request.payload.batch_index && Number(row.batch_count) === request.payload.batch_count && Number(row.document_count) === request.payload.document_count && Number(row.accepted_count) === request.accepted && String(row.knowledge_version) === String(request.payload.knowledge_version) && row.full_manifest === request.payload.full_manifest && !row.error);\nreturn [{ json: { ...request, batch_receipt_stored: Boolean(receipt) } }];"
+        "jsCode": "const validateIngestReceipt = function validateIngestReceipt(response, outcome, provider) {\n    const request = outcome?.request;\n\n    return Boolean(\n        response\n        && !Array.isArray(response)\n        && Object.keys(response).length === INGEST_RECEIPT_KEYS.length\n        && INGEST_RECEIPT_KEYS.every((key) => Object.hasOwn(response, key))\n        && response.provider === provider\n        && response.checksum === request?.checksum\n        && String(response.knowledge_version) === String(request?.knowledge_version)\n        && Number.isInteger(response.batch_index)\n        && response.batch_index === request?.batch_index\n        && Number.isInteger(response.batch_count)\n        && response.batch_count === request?.batch_count\n        && Number.isInteger(response.document_count)\n        && response.document_count === request?.document_count\n        && Number.isInteger(response.accepted_count)\n        && response.accepted_count === outcome?.accepted\n        && response.full_manifest === request?.full_manifest\n        && ['inserted', 'already_present'].includes(response.receipt_status)\n        && typeof response.manifest_activated === 'boolean'\n        && (!response.manifest_activated || request?.batch_index === request?.batch_count - 1)\n    );\n};\\nconst outcome = $('Check Ingest Result').first().json;\\nconst rawResponses = $input.all().map((item) => item.json ?? {});\\nconst responses = rawResponses.flatMap((value) => Array.isArray(value) ? value : (Array.isArray(value?.data) ? value.data : [value]));\\nconst response = responses.length === 1 ? responses[0] : null;\\nconst receiptValid = validateIngestReceipt(response, outcome, \"gemini\");\\nreturn [{ json: { ...outcome, receipt_valid: receiptValid, manifest_activated: receiptValid && response.manifest_activated === true } }];"
       }
     },
     {
@@ -726,49 +928,6 @@
           "combinator": "and"
         },
         "options": {}
-      }
-    },
-    {
-      "id": "get-manifest-ingest",
-      "name": "Get Activated Knowledge Manifest",
-      "type": "n8n-nodes-base.supabase",
-      "typeVersion": 1,
-      "position": [
-        2260,
-        -300
-      ],
-      "parameters": {
-        "operation": "getAll",
-        "tableId": "assistant_knowledge_manifests",
-        "returnAll": false,
-        "limit": 1,
-        "filterType": "manual",
-        "matchType": "allFilters",
-        "filters": {
-          "conditions": [
-            {
-              "keyName": "provider",
-              "condition": "eq",
-              "keyValue": "gemini"
-            }
-          ]
-        }
-      },
-      "alwaysOutputData": true,
-      "onError": "continueRegularOutput"
-    },
-    {
-      "id": "confirm-manifest",
-      "name": "Confirm Manifest Activation",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2420,
-        -300
-      ],
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "const request = $('Check Ingest Result').first().json;\nconst rows = $input.all().map((item) => item.json ?? {});\nconst activated = rows.some((row) => row.provider === \"gemini\" && row.active_checksum === request.payload.checksum && Number(row.document_count) === request.payload.document_count && String(row.knowledge_version) === String(request.payload.knowledge_version) && !row.error);\nreturn [{ json: { ...request, manifest_activated: activated } }];"
       }
     },
     {
@@ -924,7 +1083,7 @@
       "main": [
         [
           {
-            "node": "Convert Documents",
+            "node": "Ingest Endpoint Configuration",
             "type": "main",
             "index": 0
           }
@@ -932,6 +1091,17 @@
         [
           {
             "node": "Respond Replay Or Rate Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest Endpoint Configuration": {
+      "main": [
+        [
+          {
+            "node": "Convert Documents",
             "type": "main",
             "index": 0
           }
@@ -960,18 +1130,217 @@
         ],
         [
           {
-            "node": "Supabase Vector Store Insert",
+            "node": "Check Existing Document",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Supabase Vector Store Insert": {
+    "Check Existing Document": {
+      "main": [
+        [
+          {
+            "node": "Classify Existing Document",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Failed Document Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Existing Document": {
+      "main": [
+        [
+          {
+            "node": "Document Is Already Present",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Is Already Present": {
+      "main": [
+        [
+          {
+            "node": "Build Already Present Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Generate Document Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Already Present Result": {
+      "main": [
+        [
+          {
+            "node": "Document Result Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Document Embedding": {
+      "main": [
+        [
+          {
+            "node": "Validate Document Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Failed Document Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Document Embedding": {
+      "main": [
+        [
+          {
+            "node": "Embedding Is Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embedding Is Valid": {
+      "main": [
+        [
+          {
+            "node": "Call Idempotent Supabase RPC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Failed Document Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Idempotent Supabase RPC": {
+      "main": [
+        [
+          {
+            "node": "Validate RPC Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Failed Document Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate RPC Result": {
+      "main": [
+        [
+          {
+            "node": "RPC Result Is Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RPC Result Is Valid": {
+      "main": [
+        [
+          {
+            "node": "Confirm Stored Document",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Failed Document Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Stored Document": {
+      "main": [
+        [
+          {
+            "node": "Build Inserted Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Failed Document Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Inserted Result": {
+      "main": [
+        [
+          {
+            "node": "Document Result Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Failed Document Result": {
+      "main": [
+        [
+          {
+            "node": "Document Result Confirmed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Document Result Confirmed": {
       "main": [
         [
           {
             "node": "Loop Over Documents",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Ingest Safe Error",
             "type": "main",
             "index": 0
           }
@@ -1018,62 +1387,25 @@
         ]
       ]
     },
-    "Embeddings Gemini": {
-      "ai_embedding": [
-        [
-          {
-            "node": "Supabase Vector Store Insert",
-            "type": "ai_embedding",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Default Data Loader": {
-      "ai_document": [
-        [
-          {
-            "node": "Supabase Vector Store Insert",
-            "type": "ai_document",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Document Unit Splitter": {
-      "ai_textSplitter": [
-        [
-          {
-            "node": "Default Data Loader",
-            "type": "ai_textSplitter",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Record Ingest Batch Receipt": {
       "main": [
         [
           {
-            "node": "Get Stored Batch Receipt",
+            "node": "Validate Batch Receipt",
             "type": "main",
             "index": 0
           }
-        ]
-      ]
-    },
-    "Get Stored Batch Receipt": {
-      "main": [
+        ],
         [
           {
-            "node": "Confirm Batch Receipt",
+            "node": "Build Ingest Safe Error",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Confirm Batch Receipt": {
+    "Validate Batch Receipt": {
       "main": [
         [
           {
@@ -1106,7 +1438,7 @@
       "main": [
         [
           {
-            "node": "Get Activated Knowledge Manifest",
+            "node": "Manifest Was Activated",
             "type": "main",
             "index": 0
           }
@@ -1114,28 +1446,6 @@
         [
           {
             "node": "Build Ingest Summary",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Activated Knowledge Manifest": {
-      "main": [
-        [
-          {
-            "node": "Confirm Manifest Activation",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Confirm Manifest Activation": {
-      "main": [
-        [
-          {
-            "node": "Manifest Was Activated",
             "type": "main",
             "index": 0
           }

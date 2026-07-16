@@ -1,0 +1,5 @@
+{
+  "workflow": "mediflow-assistant-ingest-supabase-openai.json",
+  "mutation": "set-loop-version",
+  "typeVersion": 3.4
+}

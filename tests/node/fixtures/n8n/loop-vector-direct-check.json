@@ -1,0 +1,4 @@
+{
+  "workflow": "mediflow-assistant-ingest-supabase-openai.json",
+  "mutation": "connect-vector-directly-to-check"
+}

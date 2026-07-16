@@ -107,7 +107,7 @@ class AssistantN8nFinalSecurityTest extends TestCase
         );
 
         $this->assertFalse($result['success']);
-        $this->assertSame('INVALID_INGEST_RESPONSE', $result['error_code']);
+        $this->assertSame('INGEST_INVALID_RESPONSE_TYPES', $result['error_code']);
         $this->assertSame(0, $result['accepted']);
         $this->assertSame(0, $result['rejected']);
         $this->assertSame(100, $result['documents_sent']);

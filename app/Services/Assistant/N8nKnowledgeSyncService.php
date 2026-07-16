@@ -120,20 +120,26 @@ final class N8nKnowledgeSyncService
                 }
 
                 $responseData = $response->json();
-                if (! $this->validResponse(
+                $responseError = $this->responseValidationError(
                     $responseData,
                     $requestId,
                     count($documentsBatch),
                     $package,
                     $batchIndex === $batchCount - 1,
-                )) {
-                    $lastCode = 'INVALID_INGEST_RESPONSE';
+                );
+
+                if ($responseError !== null) {
+                    $lastCode = $responseError;
                     [$partialAccepted, $partialRejected] = $this->safePartialCounts(
                         $responseData,
                         count($documentsBatch),
                         $requestId,
                         $package,
                     );
+                    $responseData = null;
+                } elseif (($responseData['ok'] ?? null) === false) {
+                    $lastCode = $responseData['rejected'] > 0 ? 'INGEST_BATCH_REJECTED' : 'INGEST_REMOTE_REJECTED';
+                    [$partialAccepted, $partialRejected] = $this->safePartialCounts($responseData, count($documentsBatch), $requestId, $package);
                     $responseData = null;
                 }
 
@@ -193,32 +199,47 @@ final class N8nKnowledgeSyncService
      * @param  mixed  $data
      * @param  array<string, mixed>  $package
      */
-    private function validResponse(
+    private function responseValidationError(
         mixed $data,
         string $requestId,
         int $batchDocumentCount,
         array $package,
         bool $isFinalBatch,
-    ): bool {
-        if (! is_array($data)
-            || count($data) !== 7
-            || array_diff(array_keys($data), [
-                'ok', 'request_id', 'accepted', 'rejected',
-                'checksum', 'knowledge_version', 'activated',
-            ]) !== []
-            || ($data['ok'] ?? null) !== true
-            || ($data['request_id'] ?? null) !== $requestId
-            || ! is_int($data['accepted'] ?? null)
-            || ! is_int($data['rejected'] ?? null)
-            || $data['accepted'] !== $batchDocumentCount
-            || $data['rejected'] !== 0
-            || ($data['checksum'] ?? null) !== $package['checksum']
-            || (string) ($data['knowledge_version'] ?? '') !== (string) $package['knowledge_version']
-            || ! is_bool($data['activated'] ?? null)) {
-            return false;
+    ): ?string {
+        $expectedKeys = ['ok', 'request_id', 'accepted', 'rejected', 'checksum', 'knowledge_version', 'activated'];
+
+        if (! is_array($data) || count($data) !== 7 || array_diff(array_keys($data), $expectedKeys) !== []) {
+            return 'INGEST_INVALID_RESPONSE_SHAPE';
         }
 
-        return $isFinalBatch ? $data['activated'] === true : $data['activated'] === false;
+        if (! is_bool($data['ok'] ?? null)
+            || ! is_string($data['request_id'] ?? null)
+            || preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $data['request_id']) !== 1
+            || $data['request_id'] !== $requestId
+            || ! is_int($data['accepted'] ?? null)
+            || ! is_int($data['rejected'] ?? null)
+            || ! is_int($data['knowledge_version'] ?? null)
+            || ! is_string($data['checksum'] ?? null)
+            || preg_match('/^[a-f0-9]{64}$/', $data['checksum']) !== 1
+            || $data['checksum'] !== $package['checksum']
+            || (string) $data['knowledge_version'] !== (string) $package['knowledge_version']
+            || ! is_bool($data['activated'] ?? null)) {
+            return 'INGEST_INVALID_RESPONSE_TYPES';
+        }
+
+        if ($data['accepted'] < 0 || $data['rejected'] < 0 || $data['accepted'] + $data['rejected'] !== $batchDocumentCount) {
+            return 'INGEST_INVALID_RESPONSE_TYPES';
+        }
+
+        if ($data['ok'] === false) return null;
+
+        if ($data['accepted'] !== $batchDocumentCount || $data['rejected'] !== 0) return 'INGEST_BATCH_REJECTED';
+
+        if ($isFinalBatch && $data['activated'] !== true) return 'INGEST_MANIFEST_NOT_ACTIVATED';
+
+        if (! $isFinalBatch && $data['activated'] !== false) return 'INGEST_BATCH_REJECTED';
+
+        return null;
     }
 
     /**
@@ -227,19 +248,15 @@ final class N8nKnowledgeSyncService
      */
     private function safePartialCounts(mixed $data, int $batchDocumentCount, string $requestId, array $package): array
     {
-        if (! is_array($data)
-            || ($data['request_id'] ?? null) !== $requestId
-            || ($data['checksum'] ?? null) !== $package['checksum']
-            || (string) ($data['knowledge_version'] ?? '') !== (string) $package['knowledge_version']
-            || ! is_int($data['accepted'] ?? null)
-            || ! is_int($data['rejected'] ?? null)
-            || $data['accepted'] < 0
-            || $data['rejected'] < 0
-            || $data['accepted'] + $data['rejected'] > $batchDocumentCount) {
+        if ($this->responseValidationError($data, $requestId, $batchDocumentCount, $package, false) !== null
+            || ! is_array($data)
+            || ($data['ok'] ?? null) !== false) {
             return [0, 0];
         }
 
-        return [$data['accepted'], $data['rejected']];
+        // A failed batch can report rejected documents, but it must never
+        // increase the accepted total without confirmed remote success.
+        return [0, $data['rejected']];
     }
 
     /** @return array<string, mixed> */

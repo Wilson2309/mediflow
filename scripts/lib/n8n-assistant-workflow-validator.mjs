@@ -3,6 +3,29 @@ const RESPOND_TYPE = 'n8n-nodes-base.respondToWebhook';
 const CRYPTO_TYPE = 'n8n-nodes-base.crypto';
 const STICKY_NOTE_TYPE = 'n8n-nodes-base.stickyNote';
 const LOOP_OVER_ITEMS_TYPE = 'n8n-nodes-base.splitInBatches';
+const SUPPORTED_LOOP_OVER_ITEMS_VERSIONS = new Set([1, 2, 3]);
+const SUPPORTED_NODE_TYPE_VERSIONS = new Map([
+    ['n8n-nodes-base.webhook', new Set([2.1])],
+    ['n8n-nodes-base.respondToWebhook', new Set([1.4, 1.5])],
+    ['n8n-nodes-base.crypto', new Set([2])],
+    ['n8n-nodes-base.code', new Set([2])],
+    ['n8n-nodes-base.httpRequest', new Set([4.2])],
+    ['n8n-nodes-base.if', new Set([2.2])],
+    ['n8n-nodes-base.splitInBatches', new Set([3])],
+    ['n8n-nodes-base.stickyNote', new Set([1])],
+    ['n8n-nodes-base.supabase', new Set([1])],
+    ['n8n-nodes-base.dataTable', new Set([1.1])],
+    ['@n8n/n8n-nodes-langchain.chainLlm', new Set([1.7, 1.9])],
+    ['@n8n/n8n-nodes-langchain.documentDefaultDataLoader', new Set([1.1])],
+    ['@n8n/n8n-nodes-langchain.embeddingsGoogleGemini', new Set([1])],
+    ['@n8n/n8n-nodes-langchain.embeddingsOpenAi', new Set([1.2])],
+    ['@n8n/n8n-nodes-langchain.lmChatGoogleGemini', new Set([1.1])],
+    ['@n8n/n8n-nodes-langchain.lmChatOpenAi', new Set([1.2, 1.3])],
+    ['@n8n/n8n-nodes-langchain.outputParserStructured', new Set([1.3])],
+    ['@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter', new Set([1])],
+    ['@n8n/n8n-nodes-langchain.vectorStoreInMemory', new Set([1.3])],
+    ['@n8n/n8n-nodes-langchain.vectorStoreSupabase', new Set([1.3])],
+]);
 
 export const EXPECTED_RESPONSE_SCHEMA = Object.freeze({
     type: 'object',
@@ -41,6 +64,12 @@ function normalizeText(value) {
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .toLowerCase();
+}
+
+function usesConfiguredSupabaseEndpoint(value, path) {
+    const url = String(value ?? '');
+    return url.includes("$('Ingest Endpoint Configuration').first().json.supabase_base_url")
+        && url.includes(path);
 }
 
 function stable(value) {
@@ -176,6 +205,345 @@ function mainDestinations(workflow, sourceName) {
         .filter(Boolean);
 }
 
+
+function mainOutputDestinations(workflow, sourceName, outputIndex) {
+    const output = mainOutputGroups(workflow, sourceName)[outputIndex];
+    return Array.isArray(output) ? output : [];
+}
+
+function hasMainOutputConnection(workflow, sourceName, outputIndex, destinationName) {
+    return mainOutputDestinations(workflow, sourceName, outputIndex)
+        .some((connection) => connection?.node === destinationName && (connection.type ?? 'main') === 'main');
+}
+
+function validateLoopOverItemsCompatibility(workflow, nodes, kind, errors) {
+    const loopNodes = nodes.filter((node) => node.type === LOOP_OVER_ITEMS_TYPE);
+
+    for (const loopNode of loopNodes) {
+        if (!SUPPORTED_LOOP_OVER_ITEMS_VERSIONS.has(loopNode.typeVersion)) {
+            errors.push(`El nodo Loop Over Items "${loopNode.name}" usa typeVersion ${String(loopNode.typeVersion)}, pero n8n solo admite 1, 2 o 3.`);
+        }
+    }
+
+    if (kind !== 'ingest') {
+        return;
+    }
+
+    const documentLoop = loopNodes.find((node) => node.name === 'Loop Over Documents');
+    const convertDocuments = nodes.find((node) => node.name === 'Convert Documents');
+    const checkIngestResult = nodes.find((node) => node.name === 'Check Ingest Result');
+    const vectorStore = nodes.find((node) => normalizeText(node.type).includes('vectorstore') && !normalizeText(node.name).includes('reset'));
+
+    if (!documentLoop || !convertDocuments || !checkIngestResult) {
+        return;
+    }
+
+    if (documentLoop.typeVersion !== 3) {
+        errors.push('El Loop Over Documents generado por MediFlow debe usar typeVersion 3.');
+    }
+
+    const parameters = documentLoop.parameters ?? {};
+    if (parameters.batchSize !== 1 || !parameters.options || typeof parameters.options !== 'object' || Array.isArray(parameters.options) || Object.keys(parameters.options).length !== 0) {
+        errors.push('Loop Over Documents debe conservar batchSize: 1 y options: {}.');
+    }
+
+    if (!hasMainOutputConnection(workflow, convertDocuments.name, 0, documentLoop.name)) {
+        errors.push('Convert Documents debe conectar con Loop Over Documents.');
+    }
+
+    const resultGate = nodes.find((node) => node.name === 'Document Result Confirmed');
+    const failedBuilder = nodes.find((node) => node.name === 'Build Failed Document Result');
+    const safeError = nodes.find((node) => node.name === 'Build Ingest Safe Error');
+    const deterministicRpc = nodes.find((node) => node.name === 'Call Idempotent Supabase RPC');
+    const simpleDeterministic = vectorStore?.name === 'Simple Vector Store Insert' && resultGate;
+
+    if ((deterministicRpc || simpleDeterministic) && resultGate) {
+        const checkCode = String(checkIngestResult.parameters?.jsCode ?? '');
+        const convertCode = String(convertDocuments.parameters?.jsCode ?? '');
+        const checkSources = Object.entries(workflow.connections ?? {}).flatMap(([sourceName, groups]) => (
+            (groups?.main ?? []).flatMap((connections, outputIndex) => (Array.isArray(connections) ? connections : [])
+                .filter((connection) => connection?.node === checkIngestResult.name)
+                .map(() => ({ sourceName, outputIndex })))
+        ));
+        const checkOnlyUsesDone = checkSources.length === 1
+            && checkSources[0].sourceName === documentLoop.name
+            && checkSources[0].outputIndex === 0;
+
+        if (!checkCode.includes('const items = $input.all();')
+            || checkCode.includes("$('Classify Existing Document').all")
+            || checkCode.includes("$('Classify Stored Document').all")
+            || /collect\s*=/.test(checkCode)) {
+            errors.push('Check Ingest Result debe usar exclusivamente los items recibidos por $input.all() desde done.');
+        }
+        if (!['request', 'result', 'expected_document_id', 'batch_document_count', 'document_id', 'checksum', 'storage_status', 'confirmed', 'inserted', 'already_present'].every((token) => checkCode.includes(token))) {
+            errors.push('Check Ingest Result debe validar íntegramente el contrato determinista por documento.');
+        }
+        if (!['request', 'document', 'expected_document_id', 'batch_document_count'].every((token) => convertCode.includes(token))) {
+            errors.push('Convert Documents debe crear items autosuficientes con contexto request y document.');
+        }
+        if (!checkOnlyUsesDone || !hasMainOutputConnection(workflow, documentLoop.name, 0, checkIngestResult.name)) {
+            errors.push('Check Ingest Result solo puede recibir la salida done de Loop Over Documents.');
+        }
+        if (!failedBuilder
+            || !safeError
+            || !hasMainOutputConnection(workflow, failedBuilder.name, 0, resultGate.name)
+            || !hasMainOutputConnection(workflow, resultGate.name, 0, documentLoop.name)
+            || !hasMainOutputConnection(workflow, resultGate.name, 1, safeError.name)
+            || !hasMainOutputConnection(workflow, safeError.name, 0, 'Respond Ingest Safe Error')) {
+            errors.push('Cada iteración debe producir un resultado explícito y los fallos deben terminar en la respuesta segura.');
+        }
+
+        if (deterministicRpc) {
+            const required = ['Check Existing Document', 'Classify Existing Document', 'Document Is Already Present', 'Build Already Present Result', 'Generate Document Embedding', 'Validate Document Embedding', 'Embedding Is Valid', 'Validate RPC Result', 'RPC Result Is Valid', 'Confirm Stored Document', 'Build Inserted Result', 'Ingest Endpoint Configuration', 'Record Ingest Batch Receipt', 'Validate Batch Receipt', 'Batch Receipt Was Stored', 'Final Batch', 'Manifest Was Activated'];
+            if (!required.every((name) => nodes.some((node) => node.name === name))) {
+                errors.push('La ingesta persistente debe incluir consulta, embedding validado, RPC idempotente, confirmación y recibo.');
+            }
+            const resultBuilders = [
+                ['Build Already Present Result', 'already_present'],
+                ['Build Inserted Result', 'inserted'],
+                ['Build Failed Document Result', 'failed'],
+            ];
+            const resultBuildersAreExplicit = resultBuilders.every(([name, status]) => {
+                const code = String(nodes.find((node) => node.name === name)?.parameters?.jsCode ?? '');
+                return ['request', 'result', 'document_id', 'checksum', 'storage_status', 'confirmed', status].every((token) => code.includes(token));
+            });
+            if (!resultBuildersAreExplicit) {
+                errors.push('Cada ruta debe construir un resultado explícito con request, document_id, checksum, storage_status y confirmed.');
+            }
+            const controlledOperations = ['Check Existing Document', 'Generate Document Embedding', 'Call Idempotent Supabase RPC', 'Confirm Stored Document'];
+            if (!controlledOperations.every((name) => nodes.find((node) => node.name === name)?.onError === 'continueErrorOutput')) {
+                errors.push('Las operaciones persistentes deben usar una salida de error separada hacia failed.');
+            }
+            const embeddingRequest = nodes.find((node) => node.name === 'Generate Document Embedding');
+            if (embeddingRequest?.type !== 'n8n-nodes-base.httpRequest'
+                || embeddingRequest.parameters?.authentication !== 'predefinedCredentialType'
+                || !['googlePalmApi', 'openAiApi'].includes(embeddingRequest.parameters?.nodeCredentialType)
+                || embeddingRequest.credentials) {
+                errors.push('La generación de embeddings debe usar una credencial predefinida sin ID versionado.');
+            }
+            const documentLookups = ['Check Existing Document', 'Confirm Stored Document']
+                .map((name) => nodes.find((node) => node.name === name));
+            const lookupsAreMinimal = documentLookups.every((lookup) => {
+                const parameters = lookup?.parameters ?? {};
+                const queryParameters = parameters.queryParameters?.parameters ?? [];
+                const query = new Map(queryParameters.map((entry) => [entry.name, entry.value]));
+                return lookup?.type === 'n8n-nodes-base.httpRequest'
+                    && parameters.method === 'GET'
+                    && parameters.authentication === 'predefinedCredentialType'
+                    && parameters.nodeCredentialType === 'supabaseApi'
+                    && !lookup.credentials
+                    && ['/rest/v1/assistant_documents_openai_1536', '/rest/v1/assistant_documents_gemini_3072'].some((path) => usesConfiguredSupabaseEndpoint(parameters.url, path))
+                    && query.size === 4
+                    && query.get('select') === 'document_id,knowledge_checksum'
+                    && String(query.get('document_id') ?? '').includes('document.document_id')
+                    && String(query.get('knowledge_checksum') ?? '').includes('request.checksum')
+                    && query.get('limit') === '1';
+            });
+            if (!lookupsAreMinimal) errors.push('Las consultas de existencia y confirmación deben solicitar solo document_id y knowledge_checksum mediante Supabase REST autenticado.');
+
+
+            const explicitFlow = hasMainOutputConnection(workflow, documentLoop.name, 1, 'Check Existing Document')
+                && hasMainOutputConnection(workflow, 'Check Existing Document', 0, 'Classify Existing Document')
+                && hasMainOutputConnection(workflow, 'Check Existing Document', 1, failedBuilder.name)
+                && hasMainOutputConnection(workflow, 'Classify Existing Document', 0, 'Document Is Already Present')
+                && hasMainOutputConnection(workflow, 'Document Is Already Present', 0, 'Build Already Present Result')
+                && hasMainOutputConnection(workflow, 'Document Is Already Present', 1, 'Generate Document Embedding')
+                && hasMainOutputConnection(workflow, 'Build Already Present Result', 0, resultGate.name)
+                && hasMainOutputConnection(workflow, 'Generate Document Embedding', 0, 'Validate Document Embedding')
+                && hasMainOutputConnection(workflow, 'Generate Document Embedding', 1, failedBuilder.name)
+                && hasMainOutputConnection(workflow, 'Validate Document Embedding', 0, 'Embedding Is Valid')
+                && hasMainOutputConnection(workflow, 'Embedding Is Valid', 0, deterministicRpc.name)
+                && hasMainOutputConnection(workflow, 'Embedding Is Valid', 1, failedBuilder.name)
+                && hasMainOutputConnection(workflow, deterministicRpc.name, 0, 'Validate RPC Result')
+                && hasMainOutputConnection(workflow, deterministicRpc.name, 1, failedBuilder.name)
+                && hasMainOutputConnection(workflow, 'Validate RPC Result', 0, 'RPC Result Is Valid')
+                && hasMainOutputConnection(workflow, 'RPC Result Is Valid', 0, 'Confirm Stored Document')
+                && hasMainOutputConnection(workflow, 'RPC Result Is Valid', 1, failedBuilder.name)
+                && hasMainOutputConnection(workflow, 'Confirm Stored Document', 0, 'Build Inserted Result')
+                && hasMainOutputConnection(workflow, 'Confirm Stored Document', 1, failedBuilder.name)
+                && hasMainOutputConnection(workflow, 'Build Inserted Result', 0, resultGate.name);
+            if (!explicitFlow) {
+                errors.push('La ingesta persistente no respeta el flujo explícito existente/embedding/RPC/confirmación.');
+            }
+            if (nodes.some((node) => normalizeText(node.type).includes('vectorstoresupabase') && normalizeText(node.parameters?.mode) === 'insert')) {
+                errors.push('La escritura persistente no puede usar vectorStoreSupabase en modo insert.');
+            }
+            const embeddingCode = String(nodes.find((node) => node.name === 'Validate Document Embedding')?.parameters?.jsCode ?? '');
+            const expectedDimensions = normalizeText(deterministicRpc.parameters?.url).includes('gemini') ? '3072' : '1536';
+            if (!['Array.isArray', 'Number.isFinite', expectedDimensions, 'typeof value'].every((token) => embeddingCode.includes(token))) {
+                errors.push('El embedding debe validar array, dimensión exacta y números finitos antes de la RPC.');
+            }
+            const rpcEndpointIsSafe = ['/rest/v1/rpc/upsert_assistant_document_openai', '/rest/v1/rpc/upsert_assistant_document_gemini'].some((path) => usesConfiguredSupabaseEndpoint(deterministicRpc.parameters?.url, path));
+            const rpcBody = String(deterministicRpc.parameters?.body ?? '');
+            if (deterministicRpc.type !== 'n8n-nodes-base.httpRequest'
+                || deterministicRpc.onError !== 'continueErrorOutput'
+                || deterministicRpc.parameters?.nodeCredentialType !== 'supabaseApi'
+                || !['content', 'metadata', 'embedding'].every((token) => rpcBody.includes(token))) {
+                errors.push('La RPC Supabase debe ser una llamada HTTP autenticada, mínima y con salida de error separada.');
+            }
+            if (!rpcEndpointIsSafe) errors.push('La RPC documental debe reutilizar el host Supabase centralizado.');
+            const endpointConfigurations = nodes.filter((node) => node.type === 'n8n-nodes-base.code' && String(node.parameters?.jsCode ?? '').includes("const supabaseBaseUrl = 'https://your-project.supabase.co';"));
+            const endpointConfig = nodes.find((node) => node.name === 'Ingest Endpoint Configuration');
+            const endpointConfigCode = String(endpointConfig?.parameters?.jsCode ?? '');
+            const endpointConfigIsSafe = endpointConfigurations.length === 1
+                && endpointConfig?.type === 'n8n-nodes-base.code'
+                && endpointConfigCode.includes("const supabaseBaseUrl = 'https://your-project.supabase.co';")
+                && endpointConfigCode.includes('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED')
+                && endpointConfigCode.includes('supabase_base_url')
+                && hasMainOutputConnection(workflow, 'Nonce Is Fresh', 0, endpointConfig.name)
+                && hasMainOutputConnection(workflow, endpointConfig.name, 0, convertDocuments.name);
+            if (!endpointConfigIsSafe) {
+                errors.push('La ingesta persistente debe centralizar un único host Supabase de ejemplo y bloquear su publicación sin configurar.');
+            }
+
+            const receipt = nodes.find((node) => node.name === 'Record Ingest Batch Receipt');
+            const receiptValidator = nodes.find((node) => node.name === 'Validate Batch Receipt');
+            const receiptBody = String(receipt?.parameters?.body ?? '');
+            const receiptContract = receipt?.type === 'n8n-nodes-base.httpRequest'
+                && receipt?.parameters?.method === 'POST'
+                && receipt?.parameters?.authentication === 'predefinedCredentialType'
+                && receipt?.parameters?.nodeCredentialType === 'supabaseApi'
+                && usesConfiguredSupabaseEndpoint(receipt?.parameters?.url, '/rest/v1/rpc/record_assistant_ingest_batch_receipt')
+                && !receipt?.credentials
+                && ['request_id', 'provider', 'checksum', 'knowledge_version', 'batch_index', 'batch_count', 'document_count', 'accepted_count', 'full_manifest'].every((token) => receiptBody.includes(token))
+                && receiptValidator?.type === 'n8n-nodes-base.code'
+                && String(receiptValidator?.parameters?.jsCode ?? '').includes('receipt_valid')
+                && String(receiptValidator?.parameters?.jsCode ?? '').includes('manifest_activated');
+            if (!receiptContract) {
+                errors.push('El recibo debe usar la RPC idempotente autenticada y validar únicamente su contrato seguro.');
+            }
+
+            const receiptFlowIsSafe = hasMainOutputConnection(workflow, receipt?.name, 0, receiptValidator?.name)
+                && hasMainOutputConnection(workflow, receiptValidator?.name, 0, 'Batch Receipt Was Stored');
+            if (![receiptFlowIsSafe, hasMainOutputConnection(workflow, 'Ingest Batch Succeeded', 0, receipt?.name), receipt?.onError === 'continueErrorOutput', hasMainOutputConnection(workflow, receipt?.name, 1, safeError.name)].every(Boolean)) {
+                errors.push('No se puede registrar un recibo sin un lote determinista confirmado.');
+            }
+            const manifestFlowIsSafe = [
+                hasMainOutputConnection(workflow, 'Batch Receipt Was Stored', 1, safeError.name),
+                hasMainOutputConnection(workflow, 'Final Batch', 0, 'Manifest Was Activated'),
+                hasMainOutputConnection(workflow, 'Final Batch', 1, 'Build Ingest Summary'),
+                hasMainOutputConnection(workflow, 'Manifest Was Activated', 0, 'Build Ingest Summary'),
+                hasMainOutputConnection(workflow, 'Manifest Was Activated', 1, safeError.name),
+            ].every(Boolean);
+            if (!manifestFlowIsSafe) errors.push('Solo el lote final completo puede activar el manifiesto; los demás estados deben responder de forma segura.');
+        } else if (!hasMainOutputConnection(workflow, documentLoop.name, 1, vectorStore.name)
+            || !hasMainOutputConnection(workflow, vectorStore.name, 0, 'Build Simple Inserted Result')
+            || !hasMainOutputConnection(workflow, vectorStore.name, 1, failedBuilder.name)
+            || !hasMainOutputConnection(workflow, 'Build Simple Inserted Result', 0, resultGate.name)) {
+            errors.push('La variante simple debe devolver un resultado determinista antes de continuar el loop.');
+        }
+
+        return;
+    }
+
+    if (!vectorStore) {
+        errors.push('Falta una escritura de ingesta reconocida.');
+        return;
+    }
+
+    const generatedVectorStore = ['Supabase Vector Store Insert', 'Simple Vector Store Insert'].includes(vectorStore.name);
+    if (generatedVectorStore) {
+        const safeError = nodes.find((node) => node.name === 'Build Ingest Safe Error');
+        const checkCode = String(checkIngestResult.parameters?.jsCode ?? '');
+        const vectorUsesErrorOutput = vectorStore.onError === 'continueErrorOutput'
+            && vectorStore.alwaysOutputData !== true
+            && hasMainOutputConnection(workflow, vectorStore.name, 1, safeError?.name);
+
+        if (!vectorUsesErrorOutput) {
+            errors.push('El Vector Store de ingesta debe usar continueErrorOutput, sin alwaysOutputData, y enviar errores al fallback seguro.');
+        }
+        if (!safeError || !hasMainOutputConnection(workflow, safeError.name, 0, 'Respond Ingest Safe Error')) {
+            errors.push('La salida de error de ingesta debe terminar en Respond Ingest Safe Error.');
+        }
+        if (/item\.json\?\.error|results\.length\s*===/i.test(checkCode)
+            || !['inserted', 'already_present', 'unconfirmed', 'document_id', 'checksum', 'storage_status', 'confirmed'].every((token) => checkCode.includes(token))) {
+            errors.push('Check Ingest Result debe clasificar inserciones confirmadas, reintentos y documentos no confirmados.');
+        }
+
+        if (vectorStore.name === 'Supabase Vector Store Insert') {
+            const required = ['Check Existing Document', 'Classify Existing Document', 'Document Is Already Present', 'Confirm Stored Document', 'Classify Stored Document', 'Document Insert Confirmed', 'Record Ingest Batch Receipt'];
+            if (!required.every((name) => nodes.some((node) => node.name === name))) {
+                errors.push('La ingesta Supabase debe comprobar cada document_id y checksum antes de registrar el recibo.');
+            }
+            const existingTrueDestinations = mainOutputDestinations(workflow, 'Document Is Already Present', 0).map((connection) => connection?.node).filter(Boolean);
+            const existingFalseDestinations = mainOutputDestinations(workflow, 'Document Is Already Present', 1).map((connection) => connection?.node).filter(Boolean);
+            const trueBranchIsExact = existingTrueDestinations.length === 1 && existingTrueDestinations[0] === documentLoop.name;
+            const falseBranchIsExact = existingFalseDestinations.length === 1 && existingFalseDestinations[0] === vectorStore.name;
+            const existingCode = String(nodes.find((node) => node.name === 'Classify Existing Document')?.parameters?.jsCode ?? '');
+            const storedCode = String(nodes.find((node) => node.name === 'Classify Stored Document')?.parameters?.jsCode ?? '');
+            const existingEvidenceIsExplicit = ['document_id', 'checksum', 'storage_status', 'already_present', 'confirmed'].every((token) => existingCode.includes(token));
+            const storedEvidenceIsExplicit = ['document_id', 'checksum', 'storage_status', 'inserted', 'confirmed'].every((token) => storedCode.includes(token));
+            if (!existingEvidenceIsExplicit || !storedEvidenceIsExplicit) {
+                errors.push('Las rutas existente e insertada deben conservar document_id, checksum, storage_status y confirmed.');
+            }
+            const checkIngestSources = Object.entries(workflow.connections ?? {}).flatMap(([sourceName, groups]) => (
+                (groups?.main ?? []).flatMap((connections, outputIndex) => (Array.isArray(connections) ? connections : [])
+                    .filter((connection) => connection?.node === checkIngestResult.name)
+                    .map(() => ({ sourceName, outputIndex })))
+            ));
+            const checkOnlyRunsAfterLoopDone = checkIngestSources.length === 1
+                && checkIngestSources[0].sourceName === documentLoop.name
+                && checkIngestSources[0].outputIndex === 0;
+            const confirmationWiring = hasMainOutputConnection(workflow, documentLoop.name, 1, 'Check Existing Document')
+                && hasMainOutputConnection(workflow, 'Check Existing Document', 0, 'Classify Existing Document')
+                && hasMainOutputConnection(workflow, 'Check Existing Document', 1, safeError?.name)
+                && hasMainOutputConnection(workflow, 'Classify Existing Document', 0, 'Document Is Already Present')
+                && trueBranchIsExact
+                && falseBranchIsExact
+                && hasMainOutputConnection(workflow, vectorStore.name, 0, 'Confirm Stored Document')
+                && hasMainOutputConnection(workflow, 'Confirm Stored Document', 1, safeError?.name)
+                && hasMainOutputConnection(workflow, 'Confirm Stored Document', 0, 'Classify Stored Document')
+                && hasMainOutputConnection(workflow, 'Classify Stored Document', 0, 'Document Insert Confirmed')
+                && hasMainOutputConnection(workflow, 'Document Insert Confirmed', 0, documentLoop.name)
+                && hasMainOutputConnection(workflow, 'Document Insert Confirmed', 1, safeError?.name)
+                && checkOnlyRunsAfterLoopDone;
+            if (!confirmationWiring) {
+                errors.push('La ingesta Supabase debe cerrar el ciclo solo después de confirmar el documento almacenado.');
+            }
+            const receipt = nodes.find((node) => node.name === 'Record Ingest Batch Receipt');
+            if (!hasMainOutputConnection(workflow, 'Ingest Batch Succeeded', 0, receipt?.name)
+                || receipt?.onError !== 'continueErrorOutput'
+                || !hasMainOutputConnection(workflow, receipt?.name, 1, safeError?.name)) {
+                errors.push('No se puede registrar un recibo de ingesta sin evidencia confirmada y una salida de error segura.');
+            }
+            const confirmationNodes = ['Check Existing Document', 'Confirm Stored Document'];
+            if (!confirmationNodes.every((name) => nodes.find((node) => node.name === name)?.onError === 'continueErrorOutput')) {
+                errors.push('Las comprobaciones Supabase por documento deben usar salida de error separada.');
+            }
+            const manifestFlow = hasMainOutputConnection(workflow, 'Batch Receipt Was Stored', 1, safeError?.name)
+                && hasMainOutputConnection(workflow, 'Final Batch', 0, 'Get Activated Knowledge Manifest')
+                && hasMainOutputConnection(workflow, 'Get Activated Knowledge Manifest', 1, safeError?.name)
+                && hasMainOutputConnection(workflow, 'Get Activated Knowledge Manifest', 0, 'Confirm Manifest Activation')
+                && hasMainOutputConnection(workflow, 'Confirm Manifest Activation', 0, 'Manifest Was Activated')
+                && hasMainOutputConnection(workflow, 'Manifest Was Activated', 0, 'Build Ingest Summary')
+                && hasMainOutputConnection(workflow, 'Manifest Was Activated', 1, safeError?.name);
+            if (!manifestFlow) {
+                errors.push('Un lote incompleto no puede registrar recibo ni activar el manifiesto como éxito.');
+            }
+        } else if (!hasMainOutputConnection(workflow, documentLoop.name, 1, vectorStore.name)
+            || !hasMainOutputConnection(workflow, vectorStore.name, 0, 'Confirm Simple Store Insert')
+            || !hasMainOutputConnection(workflow, 'Confirm Simple Store Insert', 0, documentLoop.name)) {
+            errors.push('La variante simple debe confirmar la salida exitosa antes de continuar el loop.');
+        }
+
+        if (!hasMainOutputConnection(workflow, documentLoop.name, 0, checkIngestResult.name)) {
+            errors.push('La salida done de Loop Over Documents debe conectar con Check Ingest Result.');
+        }
+        return;
+    }
+    if (!hasMainOutputConnection(workflow, documentLoop.name, 1, vectorStore.name)) {
+        errors.push('La salida loop de Loop Over Documents debe conectar con el Vector Store.');
+    }
+    if (!hasMainOutputConnection(workflow, vectorStore.name, 0, documentLoop.name)) {
+        errors.push('El Vector Store debe regresar al Loop Over Documents para continuar la iteracion.');
+    }
+    if (!hasMainOutputConnection(workflow, documentLoop.name, 0, checkIngestResult.name)) {
+        errors.push('La salida done de Loop Over Documents debe conectar con Check Ingest Result.');
+    }
+    if (mainDestinations(workflow, vectorStore.name).includes(checkIngestResult.name)) {
+        errors.push('El Vector Store no puede conectar directamente con Check Ingest Result; debe cerrar primero el Loop Over Documents.');
+    }
+}
 function validateConnections(workflow, nodeMap, errors) {
     const incident = new Set();
 
@@ -382,6 +750,13 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
 
         if (typeof node.type !== 'string' || node.type.trim() === '') {
             errors.push(`El nodo "${node.name ?? index}" no tiene tipo.`);
+        } else {
+            const supportedVersions = SUPPORTED_NODE_TYPE_VERSIONS.get(node.type);
+            if (!supportedVersions) {
+                errors.push(`El nodo "${node.name ?? index}" usa un tipo no soportado: ${node.type}.`);
+            } else if (!supportedVersions.has(node.typeVersion)) {
+                errors.push(`El nodo "${node.name ?? index}" usa typeVersion ${String(node.typeVersion)} no compatible para ${node.type}.`);
+            }
         }
 
         if (!Array.isArray(node.position) || node.position.length !== 2 || !node.position.every(Number.isFinite)) {
@@ -484,10 +859,11 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
 
     const vectorNodes = nodes.filter((node) => normalizeText(node.type).includes('vectorstore'));
     const embeddingNodes = nodes.filter((node) => normalizeText(node.type).includes('embeddings'));
-    if (vectorNodes.length === 0) {
+    const explicitPersistentIngest = kind === 'ingest' && nodes.some((node) => node.name === 'Call Idempotent Supabase RPC');
+    if (vectorNodes.length === 0 && !explicitPersistentIngest) {
         errors.push('Falta un Vector Store.');
     }
-    if (embeddingNodes.length === 0) {
+    if (embeddingNodes.length === 0 && !explicitPersistentIngest) {
         errors.push('Falta un nodo de embeddings.');
     }
     for (const node of vectorNodes) {
@@ -495,6 +871,8 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
             errors.push(`El Vector Store crítico "${node.name}" debe continuar por una salida de error controlada.`);
         }
     }
+
+    validateLoopOverItemsCompatibility(workflow, nodes, kind, errors);
 
     const simpleVectorNodes = vectorNodes.filter((node) => normalizeText(node.type).includes('vectorstoreinmemory'));
     for (const node of simpleVectorNodes) {
@@ -516,11 +894,11 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
         const loaderNames = new Set(customDataLoaders.map((node) => node.name));
         const splitterConnected = documentUnitSplitters.some((node) => isConnectedTo(workflow, node.name, 'ai_textSplitter', loaderNames));
 
-        if (customDataLoaders.length === 0 || documentUnitSplitters.length === 0 || !splitterConnected) {
+        if (!explicitPersistentIngest && (customDataLoaders.length === 0 || documentUnitSplitters.length === 0 || !splitterConnected)) {
             errors.push('La ingesta debe preservar cada documento como unidad mediante Data Loader custom y Document Unit Splitter conectado.');
         }
 
-        const persistentIngest = vectorNodes.some((node) => normalizeText(node.type).includes('vectorstoresupabase'));
+        const persistentIngest = explicitPersistentIngest || vectorNodes.some((node) => normalizeText(node.type).includes('vectorstoresupabase'));
         if (persistentIngest) {
             const supabaseNodes = nodes.filter((node) => node.type === 'n8n-nodes-base.supabase');
             const batchReceipts = supabaseNodes.filter((node) => (
@@ -536,8 +914,9 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
                 && /\bupdate\s+assistant_knowledge_manifests\b/i.test(String(node.parameters?.jsCode ?? ''))
             ));
 
-            if (batchReceipts.length === 0) {
-                errors.push('La ingesta Supabase debe registrar el lote en assistant_ingest_batches para activar el manifest mediante trigger transaccional.');
+            const receiptRpc = nodes.find((node) => node.name === 'Record Ingest Batch Receipt' && node.type === 'n8n-nodes-base.httpRequest' && usesConfiguredSupabaseEndpoint(node.parameters?.url, '/rest/v1/rpc/record_assistant_ingest_batch_receipt'));
+            if (batchReceipts.length === 0 && ! receiptRpc) {
+                errors.push('La ingesta Supabase debe registrar assistant_ingest_batches mediante la RPC idempotente de recibos.');
             }
             if (directManifestUpdates.length > 0 || codeUpdatesManifest) {
                 errors.push('La ingesta Supabase no puede hacer UPDATE directo de assistant_knowledge_manifests.');

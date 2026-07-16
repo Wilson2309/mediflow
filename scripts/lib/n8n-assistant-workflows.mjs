@@ -1,4 +1,17 @@
 import { EXPECTED_RESPONSE_SCHEMA } from './n8n-assistant-workflow-validator.mjs';
+import {
+  buildDocumentResultCode,
+  buildFailedResultCode,
+  buildInsertedResultCode,
+  buildSafeErrorCode,
+  buildSummaryCode,
+  checkIngestResultCode,
+  convertDocumentsCode,
+  embeddingValidationCode,
+  linkedDocumentResultCode,
+  validateIngestReceiptCode,
+  validateRpcResultCode,
+} from './n8n-assistant-ingest-runtime.mjs';
 
 const FALLBACK = 'No encontré una respuesta exacta para eso. Puedes revisar la guía del módulo o contactar al administrador.';
 const ROLE_DENIED = 'No puedo cambiar permisos ni acceder a funciones de otro rol.';
@@ -159,7 +172,7 @@ const modules = ${JSON.stringify(modules)};
 const roleModules = ${JSON.stringify(roleModules)};
 const allowedKeys = ['request_id','provider','batch_index','batch_count','full_manifest','checksum','knowledge_version','document_count','documents','timestamp'];
 const metadataKeys = ['entry_id','role','modules','locale','status','knowledge_version','requires_online','source'];
-const fail = (statusCode) => ({ valid: false, status_code: statusCode, response: { ok: false, request_id: null, accepted: 0, rejected: 0 } });
+const fail = (statusCode) => ({ valid: false, status_code: statusCode, response: { ok: false, request_id: null, accepted: 0, rejected: 0, checksum: null, knowledge_version: null, activated: false } });
 let rawBody;
 try { rawBody = (await this.helpers.getBinaryDataBuffer(0, 'data')).toString('utf8'); } catch { return [{ json: fail(422) }]; }
 if (Buffer.byteLength(rawBody, 'utf8') > MAX_RAW_BYTES) return [{ json: fail(422) }];
@@ -208,6 +221,10 @@ if (/^[a-f0-9]{64}$/.test(expected) && /^[a-f0-9]{64}$/.test(received)) {
 }
 const { signature_input, received_signature, ...safe } = original;
 return [{ json: { ...safe, signature_valid: signatureValid, status_code: signatureValid ? 200 : 401, response: signatureValid ? undefined : ${JSON.stringify(responseObject(UNAUTHORIZED))} } }];`;
+const ingestSignatureFailureCode = `{ ok: false, request_id: original.payload?.request_id ?? null, accepted: 0, rejected: Array.isArray(original.payload?.documents) ? original.payload.documents.length : 0, checksum: original.payload?.checksum ?? null, knowledge_version: original.payload?.knowledge_version ?? null, activated: false }`;
+const compareIngestSignatureCode = compareSignatureCode.replace(JSON.stringify(responseObject(UNAUTHORIZED)), ingestSignatureFailureCode);
+
+const queryNonceUnauthorizedCode = JSON.stringify(responseObject(UNAUTHORIZED));
 
 const classifyNonceCode = `const original = $('Constant Time Signature Check').first().json;
 const current = $input.first().json ?? {};
@@ -228,7 +245,9 @@ return [{ json: {
 const queryNonceFallbackCode = JSON.stringify(responseObject(FALLBACK, 0, true));
 const ingestNonceFallbackCode = `{ ok: false, request_id: original.payload.request_id, accepted: 0, rejected: Array.isArray(original.payload.documents) ? original.payload.documents.length : 0, checksum: original.payload.checksum, knowledge_version: original.payload.knowledge_version, activated: false }`;
 function withIngestNonceFailure(code) {
-  const transformed = code.replace(queryNonceFallbackCode, ingestNonceFallbackCode);
+  const transformed = code
+    .replaceAll(queryNonceFallbackCode, ingestNonceFallbackCode)
+    .replaceAll(queryNonceUnauthorizedCode, ingestNonceFallbackCode);
   if (transformed === code) {
     throw new Error('No se pudo aplicar el contrato interno de error de ingesta.');
   }
@@ -296,12 +315,26 @@ function vectorConfig(modelProvider) {
   if (modelProvider === 'gemini') {
     return {
       table: 'assistant_documents_gemini_3072', query: 'match_assistant_documents_gemini', manifestProvider: 'gemini',
+      dimensions: 3072,
+      embeddingEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent',
+      embeddingCredential: 'googlePalmApi',
+      rpcName: 'upsert_assistant_document_gemini',
+      tablePath: '/rest/v1/assistant_documents_gemini_3072',
+      rpcPath: '/rest/v1/rpc/upsert_assistant_document_gemini',
+      receiptPath: '/rest/v1/rpc/record_assistant_ingest_batch_receipt',
       embeddings: workflowNode('emb-gemini', 'Embeddings Gemini', '@n8n/n8n-nodes-langchain.embeddingsGoogleGemini', 1, [1240, 780], { modelName: 'models/gemini-embedding-001', options: {} }),
       model: workflowNode('model-gemini', 'Gemini Chat Model', '@n8n/n8n-nodes-langchain.lmChatGoogleGemini', 1.1, [2020, 780], { modelName: 'models/gemini-2.5-flash', options: { temperature: 0.1, maxOutputTokens: 800 } }),
     };
   }
   return {
     table: 'assistant_documents_openai_1536', query: 'match_assistant_documents_openai', manifestProvider: 'openai',
+    dimensions: 1536,
+    embeddingEndpoint: 'https://api.openai.com/v1/embeddings',
+    embeddingCredential: 'openAiApi',
+    rpcName: 'upsert_assistant_document_openai',
+    tablePath: '/rest/v1/assistant_documents_openai_1536',
+    rpcPath: '/rest/v1/rpc/upsert_assistant_document_openai',
+    receiptPath: '/rest/v1/rpc/record_assistant_ingest_batch_receipt',
     embeddings: workflowNode('emb-openai', 'Embeddings OpenAI', '@n8n/n8n-nodes-langchain.embeddingsOpenAi', 1.2, [1240, 780], { model: 'text-embedding-3-small', options: { timeout: 5 } }),
     model: workflowNode('model-openai', 'OpenAI Chat Model', '@n8n/n8n-nodes-langchain.lmChatOpenAi', 1.3, [2020, 780], { model: { __rl: true, value: 'gpt-4.1-mini', mode: 'list', cachedResultName: 'gpt-4.1-mini' }, options: { temperature: 0.1, maxTokens: 800, timeout: 5500, maxRetries: 1 } }),
   };
@@ -309,18 +342,18 @@ function vectorConfig(modelProvider) {
 
 function defaultLoaderNode(id = 'loader', name = 'Default Data Loader') {
   return workflowNode(id, name, '@n8n/n8n-nodes-langchain.documentDefaultDataLoader', 1.1, [1500, 780], {
-    dataType: 'json', jsonMode: 'expressionData', jsonData: '={{ $json.content }}', textSplittingMode: 'custom',
+    dataType: 'json', jsonMode: 'expressionData', jsonData: '={{ $json.document?.content ?? $json.content }}', textSplittingMode: 'custom',
     options: { metadata: { metadataValues: [
-      { name: 'document_id', value: '={{ $json.metadata.document_id }}' },
-      { name: 'entry_id', value: '={{ $json.metadata.entry_id }}' },
-      { name: 'role', value: '={{ $json.metadata.role }}' },
-      { name: 'modules', value: '={{ JSON.stringify($json.metadata.modules) }}' },
-      { name: 'locale', value: '={{ $json.metadata.locale }}' },
-      { name: 'status', value: '={{ $json.metadata.status }}' },
-      { name: 'knowledge_version', value: '={{ String($json.metadata.knowledge_version) }}' },
-      { name: 'requires_online', value: '={{ String($json.metadata.requires_online) }}' },
-      { name: 'source', value: '={{ $json.metadata.source }}' },
-      { name: 'checksum', value: '={{ $json.metadata.checksum }}' },
+      { name: 'document_id', value: '={{ $json.document?.document_id ?? $json.metadata.document_id }}' },
+      { name: 'entry_id', value: '={{ $json.document?.metadata?.entry_id ?? $json.metadata.entry_id }}' },
+      { name: 'role', value: '={{ $json.document?.metadata?.role ?? $json.metadata.role }}' },
+      { name: 'modules', value: '={{ JSON.stringify($json.document?.metadata?.modules ?? $json.metadata.modules) }}' },
+      { name: 'locale', value: '={{ $json.document?.metadata?.locale ?? $json.metadata.locale }}' },
+      { name: 'status', value: '={{ $json.document?.metadata?.status ?? $json.metadata.status }}' },
+      { name: 'knowledge_version', value: '={{ String($json.document?.metadata?.knowledge_version ?? $json.metadata.knowledge_version) }}' },
+      { name: 'requires_online', value: '={{ String($json.document?.metadata?.requires_online ?? $json.metadata.requires_online) }}' },
+      { name: 'source', value: '={{ $json.document?.metadata?.source ?? $json.metadata.source }}' },
+      { name: 'checksum', value: '={{ $json.request?.checksum ?? $json.metadata.checksum }}' },
     ] } },
   });
 }
@@ -535,13 +568,93 @@ return [{ json: { status_code: 200, response: valid ? candidate : ${JSON.stringi
   return workflowBase(`MediFlow Assistant Query - ${suffix}`, nodes, connections);
 }
 
+function embeddingHttpParameters(vector) {
+  const body = vector.manifestProvider === 'gemini'
+    ? "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.document.content }] }, taskType: 'RETRIEVAL_DOCUMENT', outputDimensionality: 3072 }) }}"
+    : "={{ JSON.stringify({ model: 'text-embedding-3-small', input: $json.document.content, dimensions: 1536, encoding_format: 'float' }) }}";
+
+  return {
+    method: 'POST',
+    url: vector.embeddingEndpoint,
+    authentication: 'predefinedCredentialType',
+    nodeCredentialType: vector.embeddingCredential,
+    sendBody: true,
+    contentType: 'raw',
+    rawContentType: 'application/json',
+    body,
+    options: { timeout: 10000, response: { response: { responseFormat: 'json' } } },
+  };
+}
+
+function ingestEndpointConfigurationCode() {
+  return [
+    "const supabaseBaseUrl = 'https://your-project.supabase.co';",
+    "if (supabaseBaseUrl === 'https://your-project.supabase.co' || !/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/i.test(supabaseBaseUrl)) {",
+    "  throw new Error('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED');",
+    "}",
+    'return [{ json: { ...$json, supabase_base_url: supabaseBaseUrl } }];',
+  ].join('\\n');
+}
+
+function supabaseEndpointExpression(path) {
+  return "={{ $('Ingest Endpoint Configuration').first().json.supabase_base_url + " + JSON.stringify(path) + " }}";
+}
+
+function rpcHttpParameters(vector) {
+  return {
+    method: 'POST',
+    url: supabaseEndpointExpression(vector.rpcPath),
+    authentication: 'predefinedCredentialType',
+    nodeCredentialType: 'supabaseApi',
+    sendBody: true,
+    contentType: 'raw',
+    rawContentType: 'application/json',
+    body: "={{ JSON.stringify({ content: $json.document.content, metadata: { ...$json.document.metadata, document_id: $json.document.document_id, checksum: $json.request.checksum }, embedding: $json.embedding }) }}",
+    options: { timeout: 10000, response: { response: { responseFormat: 'json' } } },
+  };
+}
+
+function receiptRpcHttpParameters(vector) {
+  return {
+    method: 'POST',
+    url: supabaseEndpointExpression(vector.receiptPath),
+    authentication: 'predefinedCredentialType',
+    nodeCredentialType: 'supabaseApi',
+    sendBody: true,
+    contentType: 'raw',
+    rawContentType: 'application/json',
+    body: "={{ JSON.stringify({ request_id: $json.request.request_id, provider: " + JSON.stringify(vector.manifestProvider) + ", checksum: $json.request.checksum, knowledge_version: String($json.request.knowledge_version), batch_index: $json.request.batch_index, batch_count: $json.request.batch_count, document_count: $json.request.document_count, accepted_count: $json.accepted, full_manifest: $json.request.full_manifest }) }}",
+    options: { timeout: 10000, response: { response: { responseFormat: 'json' } } },
+  };
+}
+
+function documentLookupHttpParameters(vector) {
+  return {
+    method: 'GET',
+    url: supabaseEndpointExpression(vector.tablePath),
+    authentication: 'predefinedCredentialType',
+    nodeCredentialType: 'supabaseApi',
+    sendQuery: true,
+    queryParameters: { parameters: [
+      { name: 'select', value: 'document_id,knowledge_checksum' },
+      { name: 'document_id', value: '={{ "eq." + $json.document.document_id }}' },
+      { name: 'knowledge_checksum', value: '={{ "eq." + $json.request.checksum }}' },
+      { name: 'limit', value: '1' },
+    ] },
+    options: {
+      timeout: 10000,
+      response: { response: { responseFormat: 'json' } },
+    },
+  };
+}
+
 function createIngestWorkflow({ persistent, modelProvider, roles, modules, roleModules }) {
   const vector = vectorConfig(modelProvider);
   const suffix = persistent ? `Supabase ${modelProvider === 'gemini' ? 'Gemini' : 'OpenAI'}` : 'Simple Dev OpenAI';
   const nodes = [
     workflowNode('note-ingest', 'Ingest security and credentials setup', 'n8n-nodes-base.stickyNote', 1, [-1240, -440], {
       content: persistent
-        ? 'Asignación manual obligatoria: Crypto=MEDIFLOW_HMAC_INGEST_SECRET, Supabase=MEDIFLOW_SUPABASE y embeddings=MEDIFLOW_EMBEDDINGS. La activación del checksum ocurre solo después del último lote válido.'
+        ? 'Asignación manual obligatoria: Crypto=MEDIFLOW_HMAC_INGEST_SECRET, Supabase=MEDIFLOW_SUPABASE y embeddings=MEDIFLOW_EMBEDDINGS. Antes de publicar, edita el único nodo Ingest Endpoint Configuration con el host privado autorizado. La activación ocurre solo desde el lote final completo.'
         : 'Solo desarrollo: almacenamiento no persistente. Configure MEDIFLOW_HMAC_INGEST_SECRET, MEDIFLOW_EMBEDDINGS y Data Table MEDIFLOW_ASSISTANT_NONCES_DEV. No usar en producción.',
       width: 720, height: 220,
     }),
@@ -551,7 +664,7 @@ function createIngestWorkflow({ persistent, modelProvider, roles, modules, roleM
     workflowNode('if-valid-ingest', 'Payload Is Valid', 'n8n-nodes-base.if', 2.2, [-680, 0], ifParameters('={{ $json.valid }}')),
     workflowNode('respond-invalid-ingest', 'Respond Invalid Payload', 'n8n-nodes-base.respondToWebhook', 1.5, [-440, 280], respondParameters(422)),
     workflowNode('crypto-ingest', 'Verify HMAC', 'n8n-nodes-base.crypto', 2, [-440, -40], cryptoParameters(), { alwaysOutputData: true, onError: 'continueRegularOutput' }),
-    workflowNode('compare-ingest', 'Constant Time Signature Check', 'n8n-nodes-base.code', 2, [-220, -40], { jsCode: compareSignatureCode }),
+    workflowNode('compare-ingest', 'Constant Time Signature Check', 'n8n-nodes-base.code', 2, [-220, -40], { jsCode: compareIngestSignatureCode }),
     workflowNode('if-signature-ingest', 'Signature Is Valid', 'n8n-nodes-base.if', 2.2, [0, -40], ifParameters('={{ $json.signature_valid }}')),
     workflowNode('respond-unauthorized-ingest', 'Respond Unauthorized', 'n8n-nodes-base.respondToWebhook', 1.5, [220, 280], { ...respondParameters(401) }),
   ];
@@ -585,7 +698,7 @@ function createIngestWorkflow({ persistent, modelProvider, roles, modules, roleM
     workflowNode('respond-replay-ingest', 'Respond Replay Or Rate Limit', 'n8n-nodes-base.respondToWebhook', 1.5, [880, 280], respondParameters(409)),
   );
   addConnection(connections, 'Classify Anti-Replay Result', 'Nonce Is Fresh');
-  addConnection(connections, 'Nonce Is Fresh', persistent ? 'Convert Documents' : 'Record Nonce Data Table', 0);
+  addConnection(connections, 'Nonce Is Fresh', persistent ? 'Ingest Endpoint Configuration' : 'Record Nonce Data Table', 0);
   addConnection(connections, 'Nonce Is Fresh', 'Respond Replay Or Rate Limit', 1);
 
   if (!persistent) {
@@ -606,8 +719,8 @@ function createIngestWorkflow({ persistent, modelProvider, roles, modules, roleM
       workflowNode('build-reset-simple', 'Build Simple Store Reset Markers', 'n8n-nodes-base.code', 2, [1260, -360], { jsCode: `const request = $('Constant Time Signature Check').first().json;
 const roles = ${JSON.stringify(roles)};
 return roles.map((role) => ({ json: { content: 'MediFlow reset marker', metadata: { document_id: '__reset__:' + role + ':' + request.payload.checksum, entry_id: '__reset__', role, modules: ['support'], locale: 'es-EC', status: 'reset', knowledge_version: request.payload.knowledge_version, requires_online: false, source: 'knowledge-base.json', checksum: request.payload.checksum } } }));` }),
-      workflowNode('loop-reset-simple', 'Loop Over Simple Store Resets', 'n8n-nodes-base.splitInBatches', 3.4, [1420, -360], { batchSize: 1, options: {} }),
-      workflowNode('reset-vector-simple', 'Simple Vector Store Reset', '@n8n/n8n-nodes-langchain.vectorStoreInMemory', 1.3, [1580, -360], { mode: 'insert', memoryKey: { __rl: true, mode: 'id', value: "={{ 'mediflow-assistant-phase4-' + $json.metadata.role }}" }, clearStore: true }, { alwaysOutputData: true, onError: 'continueRegularOutput' }),
+      workflowNode('loop-reset-simple', 'Loop Over Simple Store Resets', 'n8n-nodes-base.splitInBatches', 3, [1420, -360], { batchSize: 1, options: {} }),
+      workflowNode('reset-vector-simple', 'Simple Vector Store Reset', '@n8n/n8n-nodes-langchain.vectorStoreInMemory', 1.3, [1580, -360], { mode: 'insert', memoryKey: { __rl: true, mode: 'id', value: "={{ 'mediflow-assistant-phase4-' + $json.metadata.role }}" }, clearStore: true }, { onError: 'continueErrorOutput' }),
       defaultLoaderNode('loader-reset', 'Reset Data Loader'),
       workflowNode('splitter-reset', 'Reset Marker Splitter', '@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter', 1, [1580, -560], { chunkSize: 12000, chunkOverlap: 0, options: {} }),
       workflowNode('check-reset-simple', 'Check Simple Store Reset', 'n8n-nodes-base.code', 2, [1740, -360], { mode: 'runOnceForAllItems', jsCode: `const request = $('Constant Time Signature Check').first().json; const results = $input.all(); const ok = results.length === ${roles.length} && !results.some((item) => item.json?.error); return [{ json: { ...request, simple_reset_ok: ok } }];` }),
@@ -615,47 +728,96 @@ return roles.map((role) => ({ json: { content: 'MediFlow reset marker', metadata
     );
   }
   nodes.push(
-    workflowNode('convert-docs', 'Convert Documents', 'n8n-nodes-base.code', 2, [1100, -120], { mode: 'runOnceForAllItems', jsCode: `const request = $('Constant Time Signature Check').first().json;
-return request.payload.documents.map((document) => ({ json: { content: document.content, metadata: { ...document.metadata, document_id: document.document_id, checksum: request.payload.checksum } } }));` }),
-    workflowNode('loop-documents', 'Loop Over Documents', 'n8n-nodes-base.splitInBatches', 3.4, [1240, -120], { batchSize: 1, options: {} }),
-    persistent
-      ? workflowNode('insert-vector-supabase', 'Supabase Vector Store Insert', '@n8n/n8n-nodes-langchain.vectorStoreSupabase', 1.3, [1420, -120], { mode: 'insert', tableName: { __rl: true, value: vector.table, mode: 'list', cachedResultName: vector.table }, options: { queryName: vector.query } }, { alwaysOutputData: true, onError: 'continueRegularOutput' })
-      : workflowNode('insert-vector-simple', 'Simple Vector Store Insert', '@n8n/n8n-nodes-langchain.vectorStoreInMemory', 1.3, [1420, -120], { mode: 'insert', memoryKey: { __rl: true, mode: 'id', value: "={{ 'mediflow-assistant-phase4-' + $json.metadata.role }}" }, clearStore: false }, { alwaysOutputData: true, onError: 'continueRegularOutput' }),
-    workflowNode('emb-ingest', vector.embeddings.name, vector.embeddings.type, vector.embeddings.typeVersion, [1260, 120], vector.embeddings.parameters),
-    defaultLoaderNode('loader-ingest'),
-    workflowNode('check-ingest', 'Check Ingest Result', 'n8n-nodes-base.code', 2, [1660, -120], { mode: 'runOnceForAllItems', jsCode: `const request = $('Constant Time Signature Check').first().json;
-const results = $input.all();
-const errors = results.filter((item) => item.json?.error).length;
-const completed = errors === 0 && results.length === request.payload.documents.length;
-return [{ json: { ...request, ingest_ok: completed, accepted: completed ? request.payload.documents.length : 0, rejected: completed ? 0 : request.payload.documents.length, is_final_batch: request.payload.batch_index === request.payload.batch_count - 1 } }];` }),
+    workflowNode('convert-docs', 'Convert Documents', 'n8n-nodes-base.code', 2, [1100, -120], { mode: 'runOnceForAllItems', jsCode: convertDocumentsCode(vector.manifestProvider) }),
+    workflowNode('loop-documents', 'Loop Over Documents', 'n8n-nodes-base.splitInBatches', 3, [1240, -120], { batchSize: 1, options: {} }),
+    workflowNode('check-ingest', 'Check Ingest Result', 'n8n-nodes-base.code', 2, [2100, -120], { mode: 'runOnceForAllItems', jsCode: checkIngestResultCode() }),
     workflowNode('if-ingest-ok', 'Ingest Batch Succeeded', 'n8n-nodes-base.if', 2.2, [1800, -120], ifParameters('={{ $json.ingest_ok }}')),
-    workflowNode('build-ingest-error', 'Build Ingest Safe Error', 'n8n-nodes-base.code', 2, [2020, 280], { jsCode: `const request = $json; return [{ json: { status_code: 200, response: { ok: false, request_id: request.payload.request_id, accepted: 0, rejected: request.payload.documents.length } } }];` }),
+    workflowNode('build-ingest-error', 'Build Ingest Safe Error', 'n8n-nodes-base.code', 2, [2580, 280], { jsCode: buildSafeErrorCode() }),
     workflowNode('respond-ingest-error', 'Respond Ingest Safe Error', 'n8n-nodes-base.respondToWebhook', 1.5, [2240, 280], respondParameters()),
     workflowNode('if-final', 'Final Batch', 'n8n-nodes-base.if', 2.2, [2020, -120], ifParameters('={{ $json.is_final_batch }}')),
-    workflowNode('splitter-ingest', 'Document Unit Splitter', '@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter', 1, [1500, 960], { chunkSize: 12000, chunkOverlap: 0, options: {} }),
-    workflowNode('build-ingest-summary', 'Build Ingest Summary', 'n8n-nodes-base.code', 2, [2460, -40], { jsCode: `const request = $('Check Ingest Result').first().json;
-const activated = request.is_final_batch ? ${persistent ? '$json.manifest_activated === true' : 'true'} : false; return [{ json: { status_code: 200, response: { ok: true, request_id: request.payload.request_id, accepted: request.accepted, rejected: request.rejected, checksum: request.payload.checksum, knowledge_version: request.payload.knowledge_version, activated } } }];` }),
+    workflowNode('build-ingest-summary', 'Build Ingest Summary', 'n8n-nodes-base.code', 2, [2460, -40], { jsCode: buildSummaryCode(persistent) }),
     workflowNode('respond-ingest-summary', 'Respond Ingest Summary', 'n8n-nodes-base.respondToWebhook', 1.5, [2680, -40], respondParameters()),
   );
-  const vectorStoreName = persistent ? 'Supabase Vector Store Insert' : 'Simple Vector Store Insert';
+  if (persistent) {
+    nodes.push(
+      workflowNode('check-existing-document', 'Check Existing Document', 'n8n-nodes-base.httpRequest', 4.2, [1380, -300], documentLookupHttpParameters(vector), { alwaysOutputData: true, onError: 'continueErrorOutput' }),
+      workflowNode('classify-existing-document', 'Classify Existing Document', 'n8n-nodes-base.code', 2, [1540, -300], { mode: 'runOnceForAllItems', jsCode: `const context = $('Loop Over Documents').item.json; const rawRows = $input.all().map((item) => item.json ?? {}); const rows = rawRows.flatMap((value) => Array.isArray(value) ? value : (Array.isArray(value?.data) ? value.data : [value])); const row = rows.length === 1 ? rows[0] : {}; const alreadyPresent = rows.length === 1 && row.document_id === context.document.document_id && row.knowledge_checksum === context.request.checksum; return [{ json: { ...context, already_present: alreadyPresent } }];` }),
+      workflowNode('if-existing-document', 'Document Is Already Present', 'n8n-nodes-base.if', 2.2, [1700, -300], ifParameters('={{ $json.already_present === true }}')),
+      workflowNode('build-existing-result', 'Build Already Present Result', 'n8n-nodes-base.code', 2, [1860, -380], { jsCode: buildDocumentResultCode('already_present', true) }),
+      workflowNode('generate-embedding', 'Generate Document Embedding', 'n8n-nodes-base.httpRequest', 4.2, [1860, -220], embeddingHttpParameters(vector), { onError: 'continueErrorOutput' }),
+      workflowNode('validate-embedding', 'Validate Document Embedding', 'n8n-nodes-base.code', 2, [2020, -220], { jsCode: embeddingValidationCode(vector.manifestProvider, vector.dimensions) }),
+      workflowNode('if-embedding-valid', 'Embedding Is Valid', 'n8n-nodes-base.if', 2.2, [2180, -220], ifParameters('={{ $json.embedding_valid === true }}')),
+      workflowNode('call-rpc', 'Call Idempotent Supabase RPC', 'n8n-nodes-base.httpRequest', 4.2, [2340, -220], rpcHttpParameters(vector), { onError: 'continueErrorOutput' }),
+      workflowNode('validate-rpc', 'Validate RPC Result', 'n8n-nodes-base.code', 2, [2500, -220], { mode: 'runOnceForAllItems', jsCode: validateRpcResultCode() }),
+      workflowNode('if-rpc-valid', 'RPC Result Is Valid', 'n8n-nodes-base.if', 2.2, [2660, -220], ifParameters('={{ $json.rpc_valid === true }}')),
+      workflowNode('confirm-stored-document', 'Confirm Stored Document', 'n8n-nodes-base.httpRequest', 4.2, [2820, -220], documentLookupHttpParameters(vector), { alwaysOutputData: true, onError: 'continueErrorOutput' }),
+      workflowNode('build-inserted-result', 'Build Inserted Result', 'n8n-nodes-base.code', 2, [2980, -220], { mode: 'runOnceForAllItems', jsCode: buildInsertedResultCode() }),
+    );
+  } else {
+    nodes.push(
+      workflowNode('insert-vector-simple', 'Simple Vector Store Insert', '@n8n/n8n-nodes-langchain.vectorStoreInMemory', 1.3, [1420, -120], { mode: 'insert', memoryKey: { __rl: true, mode: 'id', value: "={{ 'mediflow-assistant-phase4-' + $json.document.metadata.role }}" }, clearStore: false }, { onError: 'continueErrorOutput' }),
+      workflowNode('emb-ingest', vector.embeddings.name, vector.embeddings.type, vector.embeddings.typeVersion, [1260, 120], vector.embeddings.parameters),
+      defaultLoaderNode('loader-ingest'),
+      workflowNode('splitter-ingest', 'Document Unit Splitter', '@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter', 1, [1500, 960], { chunkSize: 12000, chunkOverlap: 0, options: {} }),
+      workflowNode('confirm-simple-document', 'Build Simple Inserted Result', 'n8n-nodes-base.code', 2, [1580, -120], { jsCode: linkedDocumentResultCode('Loop Over Documents', 'inserted', true) }),
+    );
+  }
+  if (persistent) {
+    nodes.push(
+      workflowNode('ingest-endpoint-config', 'Ingest Endpoint Configuration', 'n8n-nodes-base.code', 2, [920, -120], { jsCode: ingestEndpointConfigurationCode() }),
+    );
+    addConnection(connections, 'Ingest Endpoint Configuration', 'Convert Documents');
+  }
+  nodes.push(
+    workflowNode('build-failed-result', 'Build Failed Document Result', 'n8n-nodes-base.code', 2, [2820, 40], { jsCode: buildFailedResultCode() }),
+    workflowNode('if-document-result', 'Document Result Confirmed', 'n8n-nodes-base.if', 2.2, [3140, -120], ifParameters("={{ ['inserted', 'already_present'].includes($json.result?.storage_status) && $json.result?.confirmed === true }}")),
+  );
   addConnection(connections, 'Convert Documents', 'Loop Over Documents');
-  addConnection(connections, 'Loop Over Documents', vectorStoreName, 1);
-  addConnection(connections, vectorStoreName, 'Loop Over Documents');
+  addConnection(connections, 'Loop Over Documents', persistent ? 'Check Existing Document' : 'Simple Vector Store Insert', 1);
+  if (persistent) {
+    addConnection(connections, 'Check Existing Document', 'Classify Existing Document');
+    addConnection(connections, 'Check Existing Document', 'Build Failed Document Result', 1);
+    addConnection(connections, 'Classify Existing Document', 'Document Is Already Present');
+    addConnection(connections, 'Document Is Already Present', 'Build Already Present Result', 0);
+    addConnection(connections, 'Document Is Already Present', 'Generate Document Embedding', 1);
+    addConnection(connections, 'Build Already Present Result', 'Document Result Confirmed');
+    addConnection(connections, 'Generate Document Embedding', 'Validate Document Embedding');
+    addConnection(connections, 'Generate Document Embedding', 'Build Failed Document Result', 1);
+    addConnection(connections, 'Validate Document Embedding', 'Embedding Is Valid');
+    addConnection(connections, 'Embedding Is Valid', 'Call Idempotent Supabase RPC', 0);
+    addConnection(connections, 'Embedding Is Valid', 'Build Failed Document Result', 1);
+    addConnection(connections, 'Call Idempotent Supabase RPC', 'Validate RPC Result');
+    addConnection(connections, 'Call Idempotent Supabase RPC', 'Build Failed Document Result', 1);
+    addConnection(connections, 'Validate RPC Result', 'RPC Result Is Valid');
+    addConnection(connections, 'RPC Result Is Valid', 'Confirm Stored Document', 0);
+    addConnection(connections, 'RPC Result Is Valid', 'Build Failed Document Result', 1);
+    addConnection(connections, 'Confirm Stored Document', 'Build Inserted Result');
+    addConnection(connections, 'Confirm Stored Document', 'Build Failed Document Result', 1);
+    addConnection(connections, 'Build Inserted Result', 'Document Result Confirmed');
+  } else {
+    addConnection(connections, 'Simple Vector Store Insert', 'Build Simple Inserted Result');
+    addConnection(connections, 'Simple Vector Store Insert', 'Build Failed Document Result', 1);
+    addConnection(connections, 'Build Simple Inserted Result', 'Document Result Confirmed');
+  }
+  addConnection(connections, 'Build Failed Document Result', 'Document Result Confirmed');
+  addConnection(connections, 'Document Result Confirmed', 'Loop Over Documents', 0);
+  addConnection(connections, 'Document Result Confirmed', 'Build Ingest Safe Error', 1);
   addConnection(connections, 'Loop Over Documents', 'Check Ingest Result', 0);
   addConnection(connections, 'Check Ingest Result', 'Ingest Batch Succeeded');
   addConnection(connections, 'Ingest Batch Succeeded', persistent ? 'Record Ingest Batch Receipt' : 'Final Batch', 0);
   addConnection(connections, 'Ingest Batch Succeeded', 'Build Ingest Safe Error', 1);
   addConnection(connections, 'Build Ingest Safe Error', 'Respond Ingest Safe Error');
-  addConnection(connections, vector.embeddings.name, vectorStoreName, 0, 'ai_embedding');
-  addConnection(connections, 'Default Data Loader', vectorStoreName, 0, 'ai_document');
-  addConnection(connections, 'Document Unit Splitter', 'Default Data Loader', 0, 'ai_textSplitter');
 
   if (!persistent) {
+    addConnection(connections, vector.embeddings.name, 'Simple Vector Store Insert', 0, 'ai_embedding');
+    addConnection(connections, 'Default Data Loader', 'Simple Vector Store Insert', 0, 'ai_document');
+    addConnection(connections, 'Document Unit Splitter', 'Default Data Loader', 0, 'ai_textSplitter');
     addConnection(connections, 'Reset Simple Stores For Full Manifest', 'Build Simple Store Reset Markers', 0);
     addConnection(connections, 'Reset Simple Stores For Full Manifest', 'Convert Documents', 1);
     addConnection(connections, 'Build Simple Store Reset Markers', 'Loop Over Simple Store Resets');
     addConnection(connections, 'Loop Over Simple Store Resets', 'Simple Vector Store Reset', 1);
     addConnection(connections, 'Simple Vector Store Reset', 'Loop Over Simple Store Resets');
+    addConnection(connections, 'Simple Vector Store Reset', 'Build Ingest Safe Error', 1);
     addConnection(connections, 'Loop Over Simple Store Resets', 'Check Simple Store Reset', 0);
     addConnection(connections, 'Check Simple Store Reset', 'Simple Store Reset Succeeded');
     addConnection(connections, 'Simple Store Reset Succeeded', 'Convert Documents', 0);
@@ -666,52 +828,25 @@ const activated = request.is_final_batch ? ${persistent ? '$json.manifest_activa
   }
   if (persistent) {
     nodes.push(
-    workflowNode('record-batch', 'Record Ingest Batch Receipt', 'n8n-nodes-base.supabase', 1, [1940, -180], {
-      operation: 'create', tableId: 'assistant_ingest_batches',
-      fieldsUi: { fieldValues: [
-        { fieldId: 'request_id', fieldValue: "={{ $('Check Ingest Result').first().json.payload.request_id }}" },
-        { fieldId: 'provider', fieldValue: vector.manifestProvider },
-        { fieldId: 'checksum', fieldValue: "={{ $('Check Ingest Result').first().json.payload.checksum }}" },
-        { fieldId: 'knowledge_version', fieldValue: "={{ String($('Check Ingest Result').first().json.payload.knowledge_version) }}" },
-        { fieldId: 'batch_index', fieldValue: "={{ $('Check Ingest Result').first().json.payload.batch_index }}" },
-        { fieldId: 'batch_count', fieldValue: "={{ $('Check Ingest Result').first().json.payload.batch_count }}" },
-        { fieldId: 'document_count', fieldValue: "={{ $('Check Ingest Result').first().json.payload.document_count }}" },
-        { fieldId: 'accepted_count', fieldValue: "={{ $('Check Ingest Result').first().json.accepted }}" },
-        { fieldId: 'full_manifest', fieldValue: "={{ $('Check Ingest Result').first().json.payload.full_manifest }}" },
-      ] },
-    }, { alwaysOutputData: true, onError: 'continueRegularOutput' }),
-    workflowNode('get-batch', 'Get Stored Batch Receipt', 'n8n-nodes-base.supabase', 1, [2100, -180], {
-      operation: 'getAll', tableId: 'assistant_ingest_batches', returnAll: false, limit: 1,
-      filterType: 'manual', matchType: 'allFilters', filters: { conditions: [
-        { keyName: 'provider', condition: 'eq', keyValue: vector.manifestProvider },
-        { keyName: 'checksum', condition: 'eq', keyValue: "={{ $('Check Ingest Result').first().json.payload.checksum }}" },
-        { keyName: 'batch_index', condition: 'eq', keyValue: "={{ $('Check Ingest Result').first().json.payload.batch_index }}" },
-      ] },
-    }, { alwaysOutputData: true, onError: 'continueRegularOutput' }),
-    workflowNode('confirm-batch', 'Confirm Batch Receipt', 'n8n-nodes-base.code', 2, [2260, -180], { mode: 'runOnceForAllItems', jsCode: `const request = $('Check Ingest Result').first().json;
-const rows = $input.all().map((item) => item.json ?? {});
-const receipt = rows.find((row) => row.provider === ${JSON.stringify(vector.manifestProvider)} && row.checksum === request.payload.checksum && Number(row.batch_index) === request.payload.batch_index && Number(row.batch_count) === request.payload.batch_count && Number(row.document_count) === request.payload.document_count && Number(row.accepted_count) === request.accepted && String(row.knowledge_version) === String(request.payload.knowledge_version) && row.full_manifest === request.payload.full_manifest && !row.error);
-return [{ json: { ...request, batch_receipt_stored: Boolean(receipt) } }];` }),
+    workflowNode('record-batch', 'Record Ingest Batch Receipt', 'n8n-nodes-base.httpRequest', 4.2, [1940, -180], receiptRpcHttpParameters(vector), { alwaysOutputData: true, onError: 'continueErrorOutput' }),
+    workflowNode('validate-batch', 'Validate Batch Receipt', 'n8n-nodes-base.code', 2, [2100, -180], { mode: 'runOnceForAllItems', jsCode: validateIngestReceiptCode(vector.manifestProvider) }),
     workflowNode('if-batch', 'Batch Receipt Was Stored', 'n8n-nodes-base.if', 2.2, [2420, -180], ifParameters('={{ $json.batch_receipt_stored }}')),
-    workflowNode('get-manifest-ingest', 'Get Activated Knowledge Manifest', 'n8n-nodes-base.supabase', 1, [2260, -300], {
-      operation: 'getAll', tableId: 'assistant_knowledge_manifests', returnAll: false, limit: 1,
-      filterType: 'manual', matchType: 'allFilters', filters: { conditions: [{ keyName: 'provider', condition: 'eq', keyValue: vector.manifestProvider }] },
-    }, { alwaysOutputData: true, onError: 'continueRegularOutput' }),
-    workflowNode('confirm-manifest', 'Confirm Manifest Activation', 'n8n-nodes-base.code', 2, [2420, -300], { mode: 'runOnceForAllItems', jsCode: `const request = $('Check Ingest Result').first().json;
-const rows = $input.all().map((item) => item.json ?? {});
-const activated = rows.some((row) => row.provider === ${JSON.stringify(vector.manifestProvider)} && row.active_checksum === request.payload.checksum && Number(row.document_count) === request.payload.document_count && String(row.knowledge_version) === String(request.payload.knowledge_version) && !row.error);
-return [{ json: { ...request, manifest_activated: activated } }];` }),
+    // The receipt RPC returns the only trusted final activation state.
+    // Its validated receipt drives the final branch below.
     workflowNode('if-manifest', 'Manifest Was Activated', 'n8n-nodes-base.if', 2.2, [2440, -180], ifParameters('={{ $json.manifest_activated }}')),
     );
-    addConnection(connections, 'Record Ingest Batch Receipt', 'Get Stored Batch Receipt');
-    addConnection(connections, 'Get Stored Batch Receipt', 'Confirm Batch Receipt');
-    addConnection(connections, 'Confirm Batch Receipt', 'Batch Receipt Was Stored');
+    addConnection(connections, 'Record Ingest Batch Receipt', 'Validate Batch Receipt');
+    addConnection(connections, 'Record Ingest Batch Receipt', 'Build Ingest Safe Error', 1);
+    addConnection(connections, 'Validate Batch Receipt', 'Batch Receipt Was Stored');
+    // Receipt RPC errors are routed to the safe error response above.
+    // A receipt mismatch follows the false branch below.
     addConnection(connections, 'Batch Receipt Was Stored', 'Final Batch', 0);
     addConnection(connections, 'Batch Receipt Was Stored', 'Build Ingest Safe Error', 1);
-    addConnection(connections, 'Final Batch', 'Get Activated Knowledge Manifest', 0);
+    addConnection(connections, 'Final Batch', 'Manifest Was Activated', 0);
     addConnection(connections, 'Final Batch', 'Build Ingest Summary', 1);
-    addConnection(connections, 'Get Activated Knowledge Manifest', 'Confirm Manifest Activation');
-    addConnection(connections, 'Confirm Manifest Activation', 'Manifest Was Activated');
+    // The receipt RPC atomically reports the manifest activation state.
+    // No secondary manifest read is allowed here.
+    // Only the final batch may follow the activated branch.
     addConnection(connections, 'Manifest Was Activated', 'Build Ingest Summary', 0);
     addConnection(connections, 'Manifest Was Activated', 'Build Ingest Safe Error', 1);
   } else {

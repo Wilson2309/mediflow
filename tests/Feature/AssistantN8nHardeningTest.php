@@ -126,10 +126,10 @@ class AssistantN8nHardeningTest extends TestCase
         );
 
         $this->assertFalse($result['success']);
-        $this->assertSame('INVALID_INGEST_RESPONSE', $result['error_code']);
+        $this->assertSame('INGEST_BATCH_REJECTED', $result['error_code']);
         $this->assertSame(100, $result['documents_sent']);
-        $this->assertSame(99, $result['accepted']);
-        $this->assertSame(1, $result['rejected']);
+        $this->assertSame(0, $result['accepted']);
+        $this->assertSame(0, $result['rejected']);
         $this->assertSame(1, $result['batches']);
     }
 

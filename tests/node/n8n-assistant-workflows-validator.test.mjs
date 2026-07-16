@@ -154,6 +154,12 @@ test('acepta un workflow de consulta válido y sin credenciales embebidas', asyn
 });
 
 test('rechaza un workflow sin HMAC SHA-256', async () => {
+test('rechaza un typeVersion no soportado en un nodo critico', async () => {
+    const workflow = await loadFixture('valid-query-workflow.json');
+    workflow.nodes.find((node) => node.name === 'Webhook Query').typeVersion = 99;
+    assertError(validateWorkflow(workflow, { source: 'unsupported-type-version.json' }), /typeVersion 99 no compatible/i);
+});
+
     const result = validateWorkflow(await loadFixture('missing-hmac.json'), { source: 'missing-hmac-query.json' });
     assertError(result, /HMAC SHA-256/i);
 });
@@ -242,7 +248,7 @@ test('acepta el ciclo controlado de Loop Over Items cuando la salida done respon
             id: 'loop-documents',
             name: 'Loop Over Documents',
             type: 'n8n-nodes-base.splitInBatches',
-            typeVersion: 3.4,
+            typeVersion: 3,
             position: [990, -160],
             parameters: { batchSize: 1, options: {} },
         },
@@ -343,8 +349,8 @@ test('ingesta persistente exige assistant_ingest_batches y prohíbe UPDATE direc
 
     const directUpdate = await persistentIngestWorkflow();
     const receipt = directUpdate.nodes.find((node) => node.name === 'Record Ingest Batch Receipt');
-    receipt.parameters.operation = 'update';
-    receipt.parameters.tableId = 'assistant_knowledge_manifests';
+    receipt.type = 'n8n-nodes-base.supabase';
+    receipt.parameters = { operation: 'update', tableId: 'assistant_knowledge_manifests' };
     const result = validateWorkflow(directUpdate, { source: 'direct-manifest-update-ingest-supabase.json' });
     assertError(result, /no puede hacer UPDATE directo/i);
 });

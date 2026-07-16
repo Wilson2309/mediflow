@@ -11,7 +11,7 @@
         "assistant:n8n-documents": "node scripts/build-n8n-assistant-documents.mjs",
         "assistant:n8n-workflows": "node scripts/build-n8n-assistant-workflows.mjs",
         "n8n:assistant:validate": "node scripts/validate-n8n-assistant-workflows.mjs",
-        "n8n:assistant:validate:test": "node --test tests/node/n8n-assistant-workflows-validator.test.mjs tests/node/n8n-assistant-hardening.test.mjs tests/node/n8n-assistant-final-security.test.mjs",
+        "n8n:assistant:validate:test": "node --test tests/node/n8n-assistant-workflows-validator.test.mjs tests/node/n8n-assistant-hardening.test.mjs tests/node/n8n-assistant-final-security.test.mjs tests/node/n8n-assistant-loop-compatibility.test.mjs tests/node/n8n-assistant-ingest-confirmation.test.mjs tests/node/n8n-assistant-ingest-forensic.test.mjs tests/node/n8n-assistant-deterministic-ingest.test.mjs tests/node/n8n-assistant-phase4-simulation.test.mjs tests/node/n8n-assistant-rag-repair.test.mjs",
         "test:e2e": "playwright test",
         "test:e2e:headed": "playwright test --headed",
         "test:e2e:ui": "playwright test --ui",

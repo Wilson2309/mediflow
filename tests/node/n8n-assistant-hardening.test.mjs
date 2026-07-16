@@ -81,7 +81,7 @@ test('el esquema Gemini evita HNSW incompatible sobre vector de 3072 dimensiones
     );
     assert.match(sql, /drop index if exists public\.assistant_documents_gemini_embedding_idx/i);
     assert.match(sql, /vector\(3072\)/i);
-    assert.match(sql, /stored_document_count\s*=\s*new\.document_count/i);
-    assert.match(sql, /stored_distinct_count\s*=\s*new\.document_count/i);
+    assert.match(sql, /stored_document_count\s*=\s*input_document_count/i);
+    assert.match(sql, /stored_distinct_count\s*=\s*input_document_count/i);
     assert.match(sql, /count\(distinct d\.document_id\)/i);
 });

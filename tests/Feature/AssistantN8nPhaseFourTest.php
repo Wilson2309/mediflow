@@ -244,7 +244,7 @@ class AssistantN8nPhaseFourTest extends TestCase
         $partial = $service->sync($package, 'supabase', 100);
         $this->assertFalse($partial['success']);
         $this->assertFalse($partial['activated']);
-        $this->assertSame('INVALID_INGEST_RESPONSE', $partial['error_code']);
+        $this->assertSame('INGEST_BATCH_REJECTED', $partial['error_code']);
         Http::assertSentCount(1);
 
         $attempts = 0;

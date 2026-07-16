@@ -1,0 +1,21 @@
+{
+  "workflow": "mediflow-assistant-ingest-supabase-gemini.json",
+  "cases": [
+    "successful-insert",
+    "empty-table-false-vector-confirmed",
+    "vector-404-error",
+    "metadata-incompatible-error",
+    "embeddings-error",
+    "already-present-retry",
+    "both-valid-routes-complete-loop",
+    "unconfirmed-document",
+    "partial-batch",
+    "receipt-on-failure",
+    "manifest-on-incomplete-batch",
+    "real-confirmation-required",
+    "false-direct-loop",
+    "true-vector-store",
+    "vector-unreachable-from-false",
+    "empty-existing-evidence"
+  ]
+}

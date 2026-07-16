@@ -56,7 +56,7 @@ Antes de reanudar:
 
 - Ejecutar los validadores de JSON y sus tests.
 - Verificar manualmente credenciales, tablas, funciones RPC, modelos y Data Table.
-- Probar primero Test URL con una pregunta sintética.
+- Usar la Production URL publicada para la verificacion controlada; no usar webhook-test como configuracion de Laravel.
 - Activar un solo par por proyecto: base/OpenAI, OpenAI explícito, Gemini o Simple. Los workflows alternativos comparten paths de consulta e ingesta.
 - Confirmar 401 para firma/timestamp inválidos, 409 para replay, 422 para payload inválido y 429 para rate limit.
 - Confirmar que todas las ramas principales terminan en `Respond to Webhook`, tal como exige la configuración documentada por [n8n](https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.respondtowebhook/).
@@ -89,13 +89,13 @@ Cada exportación produce documentos por entrada/rol y un checksum global. El ge
 
 El workflow serializa los documentos para que el Data Loader y el Vector Store conserven la metadata de cada uno. Se recomienda `--batch=10` con `ASSISTANT_N8N_INGEST_TIMEOUT_SECONDS=30`; bajar el lote si el proveedor se acerca al timeout. Aumentarlo reduce peticiones y nonces, pero alarga cada ejecución y aumenta el riesgo de que todo el lote sea rechazado.
 
-Cada lote aceptado crea un recibo en `assistant_ingest_batches`. El trigger activa el manifiesto solo cuando están todos los índices, todos declaran `full_manifest`, coinciden checksum, versión, conteos y la suma aceptada alcanza el total. Una carga parcial o un “último lote” aislado no reemplaza la versión activa.
+Cada lote aceptado llama la RPC idempotente de recibos y crea o reconoce `assistant_ingest_batches` solo después de confirmar sus documentos. Solo el lote final puede intentar la activación; la RPC exige todos los índices, `full_manifest`, checksum, versión, conteos y suma aceptada coherentes. Una carga parcial o un “último lote” aislado no reemplaza la versión activa.
 
 La activación también compara el conteo real y el conteo distinto de `document_id` del checksum en la tabla vectorial. En consulta, el manifiesto es obligatorio y se valida antes de recuperar: cualquier ausencia, versión incoherente o error de Supabase termina en fallback sin vector store ni modelo. El checksum activo se aplica en la consulta y se comprueba otra vez en el postfiltro.
 
 Después de comprobar conteo, roles, módulos, búsqueda y respuesta:
 
-- Confirmar que el trigger activó el checksum a partir del conjunto completo de recibos; no editar el manifiesto para saltar la comprobación.
+- Confirmar que la RPC de recibos activó el checksum a partir del conjunto completo de recibos; no editar el manifiesto para saltar la comprobación.
 - Probar cada rol con preguntas sintéticas.
 - Mantener la colección anterior durante la ventana de rollback.
 - Solo entonces llamar `public.cleanup_inactive_assistant_documents('openai', 'REEMPLAZAR_CON_CHECKSUM_INACTIVO_64_HEX')` o la variante `gemini`, después de comprobar que ese checksum no es activo ni necesario para rollback.
@@ -190,3 +190,17 @@ No habilitar el guardado completo de ejecuciones para obtener métricas. Revisar
 ## Registro del incidente
 
 Documentar cronología, entorno, tipo de credencial, request IDs afectados, códigos seguros, acciones, responsable y cierre. No adjuntar secretos, URLs completas, cuerpos, prompts, preguntas, respuestas, pacientes, pagos ni documentos RAG.
+
+## Incidente de ingesta vacía de Gemini
+
+No tratar una respuesta HTTP 200 como evidencia de inserción. La ingesta persistente confirma cada `document_id` y `knowledge_checksum` en Supabase antes de cerrar el loop y antes de crear un recibo. Los documentos ya presentes con la misma identidad se aceptan como reintentos seguros; faltantes o no confirmados llevan al fallback, sin activar el manifiesto.
+
+Antes de reparar, consultar los tipos reales de `content`, `metadata` y `embedding` mediante `information_schema.columns` y `pg_attribute`. `metadata` debe ser `jsonb`; una columna `text` produce errores como `operator does not exist: text ->> unknown` al evaluar las columnas generadas.
+
+La reparación manual disponible en `n8n/supabase/repair-empty-gemini-rag.sql` solo puede ejecutarse cuando:
+
+- La tabla Gemini contiene cero filas.
+- El manifiesto Gemini declara `document_count = 0` y 64 ceros como checksum activo.
+- No se acepta conocimiento Gemini activo ni datos OpenAI como ámbito de reparación.
+
+El script elimina solo recibos Gemini parciales; no elimina nonces de consulta, usuarios, clínicas ni tablas Laravel. Tras el `COMMIT`, comprobar el conteo real de documentos y recibos antes de volver a publicar y sincronizar.

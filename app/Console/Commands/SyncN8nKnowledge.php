@@ -80,6 +80,7 @@ final class SyncN8nKnowledge extends Command
 
         if (! $result['success']) {
             $this->error('La sincronización no se completó. Código: '.$result['error_code']);
+            $this->line('Lote fallido: '.(int) $result['batches']);
             $this->line('Aceptados antes del fallo: '.(int) $result['accepted']);
             $this->line('Rechazados en el lote fallido: '.(int) $result['rejected']);
 
