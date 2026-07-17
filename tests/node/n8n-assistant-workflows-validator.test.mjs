@@ -160,6 +160,13 @@ test('rechaza un typeVersion no soportado en un nodo critico', async () => {
     assertError(validateWorkflow(workflow, { source: 'unsupported-type-version.json' }), /typeVersion 99 no compatible/i);
 });
 
+test('rechaza JavaScript invalido en cualquier nodo Code', async () => {
+    const workflow = await loadFixture('valid-query-workflow.json');
+    const codeNode = workflow.nodes.find((node) => node.type === 'n8n-nodes-base.code');
+    codeNode.parameters.jsCode = "if (!/^https://[a-z]+$/.test(value)) return [];";
+    assertError(validateWorkflow(workflow, { source: 'invalid-code-syntax-query.json' }), /JavaScript inválido/i);
+});
+
     const result = validateWorkflow(await loadFixture('missing-hmac.json'), { source: 'missing-hmac-query.json' });
     assertError(result, /HMAC SHA-256/i);
 });

@@ -14,6 +14,8 @@ final readonly class AssistantContext
         public string $locale,
         public int|string|null $knowledgeVersion,
         public string $timestamp,
+        /** @var array<int, string> */
+        public array $allowedModules = [],
     ) {
     }
 
@@ -30,6 +32,7 @@ final readonly class AssistantContext
             'locale' => $this->locale,
             'knowledge_version' => $this->knowledgeVersion,
             'timestamp' => $this->timestamp,
+            'allowed_modules' => $this->allowedModules,
         ];
     }
 }

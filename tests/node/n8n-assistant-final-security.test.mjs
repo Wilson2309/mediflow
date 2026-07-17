@@ -63,3 +63,24 @@ test('los fallos internos de nonce de ingesta conservan el contrato de ingesta',
         assert.equal(result.valid, true, result.errors.join('\n'));
     }
 });
+
+test('recepción usa módulos explícitos, umbral estricto y denegación financiera antes del RAG', async () => {
+    const knowledge = await readJson('resources', 'assistant', 'knowledge-base.json');
+    const allowed = knowledge.catalogs.role_modules.recepcionista;
+    for (const forbidden of ['payments', 'reports', 'financial_audit', 'medical_records', 'prescriptions']) {
+        assert.equal(allowed.includes(forbidden), false, forbidden);
+    }
+
+    const candidate = await readJson('n8n', 'workflows', 'mediflow-assistant-query-supabase-gemini.json');
+    const security = candidate.nodes.find((node) => node.name === 'Security Configuration').parameters.jsCode;
+    const validation = candidate.nodes.find((node) => node.name === 'Validate Raw Request').parameters.jsCode;
+    const filter = candidate.nodes.find((node) => node.name === 'Filter Role Module Context').parameters.jsCode;
+
+    assert.match(security, /similarity_threshold[^\n]*0\.68/);
+    assert.match(validation, /allowed_modules/);
+    assert.match(validation, /recepcionista[\s\S]*auditoria[\s\S]*financiero/);
+    assert.match(validation, /roleDenied/);
+    assert.match(filter, /modules\.some/);
+    assert.match(filter, /allowed_modules\.includes/);
+    assert.doesNotMatch(filter, /purelyGeneral|allowedGeneralModules/);
+});

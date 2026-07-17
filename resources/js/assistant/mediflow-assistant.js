@@ -3,6 +3,7 @@ import {
     MEDIFLOW_KNOWLEDGE_BASE,
     MODULE_LABELS,
     ROLE_LABELS,
+    ROLE_DENIED,
     UNKNOWN_ANSWER,
     isOfflineEntry as isOfflineKnowledgeEntry,
     quickQuestionsFor as quickQuestionsForRole,
@@ -659,6 +660,10 @@ class MediFlowAssistant {
             : searchKnowledgeBase(question, this.context, this.connectionStatus);
         const entry = result.entry;
         if (! entry) {
+            if (result.restricted) {
+                this.addMessage('assistant', ROLE_DENIED);
+                return;
+            }
             if (result.alternatives.length) {
                 this.addMessage('assistant', ambiguityContent(result.alternatives));
                 return;

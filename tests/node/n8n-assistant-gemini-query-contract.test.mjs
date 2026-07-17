@@ -44,6 +44,19 @@ test('la consulta Gemini usa embedding y RPC HTTP JSON con el contrato de 3072 d
     assert.match(rpc.parameters.jsonBody, /role:/);
 });
 
+test('la consulta ambigua de recepcionista se resuelve antes del RAG con opciones permitidas', () => {
+    const validator = node(workflow, 'Validate Raw Request');
+    const guardrail = node(workflow, 'Build Role Guardrail Response');
+
+    assert.match(validator.parameters.jsCode, /const ambiguous =/);
+    assert.match(validator.parameters.jsCode, /\[\u00bf \]\*/);
+    assert.match(validator.parameters.jsCode, /¿Cómo agendo una cita\?/);
+    assert.match(validator.parameters.jsCode, /¿Cómo consulto un paciente\?/);
+    assert.match(validator.parameters.jsCode, /blocked_suggestions/);
+    assert.match(guardrail.parameters.jsCode, /blocked_suggestions/);
+    assert.match(guardrail.parameters.jsCode, /suggestions, can_escalate: false/);
+});
+
 test('rechaza query embedding Raw, JSON serializado o con dimensión incorrecta', () => {
     for (const mutate of [
         (candidate) => {

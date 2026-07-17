@@ -71,6 +71,7 @@ final class AssistantMessageController extends Controller
             locale: (string) config('assistant.locale', 'es-EC'),
             knowledgeVersion: $validated['knowledge_version'] ?? $knowledgeCatalog->version(),
             timestamp: now('UTC')->toIso8601String(),
+            allowedModules: $knowledgeCatalog->modulesForRole($canonicalRole),
         );
 
         try {

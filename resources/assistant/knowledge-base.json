@@ -25,6 +25,13 @@
       "medico": "Médico",
       "super_admin": "Súper Admin"
     },
+    "role_modules": {
+      "administrador": ["dashboard", "patients", "doctors", "services", "appointments", "daily_agenda", "payments", "receipts", "consultations", "medical_records", "prescriptions", "reports", "audit", "financial_audit", "users", "clinic_settings", "clinic_switch", "offline", "permissions", "support"],
+      "recepcionista": ["dashboard", "patients", "doctors", "services", "appointments", "daily_agenda", "clinic_switch", "offline", "permissions", "support"],
+      "caja_finanzas": ["dashboard", "services", "appointments", "daily_agenda", "payments", "receipts", "reports", "financial_audit", "clinic_switch", "offline", "permissions", "support"],
+      "medico": ["dashboard", "appointments", "daily_agenda", "consultations", "medical_records", "prescriptions", "clinic_switch", "offline", "permissions", "support"],
+      "super_admin": ["super_admin_clinics", "subscriptions", "onboarding", "offline", "permissions", "support"]
+    },
     "modules": {
       "dashboard": { "label": "Dashboard", "roles": ["administrador", "recepcionista", "caja_finanzas", "medico"] },
       "patients": { "label": "Pacientes", "roles": ["administrador", "recepcionista"] },

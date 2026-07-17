@@ -15,6 +15,17 @@ final class AssistantKnowledgeCatalog
         return array_keys((array) ($this->document()['catalogs']['modules'] ?? []));
     }
 
+    /** @return array<int, string> */
+    public function modulesForRole(string $role): array
+    {
+        $modules = $this->document()['catalogs']['role_modules'][$role] ?? [];
+
+        return array_values(array_filter(
+            is_array($modules) ? $modules : [],
+            fn (mixed $module): bool => is_string($module) && $module !== '',
+        ));
+    }
+
     public function version(): int|string|null
     {
         return $this->document()['schema_version'] ?? null;

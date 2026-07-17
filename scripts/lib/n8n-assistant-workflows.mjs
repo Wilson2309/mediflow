@@ -82,7 +82,7 @@ function securityConfigurationCode(kind) {
       max_clock_skew_seconds: 30,
       max_question_length: 500,
       top_k: 5,
-      similarity_threshold: 0.55,
+      similarity_threshold: 0.68,
       max_context_characters: 12000,
     }
     : {
@@ -102,9 +102,9 @@ const MAX_REQUEST_AGE_SECONDS = Math.max(60, Math.min(600, Number(securityConfig
 const MAX_CLOCK_SKEW_SECONDS = Math.max(0, Math.min(60, Number(securityConfig.max_clock_skew_seconds ?? 30)));
 const MAX_QUESTION_LENGTH = Math.max(100, Math.min(1000, Number(securityConfig.max_question_length ?? 500)));
 const TOP_K = Math.max(3, Math.min(10, Number(securityConfig.top_k ?? 5)));
-const SIMILARITY_THRESHOLD = Math.max(0, Math.min(1, Number(securityConfig.similarity_threshold ?? 0.55)));
+const SIMILARITY_THRESHOLD = Math.max(0, Math.min(1, Number(securityConfig.similarity_threshold ?? 0.68)));
 const MAX_CONTEXT_CHARACTERS = Math.max(2000, Math.min(20000, Number(securityConfig.max_context_characters ?? 12000)));
-const allowedKeys = ['request_id','question','role','module','route','connection_state','locale','knowledge_version','timestamp'];
+const allowedKeys = ['request_id','question','role','module','route','connection_state','locale','knowledge_version','timestamp','allowed_modules'];
 const prohibited = ['user_id','clinic_id','email','patient_id','doctor_id','payment_id','diagnosis','prescription','medical_record','password','token','cookies','historial'];
 const roles = ${JSON.stringify(roleModules)};
 const fail = (statusCode) => ({ valid: false, status_code: statusCode, response: ${JSON.stringify(responseObject(UNAUTHORIZED))} });
@@ -135,9 +135,10 @@ const ageSeconds = (Date.now() - parsedTimestamp) / 1000;
 const roleModules = roles[body.role];
 const validRoute = body.route === null || (typeof body.route === 'string' && body.route.length <= 255);
 const validModule = body.module === null || (typeof body.module === 'string' && Boolean(roleModules?.includes(body.module)));
+const validAllowedModules = Array.isArray(body.allowed_modules) && body.allowed_modules.length > 0 && body.allowed_modules.length <= 30 && new Set(body.allowed_modules).size === body.allowed_modules.length && body.allowed_modules.every((module) => typeof module === 'string' && roleModules?.includes(module));
 const validVersion = body.knowledge_version === null || ((Number.isInteger(body.knowledge_version) || typeof body.knowledge_version === 'string') && String(body.knowledge_version).length <= 32);
 if (body.timestamp !== timestampHeader || !timestampPattern.test(body.timestamp) || !Number.isFinite(parsedTimestamp) || ageSeconds > MAX_REQUEST_AGE_SECONDS || ageSeconds < -MAX_CLOCK_SKEW_SECONDS) return [{ json: fail(401) }];
-if (!uuid.test(body.request_id) || body.request_id !== requestIdHeader || typeof body.question !== 'string' || body.question.trim().length < 2 || body.question.length > MAX_QUESTION_LENGTH || !roleModules || !validModule || !validRoute || body.connection_state !== 'ONLINE' || body.locale !== 'es-EC' || !validVersion || String(body.knowledge_version ?? 'unknown') !== assistantVersion) return [{ json: fail(422) }];
+if (!uuid.test(body.request_id) || body.request_id !== requestIdHeader || typeof body.question !== 'string' || body.question.trim().length < 2 || body.question.length > MAX_QUESTION_LENGTH || !roleModules || !validModule || !validAllowedModules || !validRoute || body.connection_state !== 'ONLINE' || body.locale !== 'es-EC' || !validVersion || String(body.knowledge_version ?? 'unknown') !== assistantVersion) return [{ json: fail(422) }];
 const normalizedQuestion = body.question.normalize('NFKC').toLocaleLowerCase('es-EC');
 const injectionPatterns = [
   /ignora(?:r)? (?:las |todas las )?(?:reglas|instrucciones)/,
@@ -155,13 +156,28 @@ const sensitivePatterns = [
   /(?:password|contrase[nñ]a|token|api.?key|secret[o]?) *[:=] *[^ ]+/i,
 ];
 const sensitive = sensitivePatterns.some((pattern) => pattern.test(body.question));
+const guardText = normalizedQuestion.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const restrictedByRole = {
+  recepcionista: /(?:auditoria|financiero|finanzas|reporte financiero|cierre de caja|ingresos?|suscripcion|super.?admin)/i,
+  caja_finanzas: /(?:historia clinica|historial clinico|diagnostico|tratamiento|receta medica|consulta clinica)/i,
+  medico: /(?:auditoria financiera|cierre de caja|ingresos?|administrar usuarios?|suscripcion|super.?admin)/i,
+  administrador: /(?:suscripciones globales|super.?admin|todas las clinicas)/i,
+  super_admin: /(?:historia clinica|diagnostico|tratamiento|receta medica|consulta clinica|pago de clinica)/i,
+};
+const roleDenied = restrictedByRole[body.role]?.test(guardText) ?? false;
+const injectionBlocked = injectionPatterns.some((pattern) => pattern.test(normalizedQuestion));
+const ambiguous = /^[¿ ]*(?:como (?:hago|puedo hacer) (?:eso|esto)|como lo hago|que hago)[?!. ]*$/i.test(guardText.trim());
+const clarificationSuggestions = {
+  recepcionista: ['¿Cómo agendo una cita?', '¿Cómo consulto un paciente?', '¿Cómo reviso la agenda diaria?'],
+};
 return [{ json: {
   valid: true,
   signature_input: timestampHeader + '.' + rawBody,
   received_signature: signature,
   payload: { ...body, question: body.question.trim() },
-  blocked_by_guardrail: sensitive || injectionPatterns.some((pattern) => pattern.test(normalizedQuestion)),
-  blocked_answer: sensitive ? ${JSON.stringify(SENSITIVE_DENIED)} : ${JSON.stringify(ROLE_DENIED)},
+  blocked_by_guardrail: sensitive || roleDenied || injectionBlocked || ambiguous,
+  blocked_answer: sensitive ? ${JSON.stringify(SENSITIVE_DENIED)} : (ambiguous ? '¿Puedes aclarar si necesitas ayuda con una cita o con un paciente?' : ${JSON.stringify(ROLE_DENIED)}),
+  blocked_suggestions: ambiguous && !sensitive && !roleDenied && !injectionBlocked ? (clarificationSuggestions[body.role] ?? []) : [],
   started_at_ms: Date.now(),
   config: { max_request_age_seconds: MAX_REQUEST_AGE_SECONDS, max_clock_skew_seconds: MAX_CLOCK_SKEW_SECONDS, top_k: TOP_K, similarity_threshold: SIMILARITY_THRESHOLD, max_context_characters: MAX_CONTEXT_CHARACTERS },
 } }];`;
@@ -331,7 +347,7 @@ function vectorConfig(modelProvider) {
       rpcPath: '/rest/v1/rpc/upsert_assistant_document_gemini',
       receiptPath: '/rest/v1/rpc/record_assistant_ingest_batch_receipt',
       embeddings: workflowNode('emb-gemini', 'Embeddings Gemini', '@n8n/n8n-nodes-langchain.embeddingsGoogleGemini', 1, [1240, 780], { modelName: 'models/gemini-embedding-001', options: {} }),
-      model: workflowNode('model-gemini', 'Gemini Chat Model', '@n8n/n8n-nodes-langchain.lmChatGoogleGemini', 1.1, [2020, 780], { modelName: 'models/gemini-2.5-flash', options: { temperature: 0.1, maxOutputTokens: 800 } }),
+      model: workflowNode('model-gemini', 'Gemini Chat Model', '@n8n/n8n-nodes-langchain.lmChatGoogleGemini', 1.1, [2020, 780], { modelName: 'models/gemini-3.1-flash-lite', options: { temperature: 0.1, maxOutputTokens: 800 } }),
     };
   }
   return {
@@ -447,7 +463,8 @@ function createQueryWorkflow({ persistent, modelProvider, systemPrompt, roleModu
   nodes.push(
     workflowNode('if-injection', 'Prompt Injection Guard', 'n8n-nodes-base.if', 2.2, [1100, -120], ifParameters('={{ $json.blocked_by_guardrail }}')),
     workflowNode('build-denied', 'Build Role Guardrail Response', 'n8n-nodes-base.code', 2, [1320, 220], { jsCode: `const answer = typeof $json.blocked_answer === 'string' ? $json.blocked_answer : ${JSON.stringify(ROLE_DENIED)};
-return [{ json: { status_code: 200, response: { answer, confidence: 0, steps: [], suggestions: [], can_escalate: false } } }];` }),
+const suggestions = Array.isArray($json.blocked_suggestions) ? $json.blocked_suggestions.filter((item) => typeof item === 'string' && item.length > 0 && item.length <= 150).slice(0, 5) : [];
+return [{ json: { status_code: 200, response: { answer, confidence: 0, steps: [], suggestions, can_escalate: false } } }];` }),
     workflowNode('respond-denied', 'Respond Role Guardrail', 'n8n-nodes-base.respondToWebhook', 1.5, [1540, 220], queryRespondParameters()),
   );
   addConnection(connections, 'Prompt Injection Guard', 'Build Role Guardrail Response', 0);
@@ -531,7 +548,6 @@ return [{ json: { ...original, query_embedding_valid: valid, query_embedding: va
   }
   nodes.push(
     workflowNode('filter-context', 'Filter Role Module Context', 'n8n-nodes-base.code', 2, [1760, -160], { mode: 'runOnceForAllItems', jsCode: `const request = $('Constant Time Signature Check').first().json;
-const allowedGeneralModules = ['offline','permissions','support'];
 const activeChecksum = ${persistent ? "$('Validate Active Knowledge Manifest').first().json.active_checksum" : 'null'};
 const selected = [];
 const rows = $input.all().flatMap((item) => {
@@ -546,10 +562,9 @@ for (const json of rows) {
   const pageContent = String(document.pageContent ?? document.content ?? json.pageContent ?? json.content ?? '');
   const scoreRaw = json.score ?? json.similarity ?? document.score ?? metadata.similarity;
   const score = scoreRaw === undefined && ${persistent ? 'false' : 'true'} ? 1 : Number(scoreRaw ?? 0);
-  const purelyGeneral = Array.isArray(modules) && modules.length > 0 && modules.every((module) => allowedGeneralModules.includes(module));
-  const moduleAllowed = Array.isArray(modules) && (modules.includes(request.payload.module) || purelyGeneral);
+  const moduleAllowed = Array.isArray(modules) && modules.length > 0 && modules.some((module) => request.payload.allowed_modules.includes(module));
   const checksumAllowed = ${persistent ? 'metadata.checksum === activeChecksum' : 'true'};
-  if (metadata.role === request.payload.role && metadata.status === 'active' && metadata.locale === request.payload.locale && checksumAllowed && moduleAllowed && Number.isFinite(score) && score >= request.config.similarity_threshold && pageContent) selected.push({ pageContent, score });
+  if (metadata.role === request.payload.role && metadata.status === 'active' && metadata.locale === request.payload.locale && checksumAllowed && moduleAllowed && Number.isFinite(score) && score >= request.config.similarity_threshold && pageContent) selected.push({ pageContent, score, document_id: String(metadata.document_id ?? ''), role: metadata.role, modules });
 }
 selected.sort((a, b) => b.score - a.score);
 const top = selected.slice(0, request.config.top_k);
@@ -559,7 +574,7 @@ for (const entry of top) {
   if (candidate.length > request.config.max_context_characters) break;
   context = candidate;
 }
-return [{ json: { ...request, context, context_sufficient: top.length > 0 && context.length > 0, retrieved_document_count: top.length } }];` }),
+return [{ json: { ...request, context, context_sufficient: top.length > 0 && context.length > 0, retrieved_document_count: top.length, selected_documents: top.map(({ document_id, role, modules, score }) => ({ document_id, role, modules, score })) } }];` }),
     workflowNode('if-context', 'Context Is Sufficient', 'n8n-nodes-base.if', 2.2, [1980, -160], ifParameters('={{ $json.context_sufficient }}')),
     workflowNode('build-fallback', 'Build Context Fallback', 'n8n-nodes-base.code', 2, [2200, 220], { jsCode: `return [{ json: { status_code: 200, response: ${JSON.stringify(responseObject(FALLBACK, 0, true))}, fallback_used: true, safe_error_code: 'NO_CONTEXT' } }];` }),
     workflowNode('respond-fallback', 'Respond Context Fallback', 'n8n-nodes-base.respondToWebhook', 1.5, [2420, 220], queryRespondParameters()),
@@ -665,8 +680,8 @@ function ingestEndpointConfigurationCode() {
 
 function queryEndpointConfigurationCode() {
   return [
-    "const supabaseBaseUrl = 'https://your-project.supabase.co';",
-    "if (!/^https:\/\/[a-z0-9-]+\\.supabase\\.co$/i.test(supabaseBaseUrl) || supabaseBaseUrl.includes('your-project')) {",
+    "const supabaseBaseUrl = 'https://iewejmvldfqambfivnhj.supabase.co';",
+    "if (!/^https:\\/\\/[a-z0-9-]+\\.supabase\\.co$/i.test(supabaseBaseUrl)) {",
     "  throw new Error('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED');",
     '}',
     'return [{ json: { ...$json, supabase_base_url: supabaseBaseUrl } }];',
@@ -936,21 +951,24 @@ return roles.map((role) => ({ json: { content: 'MediFlow reset marker', metadata
 }
 
 export function buildAssistantWorkflows({ knowledgeBase, systemPrompt }) {
-  const roleModules = {};
+  const queryRoleModules = structuredClone(knowledgeBase.catalogs.role_modules ?? {});
+  if (Object.keys(queryRoleModules).length === 0) throw new Error('Falta catalogs.role_modules en la fuente autoritativa.');
+  for (const modules of Object.values(queryRoleModules)) modules.sort();
+  const documentRoleModules = {};
   for (const [module, definition] of Object.entries(knowledgeBase.catalogs.modules)) {
-    for (const role of definition.roles) (roleModules[role] ??= []).push(module);
+    for (const role of definition.roles) (documentRoleModules[role] ??= []).push(module);
   }
-  for (const modules of Object.values(roleModules)) modules.sort();
+  for (const modules of Object.values(documentRoleModules)) modules.sort();
   const roles = Object.keys(knowledgeBase.catalogs.roles).sort();
   const modules = Object.keys(knowledgeBase.catalogs.modules).sort();
   return {
-    'mediflow-assistant-ingest-supabase.json': createIngestWorkflow({ persistent: true, modelProvider: 'openai', roles, modules, roleModules }),
-    'mediflow-assistant-query-supabase.json': createQueryWorkflow({ persistent: true, modelProvider: 'openai', systemPrompt, roleModules }),
-    'mediflow-assistant-ingest-simple.json': createIngestWorkflow({ persistent: false, modelProvider: 'openai', roles, modules, roleModules }),
-    'mediflow-assistant-query-simple.json': createQueryWorkflow({ persistent: false, modelProvider: 'openai', systemPrompt, roleModules }),
-    'mediflow-assistant-ingest-supabase-openai.json': createIngestWorkflow({ persistent: true, modelProvider: 'openai', roles, modules, roleModules }),
-    'mediflow-assistant-query-supabase-openai.json': createQueryWorkflow({ persistent: true, modelProvider: 'openai', systemPrompt, roleModules }),
-    'mediflow-assistant-ingest-supabase-gemini.json': createIngestWorkflow({ persistent: true, modelProvider: 'gemini', roles, modules, roleModules }),
-    'mediflow-assistant-query-supabase-gemini.json': createQueryWorkflow({ persistent: true, modelProvider: 'gemini', systemPrompt, roleModules }),
+    'mediflow-assistant-ingest-supabase.json': createIngestWorkflow({ persistent: true, modelProvider: 'openai', roles, modules, roleModules: documentRoleModules }),
+    'mediflow-assistant-query-supabase.json': createQueryWorkflow({ persistent: true, modelProvider: 'openai', systemPrompt, roleModules: queryRoleModules }),
+    'mediflow-assistant-ingest-simple.json': createIngestWorkflow({ persistent: false, modelProvider: 'openai', roles, modules, roleModules: documentRoleModules }),
+    'mediflow-assistant-query-simple.json': createQueryWorkflow({ persistent: false, modelProvider: 'openai', systemPrompt, roleModules: queryRoleModules }),
+    'mediflow-assistant-ingest-supabase-openai.json': createIngestWorkflow({ persistent: true, modelProvider: 'openai', roles, modules, roleModules: documentRoleModules }),
+    'mediflow-assistant-query-supabase-openai.json': createQueryWorkflow({ persistent: true, modelProvider: 'openai', systemPrompt, roleModules: queryRoleModules }),
+    'mediflow-assistant-ingest-supabase-gemini.json': createIngestWorkflow({ persistent: true, modelProvider: 'gemini', roles, modules, roleModules: documentRoleModules }),
+    'mediflow-assistant-query-supabase-gemini.json': createQueryWorkflow({ persistent: true, modelProvider: 'gemini', systemPrompt, roleModules: queryRoleModules }),
   };
 }

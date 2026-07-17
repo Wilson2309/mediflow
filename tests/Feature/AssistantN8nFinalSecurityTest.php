@@ -84,6 +84,55 @@ class AssistantN8nFinalSecurityTest extends TestCase
         Http::assertSentCount(3);
     }
 
+    public function test_spanish_del_preposition_is_allowed_but_windows_delete_command_is_rejected(): void
+    {
+        $base = [
+            'answer' => 'Completa los datos antes de guardar el documento.',
+            'confidence' => 0.9,
+            'steps' => ['Revisa el formulario autorizado.'],
+            'suggestions' => ['Consulta otra guia segura.'],
+            'can_escalate' => false,
+        ];
+        $responses = [
+            $base,
+            [...$base, 'answer' => 'del C:\\temp\\archivo.txt'],
+        ];
+        Http::fake(function () use (&$responses) {
+            return Http::response(array_shift($responses));
+        });
+
+        $provider = app(N8nAssistantProvider::class);
+        $safe = $provider->answer($this->context('00000000-0000-4000-8000-000000000010'));
+        $unsafe = $provider->answer($this->context('00000000-0000-4000-8000-000000000011'));
+
+        $this->assertFalse($safe->fallbackUsed);
+        $this->assertSame('remote', $safe->source);
+        $this->assertTrue($unsafe->fallbackUsed);
+        $this->assertSame('INVALID_REMOTE_RESPONSE', $unsafe->code);
+        Http::assertSentCount(2);
+    }
+
+    public function test_role_denial_accepts_present_empty_steps_and_suggestions(): void
+    {
+        Http::fake([self::QUERY_URL => Http::response([
+            'answer' => 'No puedo cambiar permisos ni acceder a funciones de otro rol.',
+            'confidence' => 0,
+            'steps' => [],
+            'suggestions' => [],
+            'can_escalate' => false,
+        ])]);
+
+        $result = app(N8nAssistantProvider::class)->answer(
+            $this->context('00000000-0000-4000-8000-000000000012'),
+        );
+
+        $this->assertFalse($result->fallbackUsed);
+        $this->assertSame('remote', $result->source);
+        $this->assertSame(0.0, $result->confidence);
+        $this->assertSame([], $result->steps);
+        $this->assertSame([], $result->suggestions);
+    }
+
     public function test_uncorrelated_partial_ingest_response_cannot_forge_summary_counts(): void
     {
         Http::fake(function (Request $request) {

@@ -31,9 +31,9 @@ final class AssistantRemoteResponseValidator
         $validator = Validator::make($payload, [
             'answer' => ['required', 'string', 'max:'.(int) config('assistant.max_answer_length', 2000)],
             'confidence' => ['required', 'numeric', 'between:0,1'],
-            'steps' => ['required', 'array', 'max:10'],
+            'steps' => ['present', 'array', 'max:10'],
             'steps.*' => ['required', 'string', 'min:1', 'max:300'],
-            'suggestions' => ['required', 'array', 'max:5'],
+            'suggestions' => ['present', 'array', 'max:5'],
             'suggestions.*' => ['required', 'string', 'min:1', 'max:150'],
             'can_escalate' => ['required', 'boolean'],
         ]);
@@ -70,7 +70,7 @@ final class AssistantRemoteResponseValidator
     {
         $value = preg_replace('/[\x00-\x1F\x7F]/u', ' ', trim($value)) ?? '';
 
-        return preg_replace('/\s+/u', ' ', $value) ?? '';
+        return trim(preg_replace('/\s+/u', ' ', $value) ?? '');
     }
 
     private function isUnsafe(string $text): bool
@@ -81,6 +81,10 @@ final class AssistantRemoteResponseValidator
 
         $decoded = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        return preg_match('/(?:https?:\/\/|javascript:|<\s*\/?(?:script|iframe|form|button)|\bon(?:click|error)\s*=|(?:^|\s)\/[A-Za-z0-9]|\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/|\b(?:php\s+artisan|npm(?:\.cmd)?\s+|curl\s+|powershell\s+|cmd(?:\.exe)?\s+|rm\s+|del\s+))/iu', $decoded) === 1;
+        if (preg_match('/(?:https?:\/\/|javascript:|<\s*\/?(?:script|iframe|form|button)|\bon(?:click|error)\s*=|(?:^|\s)\/[A-Za-z0-9]|\b(?:GET|POST|PUT|PATCH|DELETE)\s+\/|\b(?:php\s+artisan|npm(?:\.cmd)?\s+|curl\s+|powershell\s+|cmd(?:\.exe)?\s+|rm\s+))/iu', $decoded) === 1) {
+            return true;
+        }
+
+        return preg_match('/(?:^|[\r\n;&|])\s*del(?:\.exe)?\s+(?:\/[a-z]\s+)*(?:"[^"\r\n]+"|\'[^\'\r\n]+\'|(?:[a-z]:)?[\\\\\/]|\.\.?[\\\\\/]|[*?]|[a-z0-9_-]+\.[a-z0-9]{1,8}(?:\s|$))/iu', $decoded) === 1;
     }
 }

@@ -36,17 +36,17 @@ test('rechaza una consulta Supabase que omite la validación del manifiesto acti
     assert.match(errorText(result), /manifiesto activo/i);
 });
 
-test('rechaza postfiltro sin checksum o con módulos generales mixtos', async () => {
+test('rechaza postfiltro sin checksum o sin cruce explícito con módulos autorizados', async () => {
     const candidate = await workflow('mediflow-assistant-query-supabase-openai.json');
     const filter = candidate.nodes.find((node) => node.name === 'Filter Role Module Context');
     filter.parameters.jsCode = filter.parameters.jsCode
         .replace('metadata.checksum === activeChecksum', 'true')
-        .replace('modules.every', 'modules.some');
+        .replace('request.payload.allowed_modules.includes(module)', 'true');
 
     const result = validateWorkflow(candidate, { source: 'weak-role-module-filter-query.json' });
 
     assert.equal(result.valid, false);
-    assert.match(errorText(result), /postfiltro.*checksum|puramente generales/i);
+    assert.match(errorText(result), /postfiltro.*checksum|allowed_modules/i);
 });
 
 test('rechaza el guardrail amplio que confunde texto español con una ruta Windows', async () => {

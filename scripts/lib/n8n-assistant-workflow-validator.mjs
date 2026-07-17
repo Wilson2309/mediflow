@@ -692,6 +692,15 @@ function hasControlledErrorOutput(node) {
         || node?.continueOnFail === true;
 }
 
+function codeNodeSyntaxError(code) {
+    try {
+        new Function(`return async function __n8nCodeNode__() {\n${String(code ?? '')}\n}`);
+        return null;
+    } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+    }
+}
+
 function isConnectedTo(workflow, sourceName, connectionType, destinationNames) {
     return flattenedConnections({ [connectionType]: workflow.connections?.[sourceName]?.[connectionType] })
         .some((connection) => destinationNames.has(connection.node));
@@ -770,6 +779,13 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
 
         if (node.disabled === true && node.type !== STICKY_NOTE_TYPE) {
             errors.push(`El nodo crítico "${node.name ?? index}" está deshabilitado.`);
+        }
+
+        if (node.type === 'n8n-nodes-base.code') {
+            const syntaxError = codeNodeSyntaxError(node.parameters?.jsCode);
+            if (syntaxError) {
+                errors.push(`El nodo Code "${node.name ?? index}" contiene JavaScript inválido: ${syntaxError}.`);
+            }
         }
     }
 
@@ -980,8 +996,8 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
             if (!includesAll(manifestValidator?.parameters?.jsCode ?? '', ['active_checksum', 'knowledge_version', 'document_count', 'manifest_valid'])) {
                 errors.push('La validación del manifiesto debe exigir checksum, versión y conteo documental.');
             }
-            if (!includesAll(contextFilterCode, ['metadata.checksum', 'activechecksum', 'modules.every', 'purelygeneral'])) {
-                errors.push('El postfiltro debe volver a comprobar checksum y aceptar globalmente solo módulos puramente generales.');
+            if (!includesAll(contextFilterCode, ['metadata.checksum', 'activechecksum', 'allowed_modules.includes', 'modules.some'])) {
+                errors.push('El postfiltro debe volver a comprobar checksum y cruzar los módulos con allowed_modules.');
             }
             if (!explicitGeminiQuery && !vectorNodes.filter((node) => normalizeText(node.type).includes('vectorstoresupabase')).every((node) => Number(node.parameters?.topK) >= 20)) {
                 errors.push('La recuperación Supabase debe obtener un conjunto candidato suficiente antes del Top K final por módulo.');
@@ -994,9 +1010,11 @@ export function validateWorkflow(workflow, { source = 'workflow.json' } = {}) {
                 const rpc = nodeMap.get('Call Gemini Vector RPC');
                 const embeddingBody = String(embedding?.parameters?.jsonBody ?? '');
                 const rpcBody = String(rpc?.parameters?.jsonBody ?? '');
+                const endpointCode = String(endpoint?.parameters?.jsCode ?? '');
                 const explicitFlow = endpoint?.type === 'n8n-nodes-base.code'
-                    && String(endpoint.parameters?.jsCode ?? '').includes("const supabaseBaseUrl = 'https://your-project.supabase.co';")
-                    && String(endpoint.parameters?.jsCode ?? '').includes('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED')
+                    && /const supabaseBaseUrl = 'https:\/\/[a-z0-9-]+\.supabase\.co';/i.test(endpointCode)
+                    && !endpointCode.includes('your-project')
+                    && endpointCode.includes('MEDIFLOW_SUPABASE_BASE_URL_UNCONFIGURED')
                     && mainDestinations(workflow, endpoint.name).includes(manifestGet?.name)
                     && embedding?.type === 'n8n-nodes-base.httpRequest'
                     && embedding?.parameters?.method === 'POST'

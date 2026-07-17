@@ -216,9 +216,29 @@ class AssistantMessageTest extends TestCase
             $this->assertSame('2', $request->header('X-MediFlow-Assistant-Version')[0] ?? null);
             $this->assertStringStartsWith('application/json', $request->header('Content-Type')[0] ?? '');
             $this->assertSame(
-                ['request_id', 'question', 'role', 'module', 'route', 'connection_state', 'locale', 'knowledge_version', 'timestamp'],
+                ['request_id', 'question', 'role', 'module', 'route', 'connection_state', 'locale', 'knowledge_version', 'timestamp', 'allowed_modules'],
                 array_keys($request->data()),
             );
+
+            return true;
+        });
+    }
+
+    public function test_receptionist_remote_payload_excludes_privileged_modules(): void
+    {
+        Http::fake([self::URL => $this->validRemoteResponse()]);
+
+        $this->actingAs($this->userForClinic('recepcionista'))
+            ->postJson(route('assistant.message'), $this->payload())
+            ->assertOk();
+
+        Http::assertSent(function (Request $request): bool {
+            $allowed = $request->data()['allowed_modules'] ?? [];
+            $this->assertContains('appointments', $allowed);
+            $this->assertContains('patients', $allowed);
+            foreach (['payments', 'reports', 'financial_audit', 'audit', 'medical_records', 'prescriptions'] as $forbidden) {
+                $this->assertNotContains($forbidden, $allowed);
+            }
 
             return true;
         });

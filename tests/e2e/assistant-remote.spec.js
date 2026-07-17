@@ -45,6 +45,40 @@ test.describe('Asistente MediFlow - Fase 3 remota', () => {
     expect(endpointCalls).toBe(0);
   });
 
+  test('recepción envía la consulta de estado de cita al remoto sin desambiguación local', async ({ page }) => {
+    let sentPayload = null;
+    await page.route('**/assistant/message', async (route) => {
+      sentPayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          ok: true,
+          request_id: 'e2e-reception-appointment-status',
+          answer: 'Abre Citas médicas o Agenda del día y revisa el estado de la cita.',
+          steps: [],
+          suggestions: [],
+          confidence: 0.9,
+          source: 'remote',
+          fallback_used: false,
+        }),
+      });
+    });
+    await loginAs(page, 'reception');
+    await page.goto('/appointments');
+    const root = await openRemoteAssistant(page);
+
+    await ask(root, '¿Cómo puedo consultar el estado de una cita?');
+
+    const lastAnswer = root.locator('.mediflow-assistant__message--assistant').last();
+    await expect(lastAnswer).toContainText('Abre Citas médicas o Agenda del día');
+    await expect(lastAnswer).not.toContainText('¿Te refieres a alguna de estas opciones?');
+    expect(sentPayload).toEqual(expect.objectContaining({
+      question: '¿Cómo puedo consultar el estado de una cita?',
+      current_module: 'appointments',
+    }));
+  });
+
   test('pregunta desconocida online muestra respuesta, pasos y sugerencias remotas', async ({ page }) => {
     let sentPayload = null;
     await page.route('**/assistant/message', async (route) => {

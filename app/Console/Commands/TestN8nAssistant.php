@@ -77,6 +77,7 @@ final class TestN8nAssistant extends Command
             locale: (string) config('assistant.locale', 'es-EC'),
             knowledgeVersion: $knowledgeCatalog->version(),
             timestamp: now('UTC')->toIso8601String(),
+            allowedModules: $allowedModules,
         );
 
         $startedAt = microtime(true);
@@ -122,24 +123,6 @@ final class TestN8nAssistant extends Command
     /** @return array<int, string> */
     private function roleModules(string $role): array
     {
-        $raw = file_get_contents(resource_path('assistant/knowledge-base.json'));
-        if ($raw === false) {
-            return [];
-        }
-
-        try {
-            $knowledge = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
-            return [];
-        }
-
-        $modules = [];
-        foreach (($knowledge['catalogs']['modules'] ?? []) as $module => $definition) {
-            if (in_array($role, $definition['roles'] ?? [], true)) {
-                $modules[] = $module;
-            }
-        }
-
-        return $modules;
+        return app(AssistantKnowledgeCatalog::class)->modulesForRole($role);
     }
 }

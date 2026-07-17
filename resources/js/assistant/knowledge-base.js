@@ -61,6 +61,7 @@ const MODULE_TOKENS = Object.freeze({
 });
 
 export const UNKNOWN_ANSWER = 'No encontré una respuesta exacta para eso. Puedes revisar la guía del módulo o contactar al administrador.';
+export const ROLE_DENIED = 'No puedo acceder a esa función porque no está permitida para tu rol.';
 
 export function expandKnowledgeDocument(document = knowledgeDocument) {
     const defaults = document?.defaults || {};
@@ -272,15 +273,51 @@ export function searchKnowledge(question, context, connectionStatus = 'ONLINE') 
     const disconnected = connectionState !== 'ONLINE';
     const questionTokens = tokensFor(normalizedQuestion);
 
+    const restrictedByRole = {
+        recepcionista: /(?:auditoria|financiero|finanzas|reporte financiero|cierre de caja|ingreso|suscripcion|super admin)/,
+        caja_finanzas: /(?:historia|historial|diagnostico|tratamiento|receta|consulta clinica)/,
+        medico: /(?:auditoria financiera|cierre de caja|ingreso|administrar usuario|suscripcion|super admin)/,
+        administrador: /(?:suscripcion global|super admin|todas las clinicas)/,
+        super_admin: /(?:historia|historial|diagnostico|tratamiento|receta|consulta clinica|pago clinica)/,
+    };
+    if (restrictedByRole[context.role]?.test(normalizedQuestion)) {
+        return { entry: null, alternatives: [], restricted: true };
+    }
+
     const requestsPaymentWrite = questionTokens.has('pago') && questionTokens.has('crear');
     if (requestsPaymentWrite && ! ['administrador', 'caja_finanzas'].includes(context.role)) {
-        return { entry: null, alternatives: [] };
+        return { entry: null, alternatives: [], restricted: true };
     }
 
     const requestsClinicalContent = ['historia', 'historial', 'consulta', 'receta', 'diagnostico']
         .some((token) => questionTokens.has(token));
     if (requestsClinicalContent && ! ['administrador', 'medico'].includes(context.role)) {
-        return { entry: null, alternatives: [] };
+        return { entry: null, alternatives: [], restricted: true };
+    }
+
+    const asksAppointmentStatus = context.role === 'recepcionista'
+        && questionTokens.has('cita')
+        && questionTokens.has('estado')
+        && ['consultar', 'revisar', 'ver'].some((token) => questionTokens.has(token));
+    if (asksAppointmentStatus) {
+        return { entry: null, alternatives: [], restricted: false };
+    }
+
+    const asksWithoutContext = /\b(?:eso|esto|aquello)\b/.test(normalizedQuestion)
+        && queryModules(questionTokens).length === 0;
+    if (asksWithoutContext) {
+        const preferredByRole = {
+            recepcionista: ['appointments-create', 'daily-agenda-guide', 'patients-edit-search'],
+            caja_finanzas: ['appointments-basic-payment'],
+            medico: ['daily-agenda-guide'],
+            administrador: ['daily-agenda-guide', 'patients-edit-search'],
+            super_admin: ['support-safe'],
+        };
+        const preferred = preferredByRole[context.role] || [];
+        const alternatives = preferred
+            .map((id) => (KNOWLEDGE_INDEX_BY_ROLE[context.role] || []).find((entry) => entry.id === id))
+            .filter(Boolean);
+        return { entry: null, alternatives, restricted: false };
     }
 
     // El rol se aplica antes de puntuar; nunca se busca primero en toda la base.
