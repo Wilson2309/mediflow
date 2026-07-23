@@ -39,17 +39,19 @@ return new class extends Migration
         if (in_array($driver, ['mysql', 'mariadb'], true)) {
             $existingConstraint = $this->validatedConstraintName($foreignKey);
             $targetConstraint = $this->targetConstraintName($onDelete);
-            $supportingIndex = $this->validatedConsultationIndexName();
+            
 
             DB::statement(
                 'ALTER TABLE `prescriptions` '
-                .'DROP FOREIGN KEY `'.$existingConstraint.'`, '
-                .'DROP INDEX `'.$supportingIndex.'`, '
-                .'ADD INDEX `'.$supportingIndex.'` (`consultation_id`), '
+                .'DROP FOREIGN KEY `'.$existingConstraint.'`'
+            );
+            
+            DB::statement(
+                'ALTER TABLE `prescriptions` '
                 .'ADD CONSTRAINT `'.$targetConstraint.'` '
                 .'FOREIGN KEY (`consultation_id`) '
                 .'REFERENCES `consultations` (`id`) '
-                .'ON DELETE '.$onDelete,
+                .'ON DELETE '.$onDelete
             );
 
             return;

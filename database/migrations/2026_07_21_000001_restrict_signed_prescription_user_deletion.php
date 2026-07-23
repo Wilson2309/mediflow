@@ -43,7 +43,11 @@ return new class extends Migration
         if (in_array($driver, ['mysql', 'mariadb'], true)) {
             DB::statement(
                 'ALTER TABLE `prescriptions` '
-                .'DROP FOREIGN KEY `prescriptions_signed_by_user_id_foreign`, '
+                .'DROP FOREIGN KEY `prescriptions_signed_by_user_id_foreign`'
+             );
+
+            DB::statement(
+                'ALTER TABLE `prescriptions` '
                 .'ADD CONSTRAINT `prescriptions_signed_by_user_id_foreign` '
                 .'FOREIGN KEY (`signed_by_user_id`) REFERENCES `users` (`id`) '
                 .'ON DELETE '.$onDelete,
