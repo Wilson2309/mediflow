@@ -20,6 +20,8 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SwitchClinicController;
 use App\Http\Controllers\UserController;
+use App\Http\Middleware\AuthorizePrescriptionSign;
+use App\Support\ControlledResponse;
 use App\Models\Appointment;
 use App\Models\Consultation;
 use App\Models\Doctor;
@@ -29,6 +31,8 @@ use App\Models\Payment;
 use App\Models\Prescription;
 use App\Models\Service;
 use App\Models\User;
+use Illuminate\Auth\Middleware\RequirePassword;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -152,12 +156,31 @@ Route::middleware('auth')->group(function () {
         ->middleware(['active_clinic', 'throttle:assistant'])
         ->name('assistant.message');
 
-    $protectedResource = static function (string $uri, string $controller, string $permission): void {
-        Route::resource($uri, $controller)->only(['create', 'store'])->middleware(['active_clinic', "permission:{$permission}.create"]);
-        Route::resource($uri, $controller)->only(['index', 'show'])->middleware(['active_clinic', "permission:{$permission}.view"]);
-        Route::resource($uri, $controller)->only(['edit', 'update'])->middleware(['active_clinic', "permission:{$permission}.update"]);
-        Route::resource($uri, $controller)->only('destroy')->middleware(['active_clinic', "permission:{$permission}.delete"]);
+    $protectedResource = static function (
+        string $uri,
+        string $controller,
+        string $permission,
+        ?\Closure $missing = null,
+    ): void {
+        $registrations = [
+            Route::resource($uri, $controller)->only(['create', 'store'])->middleware(['active_clinic', "permission:{$permission}.create"]),
+            Route::resource($uri, $controller)->only(['index', 'show'])->middleware(['active_clinic', "permission:{$permission}.view"]),
+            Route::resource($uri, $controller)->only(['edit', 'update'])->middleware(['active_clinic', "permission:{$permission}.update"]),
+            Route::resource($uri, $controller)->only('destroy')->middleware(['active_clinic', "permission:{$permission}.delete"]),
+        ];
+
+        if ($missing) {
+            foreach ($registrations as $registration) {
+                $registration->missing($missing);
+            }
+        }
     };
+    $prescriptionMissing = static fn (Request $request) => ControlledResponse::error(
+        $request, 404, 'RESOURCE_NOT_FOUND',
+    );
+    $consultationMissing = static fn (Request $request) => ControlledResponse::error(
+        $request, 404, 'RESOURCE_NOT_FOUND',
+    );
 
     $protectedResource('patients', PatientController::class, 'patients');
     $protectedResource('doctors', DoctorController::class, 'doctors');
@@ -168,13 +191,37 @@ Route::middleware('auth')->group(function () {
     Route::get('appointments/doctors/search', [AppointmentController::class, 'searchDoctors'])->middleware(['active_clinic', 'permission:appointments.create'])->name('appointments.doctors.search');
     Route::get('appointments/availability', [AppointmentController::class, 'availability'])->middleware(['active_clinic', 'permission:appointments.create'])->name('appointments.availability');
     $protectedResource('appointments', AppointmentController::class, 'appointments');
-    $protectedResource('consultations', ConsultationController::class, 'consultations');
+    $protectedResource('consultations', ConsultationController::class, 'consultations', $consultationMissing);
     $protectedResource('medical-records', MedicalRecordController::class, 'medical_records');
-    Route::get('prescriptions/{prescription}/print', [PrescriptionController::class, 'print'])->middleware(['active_clinic', 'permission:prescriptions.view'])->name('prescriptions.print');
-    Route::get('prescriptions/{prescription}/pdf', [PrescriptionController::class, 'pdf'])->middleware(['active_clinic', 'permission:prescriptions.view'])->name('prescriptions.pdf');
-    Route::post('prescriptions/{prescription}/send-email', [PrescriptionController::class, 'sendEmail'])->middleware(['active_clinic', 'permission:prescriptions.update'])->name('prescriptions.send-email');
-    Route::post('prescriptions/{prescription}/sign', [PrescriptionController::class, 'sign'])->middleware(['active_clinic', 'permission:prescriptions.update'])->name('prescriptions.sign');
-    $protectedResource('prescriptions', PrescriptionController::class, 'prescriptions');
+    Route::get('prescriptions/{prescription}/print', [PrescriptionController::class, 'print'])
+        ->missing($prescriptionMissing)
+        ->name('prescriptions.print');
+    Route::get('prescriptions/{prescription}/pdf', [PrescriptionController::class, 'pdf'])
+        ->missing($prescriptionMissing)
+        ->name('prescriptions.pdf');
+    Route::post('prescriptions/{prescription}/send-email', [PrescriptionController::class, 'sendEmail'])
+        ->missing($prescriptionMissing)
+        ->name('prescriptions.send-email');
+    Route::post('prescriptions/{prescription}/sign', [PrescriptionController::class, 'sign'])
+        ->middleware([AuthorizePrescriptionSign::class, RequirePassword::using(passwordTimeoutSeconds: 300)])
+        ->missing($prescriptionMissing)
+        ->name('prescriptions.sign');
+    Route::resource('prescriptions', PrescriptionController::class)
+        ->only(['create', 'store'])
+        ->middleware(['active_clinic', 'permission:prescriptions.create']);
+    Route::resource('prescriptions', PrescriptionController::class)
+        ->only('index')
+        ->middleware(['active_clinic', 'permission:prescriptions.view']);
+
+    $prescriptionBoundRoutes = [
+        Route::resource('prescriptions', PrescriptionController::class)->only('show'),
+        Route::resource('prescriptions', PrescriptionController::class)->only(['edit', 'update']),
+        Route::resource('prescriptions', PrescriptionController::class)->only('destroy'),
+    ];
+
+    foreach ($prescriptionBoundRoutes as $prescriptionBoundRoute) {
+        $prescriptionBoundRoute->missing($prescriptionMissing);
+    }
     Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt'])->middleware(['active_clinic', 'permission:payments.view'])->name('payments.receipt');
     Route::get('payments/{payment}/receipt/print', [PaymentController::class, 'receiptPrint'])->middleware(['active_clinic', 'permission:payments.view'])->name('payments.receipt.print');
     $protectedResource('payments', PaymentController::class, 'payments');

@@ -323,13 +323,13 @@ class ConsultationModuleTest extends TestCase
     public function test_user_cannot_view_consultation_from_other_clinic(): void
     {
         [$user, $consultation] = $this->userAndOtherClinicConsultation();
-        $this->actingAs($user)->get(route('consultations.show', $consultation))->assertForbidden();
+        $this->actingAs($user)->get(route('consultations.show', $consultation))->assertNotFound();
     }
 
     public function test_user_cannot_edit_consultation_from_other_clinic(): void
     {
         [$user, $consultation] = $this->userAndOtherClinicConsultation();
-        $this->actingAs($user)->get(route('consultations.edit', $consultation))->assertForbidden();
+        $this->actingAs($user)->get(route('consultations.edit', $consultation))->assertNotFound();
     }
 
     public function test_user_cannot_update_consultation_from_other_clinic(): void
@@ -338,14 +338,14 @@ class ConsultationModuleTest extends TestCase
 
         $this->actingAs($user)
             ->put(route('consultations.update', $consultation), $this->validPayload($consultation->patient, $consultation->doctor, null, ['diagnosis' => 'No permitido']))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_user_cannot_delete_consultation_from_other_clinic(): void
     {
         [$user, $consultation] = $this->userAndOtherClinicConsultation();
 
-        $this->actingAs($user)->delete(route('consultations.destroy', $consultation))->assertForbidden();
+        $this->actingAs($user)->delete(route('consultations.destroy', $consultation))->assertNotFound();
         $this->assertDatabaseHas('consultations', ['id' => $consultation->id]);
     }
 

@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Models\Prescription;
 use App\Models\User;
+use App\Support\ControlledResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -49,7 +53,7 @@ class ProfileController extends Controller
     /**
      * Delete the user's account.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request): RedirectResponse|JsonResponse
     {
         $request->validateWithBag('userDeletion', [
             'password' => ['required', 'current_password'],
@@ -77,9 +81,33 @@ class ProfileController extends Controller
             }
         }
 
-        Auth::logout();
+        $outcome = DB::transaction(function () use ($user): string {
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
+            $hasSignatureAttribution = Prescription::query()
+                ->where('signed_by_user_id', $lockedUser->id)
+                ->lockForUpdate()
+                ->first(['id']) !== null;
 
-        $user->delete();
+            if ($hasSignatureAttribution) {
+                return 'blocked';
+            }
+
+            $lockedUser->delete();
+
+            return 'deleted';
+        });
+
+        if ($outcome === 'blocked') {
+            if ($request->expectsJson()) {
+                return ControlledResponse::jsonError(409, 'USER_REQUIRES_DEACTIVATION');
+            }
+
+            return Redirect::route('profile.edit')->withErrors([
+                'password' => 'La cuenta no puede eliminarse. Debe inactivarse para conservar la trazabilidad.',
+            ], 'userDeletion');
+        }
+
+        Auth::logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

@@ -3,15 +3,32 @@
 namespace App\Models;
 
 use DateTimeInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use LogicException;
 
 class Prescription extends Model
 {
     use HasFactory;
+
+    private const IDENTITY_ATTRIBUTES = [
+        'patient_id',
+        'doctor_id',
+        'consultation_id',
+    ];
+
+    private const SIGNATURE_ATTRIBUTES = [
+        'signed_at',
+        'signed_by_user_id',
+        'signature_verification_code',
+        'signature_hash',
+        'signed_ip_address',
+        'signed_user_agent',
+    ];
 
     protected $fillable = [
         'patient_id',
@@ -25,12 +42,6 @@ class Prescription extends Model
         'last_emailed_at',
         'last_emailed_to',
         'email_count',
-        'signed_at',
-        'signed_by_user_id',
-        'signature_verification_code',
-        'signature_hash',
-        'signed_ip_address',
-        'signed_user_agent',
     ];
 
     protected function casts(): array
@@ -43,6 +54,35 @@ class Prescription extends Model
             'email_count' => 'integer',
             'signed_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $prescription): void {
+            if ($prescription->isDirty(self::IDENTITY_ATTRIBUTES)) {
+                throw new LogicException('Prescription document identity is immutable.');
+            }
+
+            if ($prescription->hadSignatureArtifacts()
+                && $prescription->isDirty(self::SIGNATURE_ATTRIBUTES)) {
+                throw new LogicException('Prescription signature attribution is immutable.');
+            }
+        });
+
+        static::deleting(function (self $prescription): void {
+            if ($prescription->hasSignatureArtifacts()) {
+                throw new LogicException('Signed prescriptions cannot be deleted.');
+            }
+        });
+    }
+
+    public function scopeWithSignatureArtifacts(Builder $query): Builder
+    {
+        return $query->where(function (Builder $query): void {
+            foreach (self::SIGNATURE_ATTRIBUTES as $attribute) {
+                $query->orWhereNotNull($attribute);
+            }
+        });
     }
 
     public function patient(): BelongsTo
@@ -82,6 +122,19 @@ class Prescription extends Model
             && filled($this->signature_hash);
     }
 
+    public function hasSignatureArtifacts(): bool
+    {
+        foreach (self::SIGNATURE_ATTRIBUTES as $attribute) {
+            $value = $this->getAttribute($attribute);
+
+            if ($value !== null && $value !== '') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function generateVerificationCode(): string
     {
         do {
@@ -117,6 +170,19 @@ class Prescription extends Model
         ];
 
         return hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function hadSignatureArtifacts(): bool
+    {
+        foreach (self::SIGNATURE_ATTRIBUTES as $attribute) {
+            $value = $this->getRawOriginal($attribute);
+
+            if ($value !== null && $value !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function formatSignatureDate(mixed $date): ?string

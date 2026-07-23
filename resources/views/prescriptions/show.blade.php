@@ -17,17 +17,28 @@
                     <a href="{{ route('prescriptions.print', $prescription) }}" target="_blank" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#2563EB]">Imprimir receta</a>
                     <a href="{{ route('prescriptions.pdf', $prescription) }}" class="inline-flex items-center justify-center rounded-lg border border-[#E2E8F0] px-4 py-3 text-sm font-semibold text-[#0F172A]">Descargar PDF</a>
                 @endcan
-                @can('prescriptions.update')
-                    @if (! $prescription->isSigned() && $prescription->status !== 'cancelled')
+                @if (! $prescription->hasSignatureArtifacts())
+                    @if ($prescription->status !== 'cancelled')
+                        @can('sign', $prescription)
+                        <div x-data="{ submitting: false }" x-on:pageshow.window="submitting = false" x-on:submit="if ($event.defaultPrevented) { return; } if (submitting || ! navigator.onLine) { $event.preventDefault(); return; } submitting = true" class="w-full sm:w-auto">
                         <form method="POST" action="{{ route('prescriptions.sign', $prescription) }}" data-requires-online="true" data-offline-block-message="No se puede firmar ni enviar recetas sin conexión." onsubmit="return confirm('¿Firmar electrónicamente esta receta? Después de firmar no se podrá editar.');">
                             @csrf
-                            <button type="submit" class="inline-flex w-full items-center justify-center rounded-lg bg-[#10B981] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-500/20">Firmar receta</button>
+                            <button type="submit" x-bind:disabled="submitting" x-bind:aria-busy="submitting.toString()" class="inline-flex w-full items-center justify-center rounded-lg bg-[#10B981] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60">
+                                <span x-show="! submitting">Firmar receta</span>
+                                <span x-show="submitting" x-cloak>Firmando...</span>
+                            </button>
                         </form>
+                        </div>
+                        @endcan
+                        @can('update', $prescription)
                         <a href="{{ route('prescriptions.edit', $prescription) }}" class="inline-flex items-center justify-center rounded-lg bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-500/20">Editar receta</a>
-                    @elseif (! $prescription->isSigned())
+                        @endcan
+                    @else
+                        @can('prescriptions.update')
                         <span class="inline-flex items-center justify-center rounded-lg border border-[#EF4444]/20 bg-[#EF4444]/10 px-4 py-3 text-sm font-semibold text-[#EF4444]">Receta cancelada</span>
+                        @endcan
                     @endif
-                @endcan
+                @endif
             </div>
         </header>
 

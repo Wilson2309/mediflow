@@ -19,10 +19,14 @@ class PrescriptionSignatureModuleTest extends TestCase
 {
     use RefreshDatabase;
 
+    private ?User $prescriptionDoctorUser = null;
+
     protected function setUp(): void
     {
         parent::setUp();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $this->prescriptionDoctorUser = null;
+        $this->withSession(['auth.password_confirmed_at' => time()]);
     }
 
     public function test_guest_cannot_sign_prescription(): void
@@ -35,7 +39,7 @@ class PrescriptionSignatureModuleTest extends TestCase
 
     public function test_user_without_permission_cannot_sign_prescription(): void
     {
-        [$clinic, $user] = $this->clinicAndUser();
+        [$clinic, $user] = $this->clinicAndUser(role: 'recepcionista');
         $prescription = $this->prescriptionForClinic($clinic);
 
         $this->actingAs($user)
@@ -68,7 +72,7 @@ class PrescriptionSignatureModuleTest extends TestCase
 
         $this->actingAs($user)
             ->post(route('prescriptions.sign', $otherPrescription))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_cancelled_prescription_cannot_be_signed(): void
@@ -239,7 +243,7 @@ class PrescriptionSignatureModuleTest extends TestCase
         $this->assertNotSame('Instrucciones alteradas desde update', $prescription->refresh()->general_instructions);
     }
 
-    private function clinicAndUser(array $permissions = []): array
+    private function clinicAndUser(array $permissions = [], string $role = 'medico'): array
     {
         $clinic = Clinic::factory()->create([
             'name' => 'Clínica Firma MediFlow',
@@ -250,7 +254,8 @@ class PrescriptionSignatureModuleTest extends TestCase
             'status' => 'active',
         ]);
         $user = User::factory()->create(['clinic_id' => $clinic->id, 'name' => 'Usuario Firmante QA']);
-        $user->assignRole('recepcionista');
+        $user->assignRole($role);
+        $this->prescriptionDoctorUser = $user;
 
         foreach ($permissions as $permission) {
             Permission::findOrCreate($permission, 'web');
@@ -282,7 +287,15 @@ class PrescriptionSignatureModuleTest extends TestCase
             'identification_number' => fake()->unique()->numerify('##########'),
             'allergies' => 'Alergia QA',
         ]);
-        $doctorUser = User::factory()->create(['clinic_id' => $clinic->id, 'name' => 'Dra. Firma QA']);
+        $doctorUser = $this->prescriptionDoctorUser
+            && (int) $this->prescriptionDoctorUser->clinic_id === (int) $clinic->id
+                ? $this->prescriptionDoctorUser
+                : User::factory()->create(['clinic_id' => $clinic->id, 'name' => 'Dra. Firma QA']);
+
+        if (! $doctorUser->roles()->exists()) {
+            $doctorUser->assignRole('medico');
+        }
+
         $doctor = Doctor::factory()
             ->for($clinic)
             ->for($doctorUser)

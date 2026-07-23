@@ -8,7 +8,12 @@ class StorePrescriptionRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $user = $this->user();
+
+        return (bool) $user
+            && $user->status === 'active'
+            && $user->hasAnyRole(['medico', 'administrador'])
+            && $user->can('prescriptions.create');
     }
 
     protected function prepareForValidation(): void

@@ -7,11 +7,14 @@ use App\Http\Controllers\Concerns\ResolvesClinic;
 use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Models\Doctor;
+use App\Models\Prescription;
 use App\Models\Specialty;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Support\ControlledResponse;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -210,27 +213,77 @@ class UserController extends Controller
         return redirect()->route('users.show', $user)->with('success', 'Usuario actualizado correctamente.');
     }
 
-    public function destroy(User $user): RedirectResponse
+    public function destroy(Request $request, User $user): RedirectResponse|JsonResponse
     {
-        $this->authorizeClinic($user);
+        $outcome = DB::transaction(function () use ($user): string {
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
+            $this->authorizeClinic($lockedUser);
 
-        if ((int) $user->id === (int) auth()->id()) {
-            throw ValidationException::withMessages(['user' => 'No puedes eliminar tu propio usuario.']);
+            if ((int) $lockedUser->id === (int) auth()->id()) {
+                throw ValidationException::withMessages(['user' => 'No puedes eliminar tu propio usuario.']);
+            }
+
+            if ($this->isPrimaryAdministrator($lockedUser)) {
+                throw ValidationException::withMessages(['user' => 'El administrador principal de MediFlow no puede eliminarse.']);
+            }
+
+            if ($lockedUser->hasRole('administrador')
+                && $this->administratorCount($this->clinicId()) <= 1) {
+                throw ValidationException::withMessages([
+                    'user' => 'No puedes eliminar al último administrador de la clínica.',
+                ]);
+            }
+
+            $hasSignatureAttribution = Prescription::query()
+                ->where('signed_by_user_id', $lockedUser->id)
+                ->lockForUpdate()
+                ->first(['id']) !== null;
+
+            if ($hasSignatureAttribution) {
+                AuditLogger::log(
+                    'user.delete_denied',
+                    'users',
+                    $lockedUser,
+                    [],
+                    ['result' => 'denied', 'reason_code' => 'signature_attribution'],
+                    'Eliminación de usuario denegada.',
+                );
+
+                return 'blocked';
+            }
+
+            $audit = AuditLogger::log(
+                'user.deleted',
+                'users',
+                $lockedUser,
+                [
+                    'status' => $lockedUser->status,
+                    'role' => $lockedUser->getRoleNames()->first(),
+                ],
+                [],
+                'Usuario eliminado.',
+            );
+
+            if (! $audit) {
+                throw new \RuntimeException('User delete audit could not be persisted.');
+            }
+
+            $lockedUser->delete();
+
+            return 'deleted';
+        });
+
+        if ($outcome === 'blocked') {
+            if ($request->expectsJson()) {
+                return ControlledResponse::jsonError(409, 'USER_REQUIRES_DEACTIVATION');
+            }
+
+            return back()->with('error', 'El usuario no puede eliminarse. Inactívelo para conservar la trazabilidad.');
         }
 
-        if ($this->isPrimaryAdministrator($user)) {
-            throw ValidationException::withMessages(['user' => 'El administrador principal de MediFlow no puede eliminarse.']);
+        if ($request->expectsJson()) {
+            return ControlledResponse::jsonSuccess('OPERATION_COMPLETED');
         }
-
-        if ($user->hasRole('administrador') && $this->administratorCount($this->clinicId()) <= 1) {
-            throw ValidationException::withMessages(['user' => 'No puedes eliminar al último administrador de la clínica.']);
-        }
-
-        $old = AuditLogger::modelSnapshot($user, ['id', 'clinic_id', 'name', 'email', 'phone', 'status']);
-        $old['role'] = $user->getRoleNames()->first();
-        AuditLogger::log('user.deleted', 'users', $user, $old, [], 'Usuario eliminado.');
-
-        DB::transaction(fn () => $user->delete());
 
         return redirect()->route('users.index')->with('success', 'Usuario eliminado correctamente.');
     }

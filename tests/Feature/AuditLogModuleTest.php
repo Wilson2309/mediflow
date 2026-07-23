@@ -125,13 +125,16 @@ class AuditLogModuleTest extends TestCase
     {
         [$admin, $patient, $doctor] = $this->clinicalSetup(withService: false);
         $prescription = $this->prescriptionFor($patient, $doctor);
+        $doctorUser = $doctor->user;
 
-        $this->actingAs($admin)->post(route('prescriptions.sign', $prescription))
+        $this->actingAs($doctorUser)
+            ->withSession(['auth.password_confirmed_at' => time()])
+            ->post(route('prescriptions.sign', $prescription))
             ->assertRedirect(route('prescriptions.show', $prescription));
 
         $this->assertDatabaseHas('audit_logs', [
             'clinic_id' => $admin->clinic_id,
-            'action' => 'prescription.signed',
+            'action' => 'prescriptions.sign',
             'module' => 'prescriptions',
         ]);
     }
@@ -237,6 +240,37 @@ class AuditLogModuleTest extends TestCase
         $this->assertStringNotContainsString($secret, $payload);
     }
 
+    public function test_signed_prescriptions_metric_counts_legacy_and_new_success_events(): void
+    {
+        $admin = $this->userWithRole('administrador');
+
+        AuditLog::create([
+            'clinic_id' => $admin->clinic_id,
+            'user_id' => $admin->id,
+            'action' => 'prescription.signed',
+            'module' => 'prescriptions',
+        ]);
+        AuditLog::create([
+            'clinic_id' => $admin->clinic_id,
+            'user_id' => $admin->id,
+            'action' => 'prescriptions.sign',
+            'module' => 'prescriptions',
+            'new_values' => ['result' => 'success'],
+        ]);
+        AuditLog::create([
+            'clinic_id' => $admin->clinic_id,
+            'user_id' => $admin->id,
+            'action' => 'prescriptions.sign',
+            'module' => 'prescriptions',
+            'new_values' => ['result' => 'denied'],
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('audit-logs.index'))
+            ->assertOk()
+            ->assertViewHas('signedPrescriptionsToday', 2);
+    }
+
     private function userWithRole(string $role, ?Clinic $clinic = null): User
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();
@@ -330,5 +364,3 @@ class AuditLogModuleTest extends TestCase
         return $prescription;
     }
 }
-
-

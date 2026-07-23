@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesClinic;
-
 use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -52,7 +51,14 @@ class AuditLogController extends Controller
             'actions' => (clone $baseQuery)->distinct()->orderBy('action')->pluck('action'),
             'actionsToday' => (clone $baseQuery)->whereDate('created_at', today())->count(),
             'paymentsToday' => (clone $baseQuery)->where('module', 'payments')->whereDate('created_at', today())->count(),
-            'signedPrescriptionsToday' => (clone $baseQuery)->where('action', 'prescription.signed')->whereDate('created_at', today())->count(),
+            'signedPrescriptionsToday' => (clone $baseQuery)
+                ->where(function ($query) {
+                    $query->where('action', 'prescription.signed')
+                        ->orWhere(fn ($query) => $query
+                            ->where('action', 'prescriptions.sign')
+                            ->where('new_values->result', 'success'));
+                })
+                ->whereDate('created_at', today())->count(),
             'activeUsersToday' => (clone $baseQuery)->whereDate('created_at', today())->whereNotNull('user_id')->distinct('user_id')->count('user_id'),
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
@@ -62,5 +68,4 @@ class AuditLogController extends Controller
             'search' => $search,
         ]);
     }
-
 }

@@ -12,6 +12,9 @@
         @if (session('success'))
             <div class="rounded-lg border border-[#10B981]/30 bg-[#10B981]/10 px-4 py-3 text-sm font-semibold text-[#047857]">{{ session('success') }}</div>
         @endif
+        @if (session('error'))
+            <div class="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 px-4 py-3 text-sm font-semibold text-[#B91C1C]">{{ session('error') }}</div>
+        @endif
 
         <form method="GET" action="{{ route('consultations.index') }}" class="rounded-lg border border-[#E2E8F0] bg-white p-5 shadow-sm">
             <div class="grid gap-4 md:grid-cols-4">
@@ -72,11 +75,13 @@
                                     <div class="flex justify-end gap-2">
                                         <a href="{{ route('consultations.show', $consultation) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#2563EB]">Ver</a>
                                         @can('consultations.update')<a href="{{ route('consultations.edit', $consultation) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#475569]">Editar</a>@endcan
+                                        @if (! $consultation->prescriptions_exists)
                                         @can('consultations.delete')<form method="POST" action="{{ route('consultations.destroy', $consultation) }}" onsubmit="return confirm('¿Eliminar esta consulta?');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="rounded-lg border border-[#EF4444]/30 px-3 py-2 text-xs font-semibold text-[#EF4444]">Eliminar</button>
                                         </form>@endcan
+                                        @endif
                                     </div>
                                 </td>
                             </tr>

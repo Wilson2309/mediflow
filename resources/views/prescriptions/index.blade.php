@@ -77,8 +77,8 @@
                                 <td class="px-5 py-4">
                                     <div class="flex justify-end gap-2">
                                         <a href="{{ route('prescriptions.show', $prescription) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#2563EB]">Ver</a>
-                                        @can('prescriptions.update')<a href="{{ route('prescriptions.edit', $prescription) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#475569]">Editar</a>@endcan
-                                        @can('prescriptions.delete')<form method="POST" action="{{ route('prescriptions.destroy', $prescription) }}" onsubmit="return confirm('¿Eliminar esta receta?');">
+                                        @can('update', $prescription)<a href="{{ route('prescriptions.edit', $prescription) }}" class="rounded-lg border border-[#E2E8F0] px-3 py-2 text-xs font-semibold text-[#475569]">Editar</a>@endcan
+                                        @can('delete', $prescription)<form method="POST" action="{{ route('prescriptions.destroy', $prescription) }}" onsubmit="return confirm('¿Eliminar esta receta?');">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="rounded-lg border border-[#EF4444]/30 px-3 py-2 text-xs font-semibold text-[#EF4444]">Eliminar</button>

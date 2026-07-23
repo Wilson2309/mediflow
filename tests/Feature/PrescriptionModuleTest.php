@@ -237,8 +237,8 @@ class PrescriptionModuleTest extends TestCase
     public function test_authenticated_user_can_edit_prescription_from_own_clinic(): void
     {
         $clinic = Clinic::factory()->create();
-        $user = $this->userForClinic($clinic);
-        $prescription = $this->prescriptionForClinic($clinic);
+        [$user, $doctor] = $this->medicalOwnerForClinic($clinic);
+        $prescription = $this->prescriptionForClinic($clinic, doctor: $doctor);
 
         $this->actingAs($user)->get(route('prescriptions.edit', $prescription))->assertOk()->assertSee('Editar receta');
     }
@@ -246,8 +246,8 @@ class PrescriptionModuleTest extends TestCase
     public function test_authenticated_user_can_update_prescription_from_own_clinic(): void
     {
         $clinic = Clinic::factory()->create();
-        $user = $this->userForClinic($clinic);
-        [$patient, $doctor] = $this->relatedRecords($clinic);
+        [$user, $doctor] = $this->medicalOwnerForClinic($clinic);
+        $patient = $this->patientForClinic($clinic);
         $prescription = $this->prescriptionForClinic($clinic, $patient, $doctor);
 
         $this->actingAs($user)
@@ -261,8 +261,8 @@ class PrescriptionModuleTest extends TestCase
     public function test_updating_prescription_replaces_items(): void
     {
         $clinic = Clinic::factory()->create();
-        $user = $this->userForClinic($clinic);
-        [$patient, $doctor] = $this->relatedRecords($clinic);
+        [$user, $doctor] = $this->medicalOwnerForClinic($clinic);
+        $patient = $this->patientForClinic($clinic);
         $prescription = $this->prescriptionForClinic($clinic, $patient, $doctor, medication: 'Medicamento anterior');
         $oldItemId = $prescription->items()->first()->id;
 
@@ -371,13 +371,13 @@ class PrescriptionModuleTest extends TestCase
     public function test_user_cannot_view_prescription_from_other_clinic(): void
     {
         [$user, $prescription] = $this->userAndOtherClinicPrescription();
-        $this->actingAs($user)->get(route('prescriptions.show', $prescription))->assertForbidden();
+        $this->actingAs($user)->get(route('prescriptions.show', $prescription))->assertNotFound();
     }
 
     public function test_user_cannot_edit_prescription_from_other_clinic(): void
     {
         [$user, $prescription] = $this->userAndOtherClinicPrescription();
-        $this->actingAs($user)->get(route('prescriptions.edit', $prescription))->assertForbidden();
+        $this->actingAs($user)->get(route('prescriptions.edit', $prescription))->assertNotFound();
     }
 
     public function test_user_cannot_update_prescription_from_other_clinic(): void
@@ -386,14 +386,14 @@ class PrescriptionModuleTest extends TestCase
 
         $this->actingAs($user)
             ->put(route('prescriptions.update', $prescription), $this->validPayload($prescription->patient, $prescription->doctor, null))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_user_cannot_delete_prescription_from_other_clinic(): void
     {
         [$user, $prescription] = $this->userAndOtherClinicPrescription();
 
-        $this->actingAs($user)->delete(route('prescriptions.destroy', $prescription))->assertForbidden();
+        $this->actingAs($user)->delete(route('prescriptions.destroy', $prescription))->assertNotFound();
         $this->assertDatabaseHas('prescriptions', ['id' => $prescription->id]);
     }
 
@@ -412,6 +412,18 @@ class PrescriptionModuleTest extends TestCase
     {
         $user = User::factory()->create(['clinic_id' => $clinic->id, 'name' => $name]);
         return Doctor::factory()->for($clinic)->for($user)->create(['specialty_id' => Specialty::factory()->create()->id]);
+    }
+
+    private function medicalOwnerForClinic(Clinic $clinic): array
+    {
+        $user = $this->userForClinic($clinic);
+        $user->syncRoles(['medico']);
+        $doctor = Doctor::factory()->for($clinic)->for($user)->create([
+            'specialty_id' => Specialty::factory()->create()->id,
+            'status' => 'active',
+        ]);
+
+        return [$user, $doctor];
     }
 
     private function relatedRecords(Clinic $clinic): array

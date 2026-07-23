@@ -17,6 +17,7 @@
     <section>
         <h2 class="text-base font-bold text-[#0F172A]">Información general</h2>
         <div class="mt-4 grid gap-5 md:grid-cols-2">
+            @unless ($prescription)
             <div class="md:col-span-2">
                 <label for="consultation_id" class="mb-2 block text-sm font-semibold text-[#0F172A]">Consulta asociada</label>
                 <select id="consultation_id" name="consultation_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
@@ -29,6 +30,27 @@
                 </select>
                 @error('consultation_id') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
             </div>
+            @endunless
+            @if ($prescription)
+                <div class="md:col-span-2">
+                    <span class="mb-2 block text-sm font-semibold text-[#0F172A]">Consulta asociada</span>
+                    <p class="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2.5 text-sm text-[#475569]">
+                        {{ $prescription->consultation?->consultation_date?->format('d/m/Y H:i') ?? 'Sin consulta asociada' }}
+                    </p>
+                </div>
+                <div>
+                    <span class="mb-2 block text-sm font-semibold text-[#0F172A]">Paciente</span>
+                    <p class="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2.5 text-sm text-[#475569]">
+                        {{ $prescription->patient?->full_name }}
+                    </p>
+                </div>
+                <div>
+                    <span class="mb-2 block text-sm font-semibold text-[#0F172A]">Médico titular</span>
+                    <p class="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-3 py-2.5 text-sm text-[#475569]">
+                        {{ $prescription->doctor?->user?->name }}
+                    </p>
+                </div>
+            @else
             <div>
                 <label for="patient_id" class="mb-2 block text-sm font-semibold text-[#0F172A]">Paciente *</label>
                 <select id="patient_id" name="patient_id" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">
@@ -49,6 +71,7 @@
                 </select>
                 @error('doctor_id') <p class="mt-2 text-sm text-[#EF4444]">{{ $message }}</p> @enderror
             </div>
+            @endif
             <div>
                 <label for="prescription_date" class="mb-2 block text-sm font-semibold text-[#0F172A]">Fecha *</label>
                 <input id="prescription_date" name="prescription_date" type="date" value="{{ old('prescription_date', $prescription?->prescription_date?->format('Y-m-d')) }}" class="w-full rounded-lg border-[#E2E8F0] bg-[#F8FAFC] text-sm focus:border-[#2563EB] focus:ring-[#2563EB]">

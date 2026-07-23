@@ -61,9 +61,9 @@ class PrescriptionDeliveryModuleTest extends TestCase
         [$clinic, $user] = $this->clinicAndUser(['prescriptions.view', 'prescriptions.update']);
         $otherPrescription = $this->prescriptionForClinic(Clinic::factory()->create());
 
-        $this->actingAs($user)->get(route('prescriptions.print', $otherPrescription))->assertForbidden();
-        $this->actingAs($user)->get(route('prescriptions.pdf', $otherPrescription))->assertForbidden();
-        $this->actingAs($user)->post(route('prescriptions.send-email', $otherPrescription))->assertForbidden();
+        $this->actingAs($user)->get(route('prescriptions.print', $otherPrescription))->assertNotFound();
+        $this->actingAs($user)->get(route('prescriptions.pdf', $otherPrescription))->assertNotFound();
+        $this->actingAs($user)->post(route('prescriptions.send-email', $otherPrescription))->assertNotFound();
     }
 
     public function test_printable_view_shows_clinic_patient_doctor_and_medications(): void

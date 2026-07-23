@@ -4,6 +4,8 @@ namespace Tests\Feature\Auth;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class PasswordConfirmationTest extends TestCase
@@ -40,5 +42,24 @@ class PasswordConfirmationTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors();
+    }
+
+    public function test_password_confirmation_attempts_are_throttled(): void
+    {
+        $validPassword = Str::random(40);
+        $user = User::factory()->create([
+            'password' => Hash::make($validPassword),
+        ]);
+        $this->actingAs($user);
+
+        for ($attempt = 0; $attempt < 6; $attempt++) {
+            $this->post('/confirm-password', [
+                'password' => Str::random(40),
+            ])->assertSessionHasErrors('password');
+        }
+
+        $this->post('/confirm-password', [
+            'password' => Str::random(40),
+        ])->assertTooManyRequests();
     }
 }

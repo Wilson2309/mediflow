@@ -11,6 +11,16 @@ use App\Models\Consultation;
 use App\Models\Doctor;
 use App\Models\Patient;
 use App\Services\AuditLogger;
+use App\Models\Prescription;
+use App\Support\ControlledResponse;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
+use Throwable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -31,6 +41,7 @@ class ConsultationController extends Controller
 
         $consultations = Consultation::query()
             ->with(['patient', 'doctor.user', 'appointment'])
+            ->withExists('prescriptions')
             ->whereHas('patient', fn ($query) => $query->where('clinic_id', $clinicId))
             ->when($isDoctorView, function ($query) use ($doctor) {
                 $doctor ? $query->where('doctor_id', $doctor->id) : $query->whereRaw('1 = 0');
@@ -122,17 +133,153 @@ class ConsultationController extends Controller
             ->with('success', 'Consulta actualizada correctamente.');
     }
 
-    public function destroy(Consultation $consultation): RedirectResponse
+    public function destroy(Request $request, Consultation $consultation): RedirectResponse|JsonResponse
     {
         $this->authorizeClinic($consultation);
-        $old = AuditLogger::modelSnapshot($consultation);
-        AuditLogger::log('consultation.deleted', 'consultations', $consultation->load('patient'), $old, [], 'Consulta médica eliminada.');
 
-        $consultation->delete();
+        try {
+            $outcome = DB::transaction(function () use ($consultation): string {
+                $referencingPrescription = $this->lockReferencingPrescription((int) $consultation->id);
+                $lockedConsultation = Consultation::query()
+                    ->lockForUpdate()
+                    ->findOrFail($consultation->id);
+                $this->authorizeClinic($lockedConsultation);
+
+                $referencingPrescription ??= $this->lockReferencingPrescription((int) $lockedConsultation->id);
+
+                if ($referencingPrescription) {
+                    $this->recordConsultationDeleteDenied($lockedConsultation);
+
+                    return 'conflict';
+                }
+
+                $clinicId = $this->clinicId();
+                $lockedConsultation->delete();
+                $audit = AuditLogger::log(
+                    'consultation.deleted',
+                    'consultations',
+                    $lockedConsultation,
+                    [],
+                    [
+                        'clinic_id' => $clinicId,
+                        'result' => 'success',
+                    ],
+                    'Consulta eliminada.',
+                );
+
+                if (! $audit) {
+                    throw new RuntimeException('Consultation delete audit could not be persisted.');
+                }
+
+                return 'success';
+            });
+        } catch (ModelNotFoundException) {
+            return ControlledResponse::error($request, 404, 'RESOURCE_NOT_FOUND');
+        } catch (QueryException $exception) {
+            if (! $this->isForeignKeyConflict($exception)) {
+                return $this->consultationDeleteFailedResponse($request, $consultation, $exception);
+            }
+
+            try {
+                $this->recordConsultationDeleteDenied($consultation);
+            } catch (Throwable $auditException) {
+                Log::warning('Consultation delete denial audit could not be persisted.', [
+                    'consultation_id' => $consultation->id,
+                    'actor_id' => $request->user()?->id,
+                    'exception_class' => $auditException::class,
+                ]);
+            }
+
+            return $this->consultationConflictResponse($request);
+        } catch (Throwable $exception) {
+            return $this->consultationDeleteFailedResponse($request, $consultation, $exception);
+        }
+
+        if ($outcome === 'conflict') {
+            return $this->consultationConflictResponse($request);
+        }
+
+        if ($request->expectsJson()) {
+            return ControlledResponse::jsonSuccess('OPERATION_COMPLETED');
+        }
 
         return redirect()
             ->route('consultations.index')
             ->with('success', 'Consulta eliminada correctamente.');
+    }
+
+    private function lockReferencingPrescription(int $consultationId): ?Prescription
+    {
+        return Prescription::query()
+            ->select('id')
+            ->where('consultation_id', $consultationId)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function recordConsultationDeleteDenied(Consultation $consultation): void
+    {
+        $audit = AuditLogger::log(
+            'consultation.delete_denied',
+            'consultations',
+            $consultation,
+            [],
+            [
+                'clinic_id' => $this->clinicId(),
+                'result' => 'denied',
+                'reason_code' => 'has_prescriptions',
+            ],
+            'Eliminación de consulta denegada.',
+        );
+
+        if (! $audit) {
+            Log::warning('Consultation delete denial audit could not be persisted.', [
+                'consultation_id' => $consultation->id,
+                'actor_id' => auth()->id(),
+            ]);
+        }
+    }
+
+    private function consultationConflictResponse(Request $request): RedirectResponse|JsonResponse
+    {
+        if ($request->expectsJson()) {
+            return ControlledResponse::jsonError(409, 'RESOURCE_STATE_CONFLICT');
+        }
+
+        return redirect()
+            ->route('consultations.index')
+            ->with('error', 'No se puede eliminar esta consulta.');
+    }
+
+    private function consultationDeleteFailedResponse(
+        Request $request,
+        Consultation $consultation,
+        Throwable $exception,
+    ): RedirectResponse|JsonResponse {
+        Log::error('Consultation delete failed.', [
+            'consultation_id' => $consultation->id,
+            'actor_id' => $request->user()?->id,
+            'exception_class' => $exception::class,
+        ]);
+
+        if ($request->expectsJson()) {
+            return ControlledResponse::jsonError(500, 'OPERATION_FAILED');
+        }
+
+        return redirect()
+            ->route('consultations.index')
+            ->with('error', 'No se pudo eliminar la consulta.');
+    }
+
+    private function isForeignKeyConflict(QueryException $exception): bool
+    {
+        $sqlState = (string) ($exception->errorInfo[0] ?? $exception->getCode());
+        $message = strtolower($exception->getMessage());
+
+        return in_array($sqlState, ['23000', '23503'], true)
+            && (str_contains($message, 'foreign key')
+                || str_contains($message, 'prescriptions_consultation_id_foreign'));
     }
 
     private function prepareData(array $validated, int $clinicId, ?Consultation $ignore = null): array
@@ -205,11 +352,22 @@ class ConsultationController extends Controller
 
     private function authorizeClinic(Consultation $consultation): void
     {
-        abort_if((int) $consultation->patient?->clinic_id !== $this->clinicId(), 403);
+        $wrongContext = (int) $consultation->patient?->clinic_id !== $this->clinicId();
 
-        if ($this->isDoctorUser()) {
+        if (! $wrongContext && $this->isDoctorUser()) {
             $doctor = $this->authenticatedDoctor();
-            abort_if(! $doctor || (int) $consultation->doctor_id !== (int) $doctor->id, 403);
+            $wrongContext = ! $doctor
+                || (int) $consultation->doctor_id !== (int) $doctor->id;
+        }
+
+        if ($wrongContext) {
+            throw new HttpResponseException(
+                ControlledResponse::error(
+                    request(),
+                    404,
+                    'RESOURCE_NOT_FOUND',
+                ),
+            );
         }
     }
 

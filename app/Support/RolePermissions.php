@@ -16,6 +16,7 @@ final class RolePermissions
             ...self::resource('consultations'),
             ...self::resource('medical_records'),
             ...self::resource('prescriptions'),
+            'prescriptions.sign',
             ...self::resource('payments'),
             'demo_requests.view',
             'demo_requests.update',
@@ -38,13 +39,16 @@ final class RolePermissions
     /** @return array<string, array<int, string>> */
     public static function byRole(): array
     {
-        $allExceptSuperAdmin = array_values(array_filter(self::all(), fn($p) => $p !== 'super_admin.access'));
+        $administratorPermissions = array_values(array_diff(self::all(), [
+            'super_admin.access',
+            'prescriptions.sign',
+        ]));
 
         return [
             'super_admin' => [
                 'super_admin.access',
             ],
-            'administrador' => $allExceptSuperAdmin,
+            'administrador' => $administratorPermissions,
             'medico' => [
                 'dashboard.view',
                 'patients.view',
@@ -58,6 +62,7 @@ final class RolePermissions
                 'prescriptions.view',
                 'prescriptions.create',
                 'prescriptions.update',
+                'prescriptions.sign',
                 'reports.view',
                 'reports.clinical',
                 'reports.appointments',

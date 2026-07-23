@@ -11,6 +11,7 @@ use Database\Seeders\PermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class RolePermissionModuleTest extends TestCase
@@ -23,7 +24,7 @@ class RolePermissionModuleTest extends TestCase
         $this->seed(PermissionSeeder::class);
 
         $this->assertSame(count(RolePermissions::all()), Permission::count());
-        $this->assertCount(count(RolePermissions::all()) - 1, Role::findByName('administrador')->permissions);
+        $this->assertCount(count(RolePermissions::all()) - 2, Role::findByName('administrador')->permissions);
     }
 
     public function test_permission_seeder_assigns_the_exact_permissions_for_each_role(): void
@@ -33,6 +34,40 @@ class RolePermissionModuleTest extends TestCase
 
             $this->assertEqualsCanonicalizing($expectedPermissions, $actualPermissions, "Permisos incorrectos para {$roleName}.");
         }
+    }
+
+    public function test_prescriptions_sign_permission_is_assigned_only_to_medico(): void
+    {
+        $this->assertTrue(Role::findByName('medico')->hasPermissionTo('prescriptions.sign'));
+
+        foreach ([
+            'administrador',
+            'recepcionista',
+            'caja_finanzas',
+            'super_admin',
+        ] as $roleName) {
+            $this->assertFalse(Role::findByName($roleName)->hasPermissionTo('prescriptions.sign'));
+        }
+    }
+
+    public function test_data_migration_adds_sign_permission_to_an_existing_medico_role(): void
+    {
+        Permission::findByName('prescriptions.sign')->delete();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $migration = require database_path(
+            'migrations/2026_07_19_000001_add_prescriptions_sign_permission.php',
+        );
+        $migration->up();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $this->assertDatabaseHas('permissions', [
+            'name' => 'prescriptions.sign',
+            'guard_name' => 'web',
+        ]);
+        $this->assertTrue(Role::findByName('medico')->hasPermissionTo('prescriptions.sign'));
+        $this->assertFalse(Role::findByName('administrador')->hasPermissionTo('prescriptions.sign'));
+        $this->assertFalse(Role::findByName('super_admin')->hasPermissionTo('prescriptions.sign'));
     }
 
     public function test_permission_seeder_repairs_the_primary_administrator_role(): void
@@ -45,7 +80,7 @@ class RolePermissionModuleTest extends TestCase
 
         $this->assertTrue($admin->fresh()->hasRole('administrador'));
         $this->assertFalse($admin->fresh()->hasRole('recepcionista'));
-        $this->assertCount(count(RolePermissions::all()) - 1, $admin->fresh()->getAllPermissions());
+        $this->assertCount(count(RolePermissions::all()) - 2, $admin->fresh()->getAllPermissions());
     }
 
     public function test_administrator_can_access_dashboard_and_all_main_modules(): void

@@ -9,7 +9,9 @@ use App\Http\Requests\UpdateDoctorRequest;
 use App\Models\Doctor;
 use App\Models\Specialty;
 use App\Models\User;
+use App\Support\ControlledResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -145,11 +147,34 @@ class DoctorController extends Controller
             ->with('success', 'Medico actualizado correctamente.');
     }
 
-    public function destroy(Doctor $doctor): RedirectResponse
+    public function destroy(Request $request, Doctor $doctor): RedirectResponse|JsonResponse
     {
-        $this->authorizeClinic($doctor);
+        $outcome = DB::transaction(function () use ($doctor): string {
+            $lockedDoctor = Doctor::query()->lockForUpdate()->findOrFail($doctor->getKey());
+            $this->authorizeClinic($lockedDoctor);
 
-        $doctor->delete();
+            if ($lockedDoctor->appointments()->exists()
+                || $lockedDoctor->consultations()->exists()
+                || $lockedDoctor->prescriptions()->exists()) {
+                return 'blocked';
+            }
+
+            $lockedDoctor->delete();
+
+            return 'deleted';
+        });
+
+        if ($outcome === 'blocked') {
+            if ($request->expectsJson()) {
+                return ControlledResponse::jsonError(409, 'DOCTOR_REQUIRES_DEACTIVATION');
+            }
+
+            return back()->with('error', 'El médico no puede eliminarse. Inactívelo para conservar la trazabilidad.');
+        }
+
+        if ($request->expectsJson()) {
+            return ControlledResponse::jsonSuccess('OPERATION_COMPLETED');
+        }
 
         return redirect()
             ->route('doctors.index')
